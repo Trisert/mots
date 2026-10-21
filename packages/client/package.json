@@ -1,0 +1,21 @@
+{
+  "name": "@mots/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@mots/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@earendil-works/chord": "1.2.0",
+    "@earendil-works/pi-ai": "1.2.0",
+    "@earendil-works/pi-durable": "1.2.0",
+    "typescript": "~6.0.3"
+  }
+}

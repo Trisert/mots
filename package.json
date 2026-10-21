@@ -1,0 +1,25 @@
+{
+  "name": "mots",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter @mots/server dev",
+    "dev:server": "bun run --cwd apps/server dev",
+    "dev:server:lan": "bun run --cwd apps/server dev:lan",
+    "dev:mobile": "bun run --cwd apps/mobile start",
+    "dev:web": "bun run --cwd apps/mobile web",
+    "typecheck": "bun run --filter '*' typecheck",
+    "test": "bun test packages/protocol packages/client",
+    "check": "bun run typecheck && bun run check:server",
+    "check:server": "bun run --cwd apps/server check",
+    "build:mobile": "bun run --cwd apps/mobile export"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.0",
+    "typescript": "~6.0.3"
+  }
+}

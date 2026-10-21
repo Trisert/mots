@@ -1,0 +1,21 @@
+{
+  "name": "@mots/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@earendil-works/chord": "1.2.0",
+    "@earendil-works/pi-ai": "1.2.0",
+    "@earendil-works/pi-durable": "1.2.0",
+    "@mots/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  }
+}
