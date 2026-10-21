@@ -105,6 +105,19 @@ bun run dev:web
 
 L'anteprima usa `http://localhost:8787` come server; l'URL resta modificabile dall'onboarding. Su una macchina remota (ad esempio Replit) imposta `EXPO_PUBLIC_MOTS_API_URL` con l'URL raggiungibile del server prima di avviare l'anteprima web.
 
+### Replit
+
+Il repository include `.replit`: il modulo Node 22 fornisce anche Bun, mentre lo script di avvio lancia server e anteprima web insieme.
+
+1. Importa il repository da GitHub.
+2. Aggiungi `OPENROUTER_API_KEY` nei **Secrets** del progetto (opzionale `MOTS_MODEL`).
+3. Avvia il progetto. Lo script crea `apps/server/.dev.vars`, installa le dipendenze e avvia:
+   - anteprima web: porta interna `8081` → esterna `80`;
+   - API e WebSocket: porta interna `8787` → esterna `8080`.
+4. Apri la preview sulla porta `80`. L'app usa automaticamente `https://<dominio-replit>:8080` come API.
+
+Le modifiche ai Secrets richiedono il riavvio del progetto. Il deploy Replit non è configurato: il server usa Durable Objects di Cloudflare, quindi per la produzione usa `wrangler deploy`.
+
 ### Deploy su Cloudflare
 
 ```powershell
