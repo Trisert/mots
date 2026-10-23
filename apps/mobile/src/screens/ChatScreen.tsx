@@ -3,31 +3,26 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   Share,
   StyleSheet,
   Text,
   View,
+  type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { KeyboardAvoidingView, useKeyboardState } from "react-native-keyboard-controller";
 import type { TranscriptEntry } from "@mots/client";
 import { Composer } from "../components/Composer";
+import { MenuIcon, PlusIcon } from "../components/Icon";
 import { MessageBubble } from "../components/MessageBubble";
 import { SessionSheet } from "../components/SessionSheet";
 import { useMotsSession } from "../hooks/useMotsSession";
 import { colors, radius, spacing } from "../theme";
+import { TOOL_LABELS } from "../tools";
 import type { Identity } from "../storage";
-
-const TOOL_LABELS: Record<string, string> = {
-  remember: "memoria",
-  forget: "memoria",
-  schedule: "promemoria",
-  search_history: "ricerca",
-};
 
 const SUGGESTIONS = [
   "Ricordami di bere acqua tra 20 minuti",
@@ -42,6 +37,7 @@ type Props = {
 
 export function ChatScreen({ identity, onLeave }: Props) {
   const insets = useSafeAreaInsets();
+  const keyboardVisible = useKeyboardState((keyboard) => keyboard.isVisible);
   const { client, state } = useMotsSession({
     baseUrl: identity.apiUrl,
     sessionId: identity.sessionId,
@@ -108,19 +104,53 @@ export function ChatScreen({ identity, onLeave }: Props) {
     return () => clearTimeout(timer);
   }, [activeConversationId, client, connected, input]);
 
+  const contentHeight = useRef(0);
+  const viewportHeight = useRef(0);
+
+  const scrollToBottom = useCallback((animated: boolean) => {
+    const list = listRef.current;
+    if (list === null) return;
+    // `scrollToEnd` is a no-op on react-native-web, and on native it stops short of the bottom
+    // padding. Scrolling to the measured content height works the same on both platforms.
+    const target = Math.max(contentHeight.current - viewportHeight.current, 0);
+    list.scrollToOffset({ offset: target, animated });
+  }, []);
+
+  const onContentSizeChange = useCallback(
+    (_width: number, height: number) => {
+      contentHeight.current = height;
+      if (!stickToBottom.current) return;
+      requestAnimationFrame(() => {
+        scrollToBottom(false);
+      });
+    },
+    [scrollToBottom],
+  );
+
+  const onListLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      viewportHeight.current = event.nativeEvent.layout.height;
+      if (!stickToBottom.current) return;
+      requestAnimationFrame(() => {
+        scrollToBottom(false);
+      });
+    },
+    [scrollToBottom],
+  );
+
   useEffect(() => {
     stickToBottom.current = true;
     requestAnimationFrame(() => {
-      listRef.current?.scrollToEnd({ animated: false });
+      scrollToBottom(false);
     });
-  }, [activeConversationId]);
+  }, [activeConversationId, scrollToBottom]);
 
   useEffect(() => {
     if (!stickToBottom.current) return;
     requestAnimationFrame(() => {
-      listRef.current?.scrollToEnd({ animated: true });
+      scrollToBottom(true);
     });
-  }, [entries.length, liveText, runningTools.length]);
+  }, [entries.length, liveText, runningTools.length, scrollToBottom]);
 
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
@@ -243,25 +273,30 @@ export function ChatScreen({ identity, onLeave }: Props) {
       </View>
     ) : (
       <View style={styles.empty}>
-        <Text style={styles.emptyEyebrow}>IL TUO COMPAGNO</Text>
-        <Text style={styles.emptyTitle}>Ciao, sono Mots.</Text>
-        <Text style={styles.emptyBody}>
-          Posso ricordare ciò che conta, cercare nelle nostre chat e farti
-          tornare indietro quando serve.
-        </Text>
-        <View style={styles.suggestions}>
-          {SUGGESTIONS.map((suggestion) => (
-            <Pressable
-              key={suggestion}
-              onPress={() => setInput(suggestion)}
-              style={({ pressed }) => [
-                styles.suggestion,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={styles.suggestionText}>{suggestion}</Text>
-            </Pressable>
-          ))}
+        <View style={styles.emptyCardPrimary}>
+          <Text style={styles.emptyTitle}>Ciao, sono Mots.</Text>
+          <Text style={styles.emptyBody}>
+            Posso ricordare ciò che conta, cercare nelle nostre chat e farti
+            tornare indietro quando serve.
+          </Text>
+        </View>
+        <View style={styles.emptyCardAmber}>
+          <Text style={styles.emptySectionLabel}>PROVA A CHIEDERMI</Text>
+          <View style={styles.suggestions}>
+            {SUGGESTIONS.map((suggestion) => (
+              <Pressable
+                key={suggestion}
+                onPress={() => setInput(suggestion)}
+                style={({ pressed }) => [
+                  styles.suggestion,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.suggestionText}>{suggestion}</Text>
+                <View style={styles.suggestionArrow} />
+              </Pressable>
+            ))}
+          </View>
         </View>
       </View>
     );
@@ -282,7 +317,7 @@ export function ChatScreen({ identity, onLeave }: Props) {
           onPress={() => setSheetOpen(true)}
           style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
         >
-          <Text style={styles.iconText}>≡</Text>
+          <MenuIcon color={colors.text} />
         </Pressable>
 
         <View style={styles.brand}>
@@ -301,14 +336,11 @@ export function ChatScreen({ identity, onLeave }: Props) {
             pressed && styles.pressed,
           ]}
         >
-          <Text style={styles.iconText}>＋</Text>
+          <PlusIcon color={colors.text} />
         </Pressable>
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
         <FlatList
           ref={listRef}
           data={entries}
@@ -318,12 +350,24 @@ export function ChatScreen({ identity, onLeave }: Props) {
           ListEmptyComponent={empty}
           ListFooterComponent={footer}
           onScroll={onScroll}
+          onContentSizeChange={onContentSizeChange}
+          onLayout={onListLayout}
+          showsVerticalScrollIndicator={false}
           scrollEventThrottle={100}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
         />
 
-        <View style={[styles.bottom, { paddingBottom: insets.bottom + spacing.xs }]}>
+        <View
+          style={[
+            styles.bottom,
+            {
+              // The home-indicator inset does not follow the keyboard: with the keyboard open the
+              // composer has to sit on the keyboard, not float above the gesture bar.
+              paddingBottom: keyboardVisible ? spacing.xs : insets.bottom + spacing.xs,
+            },
+          ]}
+        >
           {state.status === "connecting" && activeConversationId !== undefined ? (
             <View style={styles.banner}>
               <ActivityIndicator size="small" color={colors.accent} />
@@ -395,19 +439,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.background,
+    backgroundColor: colors.bgMain,
   },
   iconButton: {
-    width: 40,
-    height: 40,
+    width: 48,
+    height: 48,
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    backgroundColor: colors.cardSurfacePrimary,
   },
   iconButtonDisabled: {
     opacity: 0.35,
@@ -438,7 +478,9 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
+    // The composer sits below the list, so the last message needs room to clear it instead of
+    // being cut in half by the composer edge.
+    paddingBottom: spacing.xxl,
   },
   footer: {
     gap: spacing.sm,
@@ -449,24 +491,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: spacing.sm,
     paddingTop: spacing.xxl,
-  },
-  emptyEyebrow: {
-    color: colors.accent,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 2,
-    marginBottom: spacing.sm,
+    gap: spacing.md,
   },
   emptyTitle: {
-    color: colors.text,
-    fontSize: 34,
-    fontWeight: "700",
-    letterSpacing: -1,
+    color: colors.textPrimary,
+    fontSize: 32,
+    fontWeight: "600",
+    letterSpacing: -0.8,
   },
   emptyBody: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
     fontSize: 16,
-    lineHeight: 24,
+    lineHeight: 22,
     marginTop: spacing.md,
     maxWidth: 320,
   },
@@ -474,18 +510,47 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.xl,
   },
+  emptyCardPrimary: {
+    backgroundColor: colors.cardSurfacePrimary,
+    borderRadius: radius.card,
+    padding: spacing.xl,
+    marginBottom: spacing.md,
+  },
+  emptyCardAmber: {
+    backgroundColor: colors.cardSurfaceAmber,
+    borderRadius: radius.card,
+    padding: spacing.xl,
+  },
+  emptySectionLabel: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    marginBottom: spacing.md,
+  },
   suggestion: {
-    alignSelf: "flex-start",
-    borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceSoft,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 20,
+    backgroundColor: colors.cardSurfacePrimary,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingVertical: 14,
   },
   suggestionText: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
     fontSize: 14,
+    flex: 1,
+  },
+  suggestionArrow: {
+    width: 6,
+    height: 6,
+    borderTopWidth: 2,
+    borderRightWidth: 2,
+    borderColor: colors.textSecondary,
+    transform: [{ rotate: "45deg" }],
+    marginLeft: spacing.sm,
   },
   connecting: {
     flex: 1,
@@ -509,14 +574,12 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     alignSelf: "flex-start",
     borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: colors.cardSurfacePrimary,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },
   progressText: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
     fontSize: 12,
   },
   liveRow: {
@@ -524,18 +587,16 @@ const styles = StyleSheet.create({
   },
   liveBubble: {
     maxWidth: "88%",
-    borderRadius: radius.lg,
-    borderBottomLeftRadius: radius.sm,
-    backgroundColor: colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    borderRadius: 24,
+    borderBottomLeftRadius: 6,
+    backgroundColor: colors.cardSurfacePrimary,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
   liveText: {
-    color: colors.text,
+    color: colors.textPrimary,
     fontSize: 16,
-    lineHeight: 23,
+    lineHeight: 24,
   },
   thinking: {
     flexDirection: "row",
@@ -543,7 +604,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   thinkingText: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
     fontSize: 14,
   },
   retryText: {
@@ -555,28 +616,24 @@ const styles = StyleSheet.create({
     alignSelf: "flex-end",
     maxWidth: "88%",
     borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surfaceSoft,
+    backgroundColor: colors.cardSurfaceAmber,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   queuedLabel: {
-    color: colors.accent,
+    color: colors.accentCoral,
     fontSize: 9,
     fontWeight: "700",
     letterSpacing: 1.2,
     marginBottom: 2,
   },
   queuedText: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
     fontSize: 13,
   },
   failure: {
     borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.danger,
-    backgroundColor: colors.dangerSoft,
+    backgroundColor: colors.cardSurfacePink,
     padding: spacing.md,
   },
   failureText: {

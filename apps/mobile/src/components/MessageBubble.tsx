@@ -1,13 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { TranscriptEntry } from "@mots/client";
+import { formatTime as formatTimestamp } from "../format";
 import { colors, radius, spacing } from "../theme";
-
-const TOOL_LABELS: Record<string, string> = {
-  remember: "memoria",
-  forget: "memoria",
-  schedule: "promemoria",
-  search_history: "ricerca",
-};
+import { TOOL_LABELS, toolSummary } from "../tools";
+import { MarkdownText } from "./MarkdownText";
 
 function displayText(entry: TranscriptEntry): string {
   if (entry.role === "user" || entry.role === "scheduled") {
@@ -17,15 +13,7 @@ function displayText(entry: TranscriptEntry): string {
 }
 
 function formatTime(timestamp: number | undefined): string | undefined {
-  if (timestamp === undefined) return undefined;
-  try {
-    return new Date(timestamp).toLocaleTimeString(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return undefined;
-  }
+  return formatTimestamp(timestamp);
 }
 
 type Props = {
@@ -50,13 +38,17 @@ export function MessageBubble({ entry, onFork }: Props) {
 
   if (entry.role === "tool") {
     const name = entry.toolResult?.name ?? "strumento";
+    // The raw tool output is written for the model; the person sees a short Italian summary
+    // instead, and the raw text only when the tool failed.
+    const summary = toolSummary(name, entry.toolResult?.details);
+    const detail = entry.toolResult?.isError === true ? entry.text : summary;
     return (
       <View style={styles.toolRow}>
         <View style={[styles.toolCard, entry.toolResult?.isError && styles.toolCardError]}>
           <Text style={styles.toolName}>{TOOL_LABELS[name] ?? name}</Text>
-          {entry.text.length > 0 ? (
+          {detail !== undefined && detail.length > 0 ? (
             <Text style={styles.toolText} numberOfLines={4}>
-              {entry.text}
+              {detail}
             </Text>
           ) : null}
         </View>
@@ -68,6 +60,10 @@ export function MessageBubble({ entry, onFork }: Props) {
   const isScheduled = entry.role === "scheduled";
   const time = formatTime(entry.timestamp);
   const text = displayText(entry);
+  // A turn that only issued tool calls has nothing of its own to say: the tool card already shows
+  // it, so an extra bubble with the same chip would repeat the same action twice.
+  const onlyToolCalls = text.length === 0 && (entry.toolCalls?.length ?? 0) > 0;
+  if (onlyToolCalls) return null;
 
   return (
     <Pressable
@@ -99,9 +95,11 @@ export function MessageBubble({ entry, onFork }: Props) {
         ) : null}
 
         {text.length > 0 ? (
-          <Text style={[styles.text, isUser && styles.textUser]} selectable>
-            {text}
-          </Text>
+          <MarkdownText
+            text={text}
+            style={[styles.text, isUser && styles.textUser]}
+            selectable
+          />
         ) : null}
 
         {entry.diagnostics !== undefined && entry.diagnostics.length > 0 ? (
@@ -136,40 +134,36 @@ const styles = StyleSheet.create({
   },
   bubble: {
     maxWidth: "88%",
-    borderRadius: radius.lg,
-    borderBottomLeftRadius: radius.sm,
+    borderRadius: 24,
+    borderBottomLeftRadius: 6,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    backgroundColor: colors.cardSurfacePrimary,
   },
   bubbleUser: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-    borderBottomLeftRadius: radius.lg,
-    borderBottomRightRadius: radius.sm,
+    backgroundColor: colors.accentCoral,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 6,
   },
   bubbleScheduled: {
-    backgroundColor: colors.surfaceSoft,
-    borderColor: colors.accent,
-    borderBottomLeftRadius: radius.sm,
+    backgroundColor: colors.cardSurfaceAmber,
+    borderBottomLeftRadius: 6,
   },
   text: {
-    color: colors.text,
+    color: colors.textPrimary,
     fontSize: 16,
-    lineHeight: 23,
+    lineHeight: 24,
   },
   textUser: {
-    color: colors.accentInk,
+    color: "#FFFFFF",
   },
   time: {
     marginTop: spacing.sm,
-    color: colors.textFaint,
+    color: colors.textSecondary,
     fontSize: 11,
   },
   timeUser: {
-    color: "rgba(27, 19, 5, 0.58)",
+    color: "rgba(255,255,255,0.7)",
   },
   scheduledLabel: {
     color: colors.accent,
@@ -186,8 +180,7 @@ const styles = StyleSheet.create({
   },
   toolChip: {
     borderRadius: radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.borderStrong,
+    backgroundColor: colors.cardSurfacePrimary,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
   },
@@ -210,6 +203,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.lg,
     paddingHorizontal: spacing.xl,
+    justifyContent: "center",
   },
   systemRule: {
     flex: 1,
@@ -228,15 +222,13 @@ const styles = StyleSheet.create({
   },
   toolCard: {
     maxWidth: "88%",
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceSoft,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    borderRadius: 24,
+    backgroundColor: colors.cardSurfaceAmber,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   toolCardError: {
-    borderColor: colors.danger,
+    backgroundColor: colors.cardSurfacePink,
   },
   toolName: {
     color: colors.textMuted,

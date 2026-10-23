@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { ArrowUpIcon } from "./Icon";
 import { colors, radius, spacing } from "../theme";
 
 type Props = {
@@ -38,9 +39,11 @@ export function Composer({ value, onChange, onSend, disabled, sending }: Props) 
           pressed && canSend && styles.sendPressed,
         ]}
       >
-        <Text style={[styles.sendText, !canSend && styles.sendTextDisabled]}>
-          {sending ? "…" : "↑"}
-        </Text>
+        {sending ? (
+          <ActivityIndicator size="small" color={colors.textFaint} />
+        ) : (
+          <ArrowUpIcon size={15} color={canSend ? colors.accentInk : colors.textFaint} />
+        )}
       </Pressable>
     </View>
   );
@@ -53,21 +56,20 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    backgroundColor: colors.background,
+    paddingBottom: spacing.lg,
+    backgroundColor: colors.bgMain,
   },
   inputWrap: {
     flex: 1,
-    borderRadius: radius.xl,
-    backgroundColor: colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    borderRadius: radius.pill,
+    backgroundColor: colors.cardSurfacePrimary,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xs,
+    minHeight: 60,
+    justifyContent: "center",
   },
   input: {
-    color: colors.text,
+    color: colors.textPrimary,
     fontSize: 16,
     lineHeight: 22,
     maxHeight: 120,
@@ -75,26 +77,17 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   send: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.accent,
+    backgroundColor: colors.accentCoral,
   },
   sendDisabled: {
     backgroundColor: colors.surfaceRaised,
   },
   sendPressed: {
     opacity: 0.78,
-  },
-  sendText: {
-    color: colors.accentInk,
-    fontSize: 22,
-    fontWeight: "700",
-    lineHeight: 25,
-  },
-  sendTextDisabled: {
-    color: colors.textFaint,
   },
 });

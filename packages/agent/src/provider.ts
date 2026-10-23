@@ -1,0 +1,321 @@
+import { type AuthContext, type Model, type ModelCostTier, type Provider } from "@earendil-works/pi-ai";
+import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
+import { createModels, type MutableModels } from "@earendil-works/pi-ai/models";
+import { nvidiaProvider } from "@earendil-works/pi-ai/providers/nvidia";
+import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
+
+/**
+ * The Vercel AI Gateway speaks the OpenAI dialect at `/v1`, so the Agent talks to it through Pi's
+ * `openai-completions` implementation. The gateway publishes its catalog without authentication, which
+ * means the model list is never stale: a model Vercel adds later works without a code change.
+ */
+export const VERCEL_GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh/v1";
+
+/** The unauthenticated catalog endpoint. */
+const VERCEL_GATEWAY_MODELS_URL = "https://ai-gateway.vercel.sh/v1/models";
+
+export const MOTS_PROVIDERS = ["openrouter", "vercel-ai-gateway", "nvidia"] as const;
+
+export type MotsProviderId = (typeof MOTS_PROVIDERS)[number];
+
+export const DEFAULT_MODELS: Readonly<Record<MotsProviderId, string>> = {
+  openrouter: "openai/gpt-6-luna",
+  "vercel-ai-gateway": "reflection/beam-free",
+  nvidia: "nvidia/nemotron-3.5-lightning-30b-a3b",
+};
+
+/** Environment variable holding the API key for each provider. */
+export const API_KEY_ENV: Readonly<Record<MotsProviderId, string>> = {
+  openrouter: "OPENROUTER_API_KEY",
+  "vercel-ai-gateway": "AI_GATEWAY_API_KEY",
+  nvidia: "NVIDIA_API_KEY",
+};
+
+export const isMotsProviderId = (value: string): value is MotsProviderId =>
+  (MOTS_PROVIDERS as readonly string[]).includes(value);
+
+/**
+ * The environment values a provider may read. The Cloudflare Worker environment is not a plain
+ * record, so the accepted shape is structural: any object whose values are strings.
+ */
+export type MotsEnvironment = Readonly<Record<string, string | undefined>>;
+
+export type GatewayPricingTier = {
+  readonly cost?: string;
+  readonly min?: number;
+  readonly max?: number;
+};
+
+export type GatewayModel = {
+  readonly id: string;
+  readonly name?: string;
+  readonly context_window?: number;
+  readonly max_tokens?: number;
+  readonly pricing?: {
+    readonly input?: string;
+    readonly output?: string;
+    readonly input_cache_read?: string;
+    readonly input_cache_write?: string;
+    readonly input_tiers?: readonly GatewayPricingTier[];
+    readonly output_tiers?: readonly GatewayPricingTier[];
+    readonly input_cache_read_tiers?: readonly GatewayPricingTier[];
+    readonly input_cache_write_tiers?: readonly GatewayPricingTier[];
+    /** When true the price depends on which upstream provider serves the request. */
+    readonly varies_by_provider?: boolean;
+  };
+  readonly modalities?: { readonly input?: readonly string[] };
+  readonly supported_parameters?: readonly string[];
+  readonly reasoning_options?: {
+    readonly type?: string;
+    readonly values?: readonly string[];
+    /** The lower bound of a budget control, in tokens. */
+    readonly min?: number;
+  }[];
+};
+
+/**
+ * A gateway model priced at zero on both directions is free regardless of the credit balance.
+ *
+ * A model whose price varies by provider is excluded: the zero is only the cheapest upstream, and
+ * the request may be served by one that charges. `reflection/beam` is the case in point: its
+ * catalog entry says zero, while the upstream it actually lands on charges per token.
+ */
+export const isFreeGatewayModel = (model: GatewayModel): boolean =>
+  model.pricing?.input === "0" &&
+  model.pricing?.output === "0" &&
+  model.pricing?.varies_by_provider !== true;
+
+const pricePerMillion = (value: string | undefined): number => {
+  if (value === undefined) return 0;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  // The gateway reports a price per token; Pi models report a price per million tokens.
+  return parsed * 1_000_000;
+};
+
+/**
+ * Map the gateway's tiered pricing to Pi's cost tiers.
+ *
+ * The gateway prices long contexts in bands: each tier has its own cost and the number of input
+ * tokens it starts from. Pi expects the same shape, with the prices already per million tokens.
+ */
+const toCostTiers = (model: GatewayModel): ModelCostTier[] => {
+  const inputTiers = model.pricing?.input_tiers ?? [];
+  const outputTiers = model.pricing?.output_tiers ?? [];
+  const cacheReadTiers = model.pricing?.input_cache_read_tiers ?? [];
+  const cacheWriteTiers = model.pricing?.input_cache_write_tiers ?? [];
+  const count = Math.max(
+    inputTiers.length,
+    outputTiers.length,
+    cacheReadTiers.length,
+    cacheWriteTiers.length,
+  );
+  const tiers: ModelCostTier[] = [];
+  for (let index = 0; index < count; index++) {
+    const input = inputTiers[index];
+    const output = outputTiers[index];
+    const cacheRead = cacheReadTiers[index];
+    const cacheWrite = cacheWriteTiers[index];
+    // The threshold is where the band starts; the first band starts at zero.
+    const threshold = input?.min ?? output?.min ?? cacheRead?.min ?? cacheWrite?.min ?? 0;
+    tiers.push({
+      input: pricePerMillion(input?.cost),
+      output: pricePerMillion(output?.cost),
+      cacheRead: pricePerMillion(cacheRead?.cost),
+      cacheWrite: pricePerMillion(cacheWrite?.cost),
+      inputTokensAbove: threshold,
+    });
+  }
+  return tiers;
+};
+
+/**
+ * Map one gateway catalog entry to a Pi model. The gateway's `supported_parameters` decides which
+ * capabilities the model has: without `tools` the Agent's memory and reminders cannot work, so such
+ * models are dropped rather than silently failing at request time.
+ */
+export const toPiModel = (
+  model: GatewayModel,
+  baseUrl: string = VERCEL_GATEWAY_BASE_URL,
+): Model<"openai-completions"> | undefined => {
+  if (!model.supported_parameters?.includes("tools")) return undefined;
+  const efforts = model.reasoning_options?.find((option) => option.type === "effort")?.values ?? [];
+  // Only the models that expose an effort control accept `reasoning_effort`. The others advertise
+  // "reasoning" but expose a toggle or a token budget instead, and Pi would send them an effort
+  // value they do not understand.
+  const supportsReasoning = model.supported_parameters.includes("reasoning") && efforts.length > 0;
+  const tiers = toCostTiers(model);
+  const piModel: Model<"openai-completions"> = {
+    id: model.id,
+    name: model.name ?? model.id,
+    api: "openai-completions",
+    provider: "vercel-ai-gateway",
+    baseUrl,
+    input: model.modalities?.input?.includes("image") ? ["text", "image"] : ["text"],
+    cost: {
+      input: pricePerMillion(model.pricing?.input),
+      output: pricePerMillion(model.pricing?.output),
+      // The gateway publishes the cache prices separately: 273 of the 482 models charge for a
+      // cache read, and reporting zero would understate the cost of a cached conversation.
+      cacheRead: pricePerMillion(model.pricing?.input_cache_read),
+      cacheWrite: pricePerMillion(model.pricing?.input_cache_write),
+      ...(tiers.length > 0 ? { tiers } : {}),
+    },
+    reasoning: supportsReasoning,
+    contextWindow: model.context_window ?? 128_000,
+    maxTokens: model.max_tokens ?? 8_192,
+    type: "chat",
+    compat: {
+      // The gateway accepts `max_tokens`, not the OpenAI-only `max_completion_tokens`: the model
+      // catalog lists `max_tokens` for every model and `max_completion_tokens` for none. The
+      // `store` flag is not in the catalog either, so it is not sent.
+      maxTokensField: "max_tokens",
+      supportsStore: false,
+      // The system prompt goes out as a `system` message. The gateway accepts `developer` too, but
+      // it routes to many upstream providers that only know `system`.
+      supportsDeveloperRole: false,
+      supportsReasoningEffort: supportsReasoning,
+    },
+  };
+  if (efforts.length > 0) {
+    // The gateway accepts the shared effort names, but each model lists only the ones it supports:
+    // 110 of the 263 effort-capable models do not offer "none", and some offer only part of the
+    // ladder. A level is mapped only when the model accepts the matching effort, so Pi never sends
+    // a value the model would reject.
+    //
+    // "off" is deliberately left unmapped: Pi would then send `reasoning_effort: "none"`, which is
+    // not among the effort values this model's catalog entry lists. Leaving it unmapped means Pi
+    // sends no reasoning parameter at all, which is what the level asks for.
+    const ladder = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
+    const effortFor: Record<(typeof ladder)[number], string> = {
+      minimal: "low",
+      low: "low",
+      medium: "medium",
+      high: "high",
+      xhigh: "xhigh",
+      max: "max",
+    };
+    const mapped: Partial<Record<(typeof ladder)[number], string>> = {};
+    for (const level of ladder) {
+      const effort = effortFor[level];
+      if (efforts.includes(effort)) mapped[level] = effort;
+    }
+    // A model that offers only part of the ladder still needs the levels it lacks to fall back to
+    // a level it does support, so each unsupported level maps to the closest supported one below it.
+    for (const level of ladder) {
+      if (mapped[level] !== undefined) continue;
+      const index = ladder.indexOf(level);
+      for (let below = index - 1; below >= 0; below--) {
+        const candidate = ladder[below]!;
+        if (mapped[candidate] !== undefined) {
+          mapped[level] = mapped[candidate]!;
+          break;
+        }
+      }
+    }
+    if (Object.keys(mapped).length > 0) piModel.thinkingLevelMap = mapped;
+  }
+  return piModel;
+};
+
+/**
+ * Build the Vercel AI Gateway provider. The model catalog comes from the gateway itself rather than
+ * from Pi's bundled snapshot, so models Vercel adds later are usable without touching the code.
+ */
+export const vercelGatewayProvider = (
+  models: readonly Model<"openai-completions">[],
+): Provider<"openai-completions"> => ({
+  id: "vercel-ai-gateway",
+  name: "Vercel AI Gateway",
+  baseUrl: VERCEL_GATEWAY_BASE_URL,
+  auth: {
+    apiKey: {
+      name: "Vercel AI Gateway API key",
+      login: async (interaction) => {
+        interaction.signal.throwIfAborted();
+        const key = await interaction.prompt({
+          type: "secret",
+          message: "Enter Vercel AI Gateway API key",
+        });
+        interaction.signal.throwIfAborted();
+        return { type: "api_key", key };
+      },
+      resolve: async ({ ctx, credential, signal }) => {
+        signal.throwIfAborted();
+        if (credential?.key) return { auth: { apiKey: credential.key }, source: "stored credential" };
+        const value = await ctx.env(API_KEY_ENV["vercel-ai-gateway"]);
+        signal.throwIfAborted();
+        return value
+          ? { auth: { apiKey: value }, source: API_KEY_ENV["vercel-ai-gateway"] }
+          : undefined;
+      },
+    },
+  },
+  getModels: () => models,
+  getAllModels: () => models,
+  stream: (model, context, options) => openAICompletionsApi().stream(model, context, options),
+  streamSimple: (model, context, options) => openAICompletionsApi().streamSimple(model, context, options),
+});
+
+let cachedModels: readonly Model<"openai-completions">[] | undefined;
+let cachedFetch: Promise<readonly Model<"openai-completions">[]> | undefined;
+
+/** Fetch the live gateway catalog, cached for the lifetime of the isolate. */
+export const gatewayModels = async (): Promise<readonly Model<"openai-completions">[]> => {
+  if (cachedModels !== undefined) return cachedModels;
+  cachedFetch ??= (async () => {
+    const response = await fetch(VERCEL_GATEWAY_MODELS_URL, { headers: { accept: "application/json" } });
+    if (!response.ok) throw new Error(`Vercel AI Gateway catalog request failed: ${response.status}`);
+    const body = (await response.json()) as { readonly data?: readonly GatewayModel[] };
+    const models = (body.data ?? [])
+      .map((model) => toPiModel(model))
+      .filter((model): model is Model<"openai-completions"> => model !== undefined);
+    cachedModels = models;
+    return models;
+  })().catch((error: unknown) => {
+    cachedFetch = undefined;
+    throw error;
+  });
+  return cachedFetch;
+};
+
+/** The free gateway models, for diagnostics and documentation. */
+export const freeGatewayModels = async (): Promise<readonly string[]> => {
+  const response = await fetch(VERCEL_GATEWAY_MODELS_URL, { headers: { accept: "application/json" } });
+  if (!response.ok) throw new Error(`Vercel AI Gateway catalog request failed: ${response.status}`);
+  const body = (await response.json()) as { readonly data?: readonly GatewayModel[] };
+  return (body.data ?? []).filter(isFreeGatewayModel).map((model) => model.id);
+};
+
+/**
+ * Resolve the provider credentials for the given provider. The API key stays in the Worker's
+ * environment and is never written to disk or sent to the client.
+ */
+export const providerAuthContext = (env: MotsEnvironment): AuthContext => ({
+  async env(name: string): Promise<string | undefined> {
+    const value = (env as Record<string, unknown>)[name];
+    return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+  },
+  async fileExists(): Promise<boolean> {
+    return false;
+  },
+});
+
+/**
+ * Build the model catalog used by the Agent. The provider is selected by `MOTS_PROVIDER` and the model
+ * by `MOTS_MODEL`, so switching away from a provider that ran out of quota needs no code change.
+ */
+export const createMotsModels = async (
+  env: MotsEnvironment,
+  provider: MotsProviderId,
+): Promise<MutableModels> => {
+  const models = createModels({ authContext: providerAuthContext(env) });
+  if (provider === "vercel-ai-gateway") {
+    models.setProvider(vercelGatewayProvider(await gatewayModels()));
+  } else if (provider === "nvidia") {
+    models.setProvider(nvidiaProvider());
+  } else {
+    models.setProvider(openrouterProvider());
+  }
+  return models;
+};

@@ -1,2 +1,16 @@
+# Provider: openrouter (default) | vercel-ai-gateway | nvidia
+# MOTS_PROVIDER=vercel-ai-gateway
+# Model. Defaults per provider:
+#   openrouter          -> openai/gpt-6-luna
+#   vercel-ai-gateway   -> reflection/beam-free
+#   nvidia              -> nvidia/nemotron-3.5-lightning-30b-a3b
+# MOTS_MODEL=reflection/beam-free
+
+# openrouter
 OPENROUTER_API_KEY=
-# MOTS_MODEL=openai/gpt-6-luna
+
+# vercel-ai-gateway (https://vercel.com/ai-gateway)
+# AI_GATEWAY_API_KEY=
+
+# nvidia (https://build.nvidia.com)
+# NVIDIA_API_KEY=

@@ -1,5 +1,8 @@
 interface __BaseEnv_Env {
   OPENROUTER_API_KEY: string;
+  AI_GATEWAY_API_KEY?: string;
+  NVIDIA_API_KEY?: string;
+  MOTS_PROVIDER?: string;
   MOTS_MODEL?: string;
   SESSIONS: DurableObjectNamespace<import("./src/index").Session>;
 }
@@ -19,7 +22,12 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 };
 
 declare namespace NodeJS {
-  interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "OPENROUTER_API_KEY" | "MOTS_MODEL">> {}
+  interface ProcessEnv extends StringifyValues<
+    Pick<
+      Cloudflare.Env,
+      "OPENROUTER_API_KEY" | "AI_GATEWAY_API_KEY" | "NVIDIA_API_KEY" | "MOTS_PROVIDER" | "MOTS_MODEL"
+    >
+  > {}
 }
 
 declare module "*.txt" {

@@ -16,7 +16,13 @@ import {
   watchEvents,
 } from "@earendil-works/pi-durable";
 import { openDurableObjectSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/cloudflare";
-import { createMotsHarnessOptions, scheduledDeadline } from "@mots/agent";
+import {
+  createMotsHarnessOptions,
+  isMotsProviderId,
+  type MotsEnvironment,
+  type MotsProviderId,
+  scheduledDeadline,
+} from "@mots/agent";
 import {
   InvalidClientCommand,
   MAX_CLIENT_FRAME_CHARACTERS,
@@ -167,9 +173,16 @@ export class Session extends DurableObject<Env> {
 
   async #initialize(): Promise<void> {
     const storage = await openDurableObjectSqliteStorage(this.ctx.storage);
-    const chatOptions = createMotsHarnessOptions(
+    const provider = isMotsProviderId(this.env.MOTS_PROVIDER ?? "")
+      ? (this.env.MOTS_PROVIDER as MotsProviderId)
+      : "openrouter";
+    const chatOptions = await createMotsHarnessOptions(
       (timestamp) => this.#setAlarmNoLaterThan(timestamp),
-      { modelId: this.env.MOTS_MODEL },
+      {
+        modelId: this.env.MOTS_MODEL,
+        provider,
+        env: this.env as unknown as MotsEnvironment,
+      },
     );
     const harness = await Harness.open(
       storage,

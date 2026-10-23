@@ -1,6 +1,7 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ROOT_CONVERSATION_ID, type ConversationSummary } from "@mots/protocol";
+import { ChevronRightIcon, CloseIcon, PlusIcon } from "./Icon";
 import { colors, radius, spacing } from "../theme";
 
 type Props = {
@@ -55,11 +56,15 @@ export function SessionSheet({
             onPress={onClose}
             style={styles.close}
           >
-            <Text style={styles.closeText}>×</Text>
+            <CloseIcon size={14} color={colors.textMuted} />
           </Pressable>
         </View>
 
-        <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        >
           {conversations.map((conversation, index) => {
             const active = conversation.id === activeConversationId;
             return (
@@ -76,17 +81,20 @@ export function SessionSheet({
                 <Text style={[styles.itemText, active && styles.itemTextActive]}>
                   {conversationName(conversation, index)}
                 </Text>
-                <Text style={styles.chevron}>›</Text>
+                <ChevronRightIcon size={14} color={colors.textFaint} />
               </Pressable>
             );
           })}
         </ScrollView>
 
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Nuova chat"
           onPress={onCreate}
           style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
         >
-          <Text style={styles.primaryText}>＋ Nuova chat</Text>
+          <PlusIcon size={16} color={colors.accentInk} />
+          <Text style={styles.primaryText}>Nuova chat</Text>
         </Pressable>
 
         <View style={styles.secondaryRow}>
@@ -126,8 +134,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     backgroundColor: colors.surfaceSoft,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
     paddingTop: spacing.sm,
     paddingHorizontal: spacing.lg,
   },
@@ -157,17 +163,12 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   close: {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surfaceRaised,
-  },
-  closeText: {
-    color: colors.textMuted,
-    fontSize: 22,
-    lineHeight: 24,
   },
   list: {
     maxHeight: 320,
@@ -182,6 +183,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+    minHeight: 44,
     borderRadius: radius.md,
   },
   itemActive: {
@@ -208,13 +210,13 @@ const styles = StyleSheet.create({
   dotActive: {
     backgroundColor: colors.accent,
   },
-  chevron: {
-    color: colors.textFaint,
-    fontSize: 20,
-  },
   primary: {
     marginTop: spacing.sm,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    minHeight: 48,
     borderRadius: radius.lg,
     backgroundColor: colors.accent,
     paddingVertical: spacing.md,
@@ -233,8 +235,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    backgroundColor: colors.cardSurfacePrimary,
     paddingVertical: spacing.md,
   },
   secondaryText: {

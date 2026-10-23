@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ChatScreen } from "./src/screens/ChatScreen";
 import { OnboardingScreen } from "./src/screens/OnboardingScreen";
@@ -52,14 +53,16 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
-      {loading ? (
-        <Splash />
-      ) : identity !== undefined ? (
-        <ChatScreen identity={identity} onLeave={handleLeave} />
-      ) : (
-        <OnboardingScreen onReady={handleReady} />
-      )}
+      <KeyboardProvider>
+        <StatusBar style="light" />
+        {loading ? (
+          <Splash />
+        ) : identity !== undefined ? (
+          <ChatScreen identity={identity} onLeave={handleLeave} />
+        ) : (
+          <OnboardingScreen onReady={handleReady} />
+        )}
+      </KeyboardProvider>
     </SafeAreaProvider>
   );
 }

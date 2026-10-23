@@ -1,5 +1,3 @@
-import { createModels } from "@earendil-works/pi-ai/models";
-import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 import {
   configure,
   createRegistry,
@@ -8,21 +6,28 @@ import {
   type HarnessOptions,
 } from "@earendil-works/pi-durable";
 import { forgetTool, memorySection, rememberTool } from "./memory.ts";
+import {
+  createMotsModels,
+  DEFAULT_MODELS,
+  isMotsProviderId,
+  type MotsEnvironment,
+  type MotsProviderId,
+} from "./provider.ts";
 import { DeliverScheduledInstruction } from "./schedule.ts";
 import { conversationSearchExtension, searchHistoryTool } from "./search.ts";
 import { createScheduleTool } from "./tools.ts";
 
-const models = createModels();
-models.setProvider(openrouterProvider());
-
 export type MotsHarnessOptions = {
   readonly modelId?: string;
+  readonly provider?: MotsProviderId;
+  /** The Worker's environment; the provider API key is read from here and never leaves the Worker. */
+  readonly env?: MotsEnvironment;
 };
 
-export function createMotsHarnessOptions(
+export async function createMotsHarnessOptions(
   ensureWakeupAt: (timestamp: number) => Promise<void>,
   options: MotsHarnessOptions = {},
-): HarnessOptions {
+): Promise<HarnessOptions> {
   const scheduleTool = createScheduleTool(ensureWakeupAt);
   const motsExtension = defineExtension({
     name: "mots",
@@ -54,8 +59,11 @@ export function createMotsHarnessOptions(
   const registry = createRegistry();
   registry.install(motsExtension);
   registry.install(conversationSearchExtension);
+  const provider = options.provider ?? "openrouter";
+  const modelId = options.modelId ?? DEFAULT_MODELS[provider];
+  const models = await createMotsModels(options.env ?? {}, provider);
   const defaultAgent = {
-    model: { provider: "openrouter", modelId: options.modelId ?? "openai/gpt-6-luna" },
+    model: { provider, modelId },
     thinkingLevel: "off" as const,
     tools: [rememberTool, forgetTool, scheduleTool, searchHistoryTool],
   };
