@@ -22,6 +22,8 @@ interface __BaseEnv_Env {
    * Leave unset everywhere except the hermetic Worker smoke.
    */
   MOTS_FAKE_LLM?: string;
+  /** Optional Expo access token for reminder pushes. See apps/server/.dev.vars.example. */
+  EXPO_ACCESS_TOKEN?: string;
   SESSIONS: DurableObjectNamespace<import("./src/index").Session>;
 }
 
