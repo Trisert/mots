@@ -25,17 +25,18 @@ import {
   saveIdentity,
   type Identity,
 } from "./src/storage";
-import { fonts, spacing } from "./src/theme";
+import { spacing, type as typeScale } from "./src/theme";
+import { BrandMark } from "./src/ui/BrandMark";
 
 function Splash() {
   const { colors } = useTheme();
   return (
     <View style={[styles.splash, { backgroundColor: colors.bgMain }]}>
-      <View style={styles.brandRow}>
-        <Text style={[styles.wordmark, { color: colors.textPrimary }]}>mots</Text>
-        <View style={[styles.brandDot, { backgroundColor: colors.accentCoral }]} />
-      </View>
-      <ActivityIndicator color={colors.accentCoral} />
+      <BrandMark size={56} />
+      <Text accessibilityRole="header" style={[styles.wordmark, { color: colors.textPrimary }]}>
+        Mots
+      </Text>
+      <ActivityIndicator color={colors.textSecondary} />
     </View>
   );
 }
@@ -65,20 +66,20 @@ function MainApp() {
         document.head.appendChild(link);
       }
 
-      const styleId = "mots-web-outline-reset";
+      const styleId = "mots-web-base";
       if (!document.getElementById(styleId)) {
         const style = document.createElement("style");
         style.id = styleId;
         style.textContent = `
-          *:focus, *:focus-visible {
-            outline: none !important;
-            -webkit-tap-highlight-color: transparent !important;
-          }
           html, body, #root {
             height: 100%;
             margin: 0;
             padding: 0;
             font-family: 'Instrument Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          }
+          :focus-visible {
+            outline: 2px solid var(--mots-focus, currentColor);
+            outline-offset: 2px;
           }
         `;
         document.head.appendChild(style);
@@ -100,13 +101,15 @@ function MainApp() {
       document.body.style.backgroundColor = colors.bgMain;
       if (document.documentElement) {
         document.documentElement.style.backgroundColor = colors.bgMain;
+        document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+        document.documentElement.style.setProperty("--mots-focus", colors.accent);
       }
       const root = document.getElementById("root");
       if (root) {
         root.style.backgroundColor = colors.bgMain;
       }
     }
-  }, [colors.bgMain]);
+  }, [colors.accent, colors.bgMain, isDark]);
 
   const handleReady = async (next: Identity) => {
     await saveIdentity(next);
@@ -124,7 +127,7 @@ function MainApp() {
 
   const content =
     identity !== undefined ? (
-      <ChatScreen identity={identity} onLeave={handleLeave} />
+      <ChatScreen identity={identity} onLeave={handleLeave} onIdentityChange={handleReady} />
     ) : (
       <OnboardingScreen onReady={handleReady} />
     );
@@ -155,22 +158,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.xl,
-  },
-  brandRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: spacing.xs,
+    gap: spacing.md,
+    paddingHorizontal: spacing.xxl,
   },
   wordmark: {
-    fontFamily: fonts.bold,
-    fontSize: 44,
-    letterSpacing: -2,
-  },
-  brandDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginBottom: 10,
+    ...typeScale.display,
   },
 });

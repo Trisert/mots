@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { MotsClient } from "@mots/client";
 
 export type MotsSessionOptions = {
@@ -8,6 +8,10 @@ export type MotsSessionOptions = {
 };
 
 export function useMotsSession(options: MotsSessionOptions) {
+  // A terminal close sets a private flag on MotsClient and later connect() calls do nothing.
+  // A new client is the reset available without changing the client package.
+  const [epoch, setEpoch] = useState(0);
+  const retry = useCallback(() => setEpoch((current) => current + 1), []);
   const client = useMemo(
     () =>
       new MotsClient({
@@ -15,7 +19,7 @@ export function useMotsSession(options: MotsSessionOptions) {
         sessionId: options.sessionId,
         username: options.username,
       }),
-    [options.baseUrl, options.sessionId, options.username],
+    [epoch, options.baseUrl, options.sessionId, options.username],
   );
 
   const subscribe = useMemo(
@@ -30,5 +34,5 @@ export function useMotsSession(options: MotsSessionOptions) {
     return () => client.dispose();
   }, [client]);
 
-  return { client, state };
+  return { client, state, retry };
 }
