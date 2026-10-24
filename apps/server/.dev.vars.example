@@ -1,6 +1,9 @@
 # Provider: kilo (default when unset) | openrouter | vercel-ai-gateway | nvidia
-# MOTS_PROVIDER=vercel-ai-gateway
-# Model. Defaults per provider:
+# An unknown MOTS_PROVIDER fails session startup.
+# MOTS_PROVIDER=kilo
+# Model defaults from packages/agent/src/provider.ts (DEFAULT_MODELS).
+# Leave MOTS_MODEL unset to use the row for the selected provider.
+#   kilo                -> reflection/beam-free
 #   openrouter          -> openai/gpt-6-luna
 #   vercel-ai-gateway   -> reflection/beam-free
 #   nvidia              -> nvidia/nemotron-3.5-lightning-30b-a3b
@@ -28,10 +31,13 @@ MOTS_CREATE_TOKEN=
 # MOTS_MAX_SCHEDULES=8
 # MOTS_MIN_RECURRENCE_SECONDS=900
 
-# openrouter
-OPENROUTER_API_KEY=
+# kilo (default). If unset, local dev may read ~/.pi/agent/auth.json or send the literal key free.
+# KILO_API_KEY=
 
-# vercel-ai-gateway (https://vercel.com/ai-gateway)
+# openrouter. Used only when MOTS_PROVIDER=openrouter. Default model: openai/gpt-6-luna.
+# OPENROUTER_API_KEY=
+
+# vercel-ai-gateway. Secret name is AI_GATEWAY_API_KEY. Host: https://ai-gateway.vercel.sh/v1
 # AI_GATEWAY_API_KEY=
 
 # nvidia (https://build.nvidia.com)
