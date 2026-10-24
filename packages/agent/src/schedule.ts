@@ -3,6 +3,7 @@ import {
   defineDoc,
   defineTask,
   type TaskInspection,
+  type Tx,
 } from "@earendil-works/pi-durable";
 import { formatScheduledInstruction } from "@mots/protocol";
 
@@ -43,6 +44,8 @@ type LocalDateTime = {
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
+/** Calendar recurrence stops after this many steps instead of searching forever. */
+export const RECURRENCE_SEARCH_LIMIT = 1_000_000;
 const localFormatters = new Map<string, Intl.DateTimeFormat>();
 
 const localFormatter = (timezone: string): Intl.DateTimeFormat => {
@@ -164,11 +167,16 @@ const addMonths = (value: LocalDateTime, months: number): LocalDateTime => {
   return { ...value, year, month, day: Math.min(value.day, lastDay) };
 };
 
-/** First recurrence deadline after `now`, advanced from the previous scheduled deadline. */
+/**
+ * First recurrence deadline after `now`, advanced from the previous scheduled deadline.
+ * Minute and hour cadences are fixed durations. Day, week, and month cadences follow
+ * the timezone wall clock. A calendar search throws after `maxAttempts` steps.
+ */
 export function nextRecurrenceRunAt(
   previousRunAt: number,
   recurrence: ScheduleRecurrence,
   now: number,
+  maxAttempts = RECURRENCE_SEARCH_LIMIT,
 ): number {
   const { interval, unit } = recurrence.cadence;
   if (!Number.isSafeInteger(interval) || interval < 1) {
@@ -184,7 +192,7 @@ export function nextRecurrenceRunAt(
   }
 
   let local = localDateTime(previousRunAt, recurrence.timezone);
-  for (let attempts = 0; attempts < 1_000_000; attempts++) {
+  for (let attempts = 0; attempts < maxAttempts; attempts++) {
     local =
       unit === "month"
         ? addMonths(local, interval)
@@ -197,17 +205,51 @@ export function nextRecurrenceRunAt(
   throw new Error("recurrence deadline search exceeded its safety limit");
 }
 
+/** One active delivery. `successor` is set when `schedule` already wrote the next run. */
+export type ScheduleDelivery = {
+  scheduleId: string;
+  conversationId: ConversationId;
+  instruction: string;
+  name?: string;
+  runAt: number;
+  recurrence?: ScheduleRecurrence;
+  successor?: ScheduledInstruction;
+};
+
+/**
+ * The next row a successful delivery writes, or `undefined` when this settlement
+ * must not create one. A stored successor means an in-flight `sourceScheduleId`
+ * call already created the task.
+ */
+export function planNextInstruction(
+  delivery: ScheduleDelivery | undefined,
+  now: number,
+  delivered: boolean,
+  nextId: string,
+): ScheduledInstruction | undefined {
+  if (!delivered || delivery === undefined) return undefined;
+  if (delivery.successor !== undefined || delivery.recurrence === undefined) return undefined;
+  const recurrence: ScheduleRecurrence = {
+    cadence: {
+      unit: delivery.recurrence.cadence.unit,
+      interval: delivery.recurrence.cadence.interval,
+    },
+    timezone: delivery.recurrence.timezone,
+  };
+  const runAt = nextRecurrenceRunAt(delivery.runAt, recurrence, now);
+  return {
+    id: nextId,
+    conversationId: delivery.conversationId,
+    instruction: delivery.instruction,
+    ...(delivery.name === undefined ? {} : { name: delivery.name }),
+    runAt,
+    recurrence,
+  };
+}
+
 /** Deliveries currently running, so `schedule` can reject accidental recursion. */
 export const ScheduleDeliveries = defineDoc<{
-  active: Array<{
-    scheduleId: string;
-    conversationId: ConversationId;
-    instruction: string;
-    name?: string;
-    runAt: number;
-    recurrence?: ScheduleRecurrence;
-    successor?: ScheduledInstruction;
-  }>;
+  active: ScheduleDelivery[];
 }>({
   kind: "app.schedule-deliveries",
   version: 1,
@@ -238,6 +280,7 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
       }, context);
     },
     deliver: async (task, runtime, context) => {
+      let delivered = false;
       try {
         const conversation = await runtime.conversation(task.input.conversationId, context);
         if (conversation !== undefined) {
@@ -250,7 +293,8 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
             },
             context,
           );
-          await submission.wait(context);
+          const settled = await submission.wait(context);
+          delivered = settled.status === "done";
         } else {
           runtime.report(
             new Error(
@@ -258,26 +302,51 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
             ),
           );
         }
-      } finally {
         await runtime.commit(async (tx) => {
-          removeDelivery(await tx.doc(ScheduleDeliveries), task.input.id);
+          await commitDeliveryOutcome(tx, task.input, runtime.now(), delivered);
+          return { status: "terminal", outcome: { status: "completed", result: null } };
+        }, context);
+      } catch (error) {
+        await runtime.commit(async (tx) => {
+          await commitDeliveryOutcome(tx, task.input, runtime.now(), false);
           return { status: "running", checkpoint: { phase: "deliver" } };
         }, context);
+        throw error;
       }
-
-      await runtime.commit(
-        () => ({ status: "terminal", outcome: { status: "completed", result: null } }),
-        context,
-      );
     },
   },
   abort: async (task, runtime, context) => {
     await runtime.commit(async (tx) => {
-      removeDelivery(await tx.doc(ScheduleDeliveries), task.input.id);
+      await commitDeliveryOutcome(tx, task.input, runtime.now(), false);
       return { status: "terminal", outcome: { status: "aborted" } };
     }, context);
   },
 });
+
+/**
+ * Clear the active delivery and, when the run succeeded, write its next row
+ * in that same commit. Failed and aborted runs pass `delivered: false`.
+ */
+export async function commitDeliveryOutcome(
+  tx: Tx,
+  input: ScheduledInstruction,
+  now: number,
+  delivered: boolean,
+  nextId = `schedule:${crypto.randomUUID()}`,
+): Promise<ScheduledInstruction | undefined> {
+  const deliveries = await tx.doc(ScheduleDeliveries);
+  const delivery = deliveries.active.find((item) => item.scheduleId === input.id);
+  const scheduled = planNextInstruction(delivery, now, delivered, nextId);
+  if (scheduled !== undefined) {
+    await tx.createTask(DeliverScheduledInstruction, scheduled, {
+      ownership: { kind: "conversation" },
+      conversationId: scheduled.conversationId,
+      background: true,
+    });
+  }
+  removeDelivery(deliveries, input.id);
+  return scheduled;
+}
 
 const removeDelivery = (
   deliveries: { active: Array<{ scheduleId: string }> },
