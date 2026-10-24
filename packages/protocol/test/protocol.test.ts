@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   formatScheduledInstruction,
   InvalidClientCommand,
+  MAX_PUSH_TOKEN_CHARACTERS,
   parseClientCommand,
   parseScheduledInstruction,
   parseServerEventEnvelope,
@@ -132,6 +133,125 @@ describe("client commands", () => {
   });
 });
 
+describe("push token commands", () => {
+  const exponentToken = "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]";
+  const expoToken = "ExpoPushToken[xxxxxxxxxxxxxxxxxxxxxx]";
+  const legacyToken = "F5741A13-BCDA-434B-A316-5DC0E6FFA94F";
+
+  const bracketToken = (extra: number): string => {
+    const prefix = "ExpoPushToken[";
+    const suffix = "]";
+    return `${prefix}${"a".repeat(extra)}${suffix}`;
+  };
+
+  test("registers an Expo push token and clears it", () => {
+    expect(
+      parseClientCommand(
+        JSON.stringify({
+          type: "pushToken.register",
+          requestId: "req-push-1",
+          token: exponentToken,
+        }),
+      ),
+    ).toEqual({
+      type: "pushToken.register",
+      requestId: "req-push-1",
+      token: exponentToken,
+    });
+
+    expect(
+      parseClientCommand(
+        JSON.stringify({
+          type: "pushToken.register",
+          requestId: "req-push-2",
+          token: expoToken,
+        }),
+      ),
+    ).toEqual({
+      type: "pushToken.register",
+      requestId: "req-push-2",
+      token: expoToken,
+    });
+
+    expect(
+      parseClientCommand(
+        JSON.stringify({
+          type: "pushToken.register",
+          requestId: "req-push-3",
+          token: legacyToken,
+        }),
+      ),
+    ).toEqual({
+      type: "pushToken.register",
+      requestId: "req-push-3",
+      token: legacyToken,
+    });
+
+    expect(
+      parseClientCommand(
+        JSON.stringify({ type: "pushToken.clear", requestId: "req-push-4" }),
+      ),
+    ).toEqual({ type: "pushToken.clear", requestId: "req-push-4" });
+  });
+
+  test("accepts a token at the size limit and rejects a longer one", () => {
+    const atLimit = bracketToken(
+      MAX_PUSH_TOKEN_CHARACTERS - "ExpoPushToken[".length - "]".length,
+    );
+    expect(atLimit.length).toBe(MAX_PUSH_TOKEN_CHARACTERS);
+    expect(
+      parseClientCommand(
+        JSON.stringify({ type: "pushToken.register", requestId: "req-push-5", token: atLimit }),
+      ),
+    ).toEqual({ type: "pushToken.register", requestId: "req-push-5", token: atLimit });
+
+    const overLimit = `${atLimit.slice(0, -1)}a]`;
+    expect(overLimit.length).toBe(MAX_PUSH_TOKEN_CHARACTERS + 1);
+    expect(() =>
+      parseClientCommand(
+        JSON.stringify({ type: "pushToken.register", requestId: "req-push-6", token: overLimit }),
+      ),
+    ).toThrow(
+      `token must be a non-empty string of at most ${MAX_PUSH_TOKEN_CHARACTERS} characters`,
+    );
+  });
+
+  test("rejects tokens Expo would not accept", () => {
+    const rejected = [
+      "",
+      "not-a-token",
+      "ExpoPushToken[]",
+      "ExpoPushToken[abc def]",
+      "ExpoPushToken[abc]extra]",
+      "exponentpushtoken[xxxxxxxxxxxxxxxxxxxxxx]",
+      "dOKpuo4qbsM:APA91bHkSmF84ROx7Y-2eMGxc0lmpQeN33ZwDMG763dkjd8yjKK-rhPtiR1OoIWNG5ZshlL8oyxsTnQ5XtahyBNS9mJAvfeE6aHzv_mOF_Ve4vL2po4clMIYYV2-Iea_sZVJF7xFLXih4Y0y88JNYULxFfz-XXXXX",
+      "5fa729c6e535eb568g18fdabd35785fc60f41c161d9d7cf4b0bbb0d92437fda0",
+    ];
+    for (const token of rejected) {
+      expect(() =>
+        parseClientCommand(
+          JSON.stringify({ type: "pushToken.register", requestId: "req-push-7", token }),
+        ),
+      ).toThrow(InvalidClientCommand);
+    }
+
+    expect(() =>
+      parseClientCommand(
+        JSON.stringify({ type: "pushToken.register", requestId: "req-push-8", token: 12 }),
+      ),
+    ).toThrow(InvalidClientCommand);
+    expect(() =>
+      parseClientCommand(JSON.stringify({ type: "pushToken.register", requestId: "req-push-9" })),
+    ).toThrow(InvalidClientCommand);
+    expect(() =>
+      parseClientCommand(JSON.stringify({ type: "pushToken.clear" })),
+    ).toThrow(InvalidClientCommand);
+    expect(() =>
+      parseClientCommand(JSON.stringify({ type: "pushToken.unknown", requestId: "req-push-10" })),
+    ).toThrow(InvalidClientCommand);
+  });
+});
+
 describe("server events", () => {
   test("parses a session snapshot with parents", () => {
     const event = parseServerEventEnvelope(
@@ -189,5 +309,41 @@ describe("server events", () => {
     expect(() =>
       parseServerEventEnvelope(JSON.stringify({ type: "unknown" })),
     ).toThrow("Unknown server event");
+  });
+
+  test("parses push token command results", () => {
+    expect(
+      parseServerEventEnvelope(
+        JSON.stringify({
+          type: "command.result",
+          command: "pushToken.register",
+          requestId: "req-push-1",
+          ok: true,
+        }),
+      ),
+    ).toEqual({
+      type: "command.result",
+      command: "pushToken.register",
+      requestId: "req-push-1",
+      ok: true,
+    });
+
+    expect(
+      parseServerEventEnvelope(
+        JSON.stringify({
+          type: "command.result",
+          command: "pushToken.clear",
+          requestId: "req-push-2",
+          ok: false,
+          error: { code: "command_failed", message: "Push token was not stored" },
+        }),
+      ),
+    ).toEqual({
+      type: "command.result",
+      command: "pushToken.clear",
+      requestId: "req-push-2",
+      ok: false,
+      error: { code: "command_failed", message: "Push token was not stored" },
+    });
   });
 });
