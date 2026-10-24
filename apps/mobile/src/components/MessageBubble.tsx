@@ -191,7 +191,6 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     bubbleAssistant: {
       width: "100%",
       backgroundColor: "transparent",
-      paddingHorizontal: 2,
       paddingVertical: 6,
     },
     bubbleUser: {

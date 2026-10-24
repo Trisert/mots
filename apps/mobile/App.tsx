@@ -25,7 +25,7 @@ import {
   saveIdentity,
   type Identity,
 } from "./src/storage";
-import { spacing, type as typeScale } from "./src/theme";
+import { inset, spacing, type as typeScale } from "./src/theme";
 
 function Splash() {
   const { colors } = useTheme();
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.md,
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: inset,
   },
   wordmark: {
     ...typeScale.display,

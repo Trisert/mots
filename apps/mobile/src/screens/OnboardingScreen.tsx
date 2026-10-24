@@ -5,7 +5,8 @@ import { createSession, parseJoinTarget } from "../api";
 import { DEFAULT_API_URL, normalizeBaseUrl } from "../config";
 import { useTheme } from "../context/ThemeContext";
 import type { Identity } from "../storage";
-import { hit, spacing, type as typeScale, type ThemeColors } from "../theme";
+import { hit, inset, spacing, type as typeScale, type ThemeColors } from "../theme";
+import { DotMascot } from "../ui/DotMascot";
 import { Banner } from "../ui/Banner";
 import { Button } from "../ui/Button";
 import { TextField } from "../ui/TextField";
@@ -92,6 +93,7 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
         <Text accessibilityRole="header" maxFontSizeMultiplier={1.4} style={styles.title}>
           Mots
         </Text>
+        <DotMascot size={72} />
         <Text style={styles.line}>Uno spazio per pensare.</Text>
         {error !== undefined ? <Banner message={error} /> : null}
         <Button
@@ -164,7 +166,7 @@ function createStyles(colors: ThemeColors) {
     content: {
       flexGrow: 1,
       justifyContent: "center",
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: inset,
     },
     column: {
       width: "100%",

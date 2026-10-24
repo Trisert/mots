@@ -7,7 +7,7 @@ import { normalizeBaseUrl } from "../config";
 import { useTheme } from "../context/ThemeContext";
 import { presentModel, providerLabel, shortModelName, type PresentedModel } from "../present";
 import { PROVIDER_MODELS, PROVIDERS } from "../models";
-import { hit, spacing, type as typeScale, type ThemeColors } from "../theme";
+import { hit, inset, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TextField } from "../ui/TextField";
 import { ThemeSwitcher } from "../ui/ThemeSwitcher";
 
@@ -281,12 +281,12 @@ function createStyles(colors: ThemeColors) {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.borderSubtle,
       paddingTop: spacing.md,
+      paddingHorizontal: inset,
     },
     header: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      paddingHorizontal: spacing.xl,
     },
     title: {
       ...typeScale.body,
@@ -295,13 +295,11 @@ function createStyles(colors: ThemeColors) {
     code: {
       ...typeScale.small,
       color: colors.textSecondary,
-      paddingHorizontal: spacing.xl,
       paddingVertical: spacing.md,
     },
     row: {
       minHeight: hit,
       justifyContent: "center",
-      paddingHorizontal: spacing.xl,
     },
     rowLabel: {
       ...typeScale.body,
@@ -313,17 +311,14 @@ function createStyles(colors: ThemeColors) {
     note: {
       ...typeScale.small,
       color: colors.textSecondary,
-      paddingHorizontal: spacing.xl,
       paddingBottom: spacing.sm,
     },
     rule: {
       height: StyleSheet.hairlineWidth,
       backgroundColor: colors.borderSubtle,
       marginVertical: spacing.sm,
-      marginHorizontal: spacing.xl,
     },
     server: {
-      paddingHorizontal: spacing.xl,
       gap: spacing.sm,
     },
   });

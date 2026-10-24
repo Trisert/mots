@@ -26,10 +26,11 @@ import { SessionSheet } from "../components/SessionSheet";
 import { probeSession, type SessionAccess } from "../api";
 import { useMotsSession } from "../hooks/useMotsSession";
 import { presentConnection, presentError } from "../present";
-import { motion, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
+import { inset, motion, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TOOL_LABELS } from "../tools";
 import type { Identity } from "../storage";
 import { Banner } from "../ui/Banner";
+import { DotMascot } from "../ui/DotMascot";
 import { IconButton } from "../ui/IconButton";
 
 type AccessView = SessionAccess | "checking";
@@ -231,7 +232,12 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
       ))}
       {liveActive ? (
         <View style={styles.live}>
-          {liveText.length > 0 ? <MarkdownText text={liveText} /> : <Thinking />}
+          <View style={styles.liveRow}>
+            <DotMascot size={28} thinking decorative />
+            <View style={styles.liveBody}>
+              {liveText.length > 0 ? <MarkdownText text={liveText} /> : <Thinking />}
+            </View>
+          </View>
           {active?.live?.retry !== undefined ? (
             <Text style={styles.danger}>{presentError(active.live.retry.error)}</Text>
           ) : null}
@@ -291,7 +297,9 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
       {connection.body.length > 0 ? <QuietDetail detail={connection.body} /> : null}
     </View>
   ) : (
-    <View style={styles.empty} />
+    <View style={styles.empty}>
+      <DotMascot size={56} />
+    </View>
   );
 
   return (
@@ -479,8 +487,7 @@ function createStyles(colors: ThemeColors) {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      paddingLeft: spacing.xl,
-      paddingRight: spacing.sm,
+      paddingHorizontal: inset,
       backgroundColor: colors.bgMain,
     },
     brand: {
@@ -488,7 +495,7 @@ function createStyles(colors: ThemeColors) {
       color: colors.textPrimary,
     },
     list: {
-      paddingHorizontal: spacing.lg,
+      paddingHorizontal: inset,
       paddingTop: spacing.md,
       paddingBottom: spacing.xl,
     },
@@ -571,6 +578,15 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.xs,
       paddingVertical: spacing.sm,
     },
+    liveRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: spacing.md,
+    },
+    liveBody: {
+      flex: 1,
+      minWidth: 0,
+    },
     danger: {
       ...typeScale.small,
       color: colors.danger,
@@ -596,7 +612,7 @@ function createStyles(colors: ThemeColors) {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: inset,
     },
     stripText: {
       ...typeScale.body,
@@ -613,7 +629,7 @@ function createStyles(colors: ThemeColors) {
       color: colors.textPrimary,
     },
     bannerWrap: {
-      paddingHorizontal: spacing.lg,
+      paddingHorizontal: inset,
       paddingTop: spacing.sm,
     },
     pressed: {

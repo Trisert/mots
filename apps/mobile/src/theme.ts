@@ -159,6 +159,9 @@ export const radius = {
 
 export const hit = 44;
 
+/** Shared screen and sheet inset. Rows, headers, and lists use this once. */
+export const inset = 28;
+
 export const motion = {
   fast: 140,
   base: 220,

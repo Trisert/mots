@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTheme } from "../context/ThemeContext";
-import { fonts, hit, spacing, type as typeScale, type ThemeColors } from "../theme";
+import { fonts, hit, inset, spacing, type as typeScale, type ThemeColors } from "../theme";
 
 type Props = {
   readonly value: string;
@@ -68,7 +68,7 @@ function createStyles(colors: ThemeColors) {
       flexDirection: "row",
       alignItems: "center",
       gap: spacing.md,
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: inset,
       paddingVertical: spacing.md,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.borderSubtle,
