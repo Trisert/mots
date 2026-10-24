@@ -370,7 +370,19 @@ export const providerAuthContext = (env: MotsEnvironment): AuthContext => ({
   },
 });
 
-function readStoredKiloToken(): string | undefined {
+/** Opt-in for reading ~/.pi/agent/auth.json. Any other value leaves the file unread. */
+const LOCAL_KILO_AUTH_ENV = "MOTS_ALLOW_LOCAL_KILO_AUTH";
+
+function allowsLocalKiloAuth(value: string | undefined): boolean {
+  return value?.trim() === "1";
+}
+
+/**
+ * Pi stores a Kilo access token in ~/.pi/agent/auth.json. The Worker reads that file only when
+ * MOTS_ALLOW_LOCAL_KILO_AUTH=1. The `require("node:fs")` call sits below that check.
+ */
+function readStoredKiloToken(allowLocalAuth: string | undefined): string | undefined {
+  if (!allowsLocalKiloAuth(allowLocalAuth)) return undefined;
   try {
     if (typeof process === "undefined" || !process.env) return undefined;
     const home = process.env.HOME || process.env.USERPROFILE;
@@ -385,6 +397,15 @@ function readStoredKiloToken(): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+let loggedKiloFreeSource = false;
+
+/** The free-tier key is intentional. Say so once per isolate, without the key. */
+function logKiloFreeSource(): void {
+  if (loggedKiloFreeSource) return;
+  loggedKiloFreeSource = true;
+  console.info("Kilo auth source: kilo-free");
 }
 
 export const toKiloPiModel = (
@@ -449,8 +470,11 @@ export const kiloGatewayProvider = (
         const value = await ctx.env(API_KEY_ENV.kilo);
         signal.throwIfAborted();
         if (value) return { auth: { apiKey: value }, source: API_KEY_ENV.kilo };
-        const local = readStoredKiloToken();
+        const allowLocal = await ctx.env(LOCAL_KILO_AUTH_ENV);
+        signal.throwIfAborted();
+        const local = readStoredKiloToken(allowLocal);
         if (local) return { auth: { apiKey: local }, source: "~/.pi/agent/auth.json" };
+        logKiloFreeSource();
         return { auth: { apiKey: "free" }, source: "kilo-free" };
       },
     },

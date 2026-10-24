@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { Module } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   API_KEY_ENV,
   CATALOG_TIMEOUT_MS,
@@ -10,6 +14,7 @@ import {
   createMotsModels,
   isFreeGatewayModel,
   isMotsProviderId,
+  kiloGatewayProvider,
   providerAuthContext,
   resolveMotsProvider,
   toPiModel,
@@ -270,6 +275,102 @@ describe("providerAuthContext", () => {
   test("never reports a credential file", async () => {
     const context = providerAuthContext({});
     expect(await context.fileExists("~/.config/mots/credentials.json")).toBe(false);
+  });
+});
+
+const LOCAL_KILO_TOKEN = "mots-local-kilo-token";
+
+const resolveKiloAuth = (env: Record<string, string | undefined>) => {
+  const resolve = kiloGatewayProvider([]).auth.apiKey?.resolve;
+  if (resolve === undefined) throw new Error("Kilo API key auth is missing");
+  return resolve({
+    ctx: providerAuthContext(env),
+    signal: new AbortController().signal,
+  });
+};
+
+/**
+ * `readStoredKiloToken` loads `node:fs` with `require` at call time. A spy on the ESM namespace
+ * misses that call, so this watches `Module.prototype.require` for the duration of one resolve.
+ */
+const withFsRequireProbe = async <T>(
+  work: () => Promise<T>,
+): Promise<{ readonly result: T; readonly fsLoads: readonly string[] }> => {
+  const original = Module.prototype.require;
+  const fsLoads: string[] = [];
+  Module.prototype.require = function (this: NodeModule, id: string) {
+    if (id === "fs" || id === "node:fs") fsLoads.push(id);
+    return original.call(this, id);
+  } as typeof Module.prototype.require;
+  try {
+    return { result: await work(), fsLoads };
+  } finally {
+    Module.prototype.require = original;
+  }
+};
+
+describe("kilo provider auth", () => {
+  test("reads ~/.pi/agent/auth.json only when MOTS_ALLOW_LOCAL_KILO_AUTH=1", async () => {
+    const home = mkdtempSync(join(tmpdir(), "mots-kilo-auth-"));
+    const previousHome = process.env.HOME;
+    const previousProfile = process.env.USERPROFILE;
+    const logged: string[] = [];
+    const originalInfo = console.info;
+    console.info = (...parts: unknown[]) => {
+      logged.push(parts.map((part) => String(part)).join(" "));
+    };
+    process.env.HOME = home;
+    delete process.env.USERPROFILE;
+    try {
+      mkdirSync(join(home, ".pi", "agent"), { recursive: true });
+      writeFileSync(
+        join(home, ".pi", "agent", "auth.json"),
+        JSON.stringify({ kilo: { access: LOCAL_KILO_TOKEN } }),
+      );
+
+      const blocked = await withFsRequireProbe(() => resolveKiloAuth({}));
+      const blockedAgain = await withFsRequireProbe(() => resolveKiloAuth({}));
+      expect(blocked.fsLoads).toEqual([]);
+      expect(blockedAgain.fsLoads).toEqual([]);
+      expect(blocked.result).toEqual({ auth: { apiKey: "free" }, source: "kilo-free" });
+      expect(blockedAgain.result).toEqual({ auth: { apiKey: "free" }, source: "kilo-free" });
+      expect(logged).toEqual(["Kilo auth source: kilo-free"]);
+
+      for (const flag of ["0", "true", "yes", ""]) {
+        const ignored = await withFsRequireProbe(() =>
+          resolveKiloAuth({ MOTS_ALLOW_LOCAL_KILO_AUTH: flag }),
+        );
+        expect(ignored.fsLoads).toEqual([]);
+        expect(ignored.result).toEqual({ auth: { apiKey: "free" }, source: "kilo-free" });
+      }
+      expect(logged).toEqual(["Kilo auth source: kilo-free"]);
+
+      const allowed = await withFsRequireProbe(() =>
+        resolveKiloAuth({ MOTS_ALLOW_LOCAL_KILO_AUTH: "1" }),
+      );
+      expect(allowed.fsLoads).toEqual(["node:fs"]);
+      expect(allowed.result).toEqual({
+        auth: { apiKey: LOCAL_KILO_TOKEN },
+        source: "~/.pi/agent/auth.json",
+      });
+      expect(logged).toEqual(["Kilo auth source: kilo-free"]);
+
+      const fromEnv = await withFsRequireProbe(() =>
+        resolveKiloAuth({
+          KILO_API_KEY: "sk-from-env",
+          MOTS_ALLOW_LOCAL_KILO_AUTH: "1",
+        }),
+      );
+      expect(fromEnv.fsLoads).toEqual([]);
+      expect(fromEnv.result).toEqual({ auth: { apiKey: "sk-from-env" }, source: "KILO_API_KEY" });
+    } finally {
+      console.info = originalInfo;
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+      if (previousProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = previousProfile;
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 });
 
