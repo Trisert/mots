@@ -17,6 +17,17 @@ export {
   VERCEL_GATEWAY_BASE_URL,
   vercelGatewayProvider,
 } from "./provider.ts";
+export {
+  apartLabel,
+  assertRecurrenceAllowed,
+  assertScheduleCapacity,
+  countOpenScheduleTasks,
+  DEFAULT_MAX_ACTIVE_SCHEDULES,
+  DEFAULT_MIN_RECURRENCE_MS,
+  recurrenceIntervalMs,
+  scheduleLimitsFromEnv,
+  type ScheduleLimits,
+} from "./schedule-limits.ts";
 export { scheduledDeadline } from "./schedule.ts";
 export {
   forgetTool,
