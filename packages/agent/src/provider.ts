@@ -45,6 +45,17 @@ export const isMotsProviderId = (value: string): value is MotsProviderId =>
   (MOTS_PROVIDERS as readonly string[]).includes(value);
 
 /**
+ * Blank or unset stays on Kilo. Any other value must be a known provider id.
+ * An unknown value throws so a typo cannot silently spend the Kilo key.
+ */
+export function resolveMotsProvider(value: string | undefined): MotsProviderId {
+  const trimmed = value?.trim() ?? "";
+  if (trimmed.length === 0) return "kilo";
+  if (isMotsProviderId(trimmed)) return trimmed;
+  throw new Error("MOTS_PROVIDER is not one of kilo, openrouter, vercel-ai-gateway, nvidia");
+}
+
+/**
  * The environment values a provider may read. The Cloudflare Worker environment is not a plain
  * record, so the accepted shape is structural: any object whose values are strings.
  */

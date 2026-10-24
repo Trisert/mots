@@ -1,3 +1,4 @@
+export { isAllowedAgentModel, ModelNotAllowedError, type ModelCatalog } from "./allowlist.ts";
 export { createMotsHarnessOptions, type MotsHarnessOptions } from "./chat.ts";
 export {
   API_KEY_ENV,
@@ -11,6 +12,7 @@ export {
   type MotsEnvironment,
   type MotsProviderId,
   providerAuthContext,
+  resolveMotsProvider,
   toPiModel,
   VERCEL_GATEWAY_BASE_URL,
   vercelGatewayProvider,
