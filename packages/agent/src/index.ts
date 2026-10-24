@@ -29,6 +29,7 @@ export {
   scheduleLimitsFromEnv,
   type ScheduleLimits,
 } from "./schedule-limits.ts";
+export { applyPushTokenCommand, PushTokenDoc } from "./push-token.ts";
 export { scheduledDeadline } from "./schedule.ts";
 export {
   forgetTool,
