@@ -55,8 +55,9 @@ Run from the repo root unless noted.
 | `bun install --frozen-lockfile` | Install workspace dependencies. |
 | `bun run typecheck` | `tsc` in every workspace. |
 | `bun run test` | Bun tests for protocol, client, agent, the Worker gate, and mobile pure functions. The suite is 134 tests. |
-| `bun run check:server` | `wrangler deploy --dry-run` for the Worker. |
-| `bun run check` | Typecheck, then the Worker dry-run. This is the gate for a PR. |
+| `bun run check:server` | `wrangler deploy --dry-run --env=""` for the top-level Worker `mots`. |
+| `bun run check:server:staging` | `wrangler deploy --dry-run --env staging` for `mots-staging`. Does not publish. |
+| `bun run check` | Typecheck, then the top-level Worker dry-run. This is the gate for a PR. |
 | `bun run dev:server` | `wrangler dev` on port 8787. See the Wrangler gotcha below. |
 | `bun run dev:server:lan` | Same, bound to `0.0.0.0`. |
 | `bun run dev:mobile` | Expo. |
@@ -64,7 +65,7 @@ Run from the repo root unless noted.
 | `bun run build:mobile` | Android Metro export only. There is no iOS export script. |
 | `bun run gateway:models` | Hits the public Vercel catalog. Needs network. Not part of CI. |
 
-CI (`.github/workflows/ci.yml`) runs typecheck, test, and the Worker dry-run on Ubuntu with Node 22 and Bun 1.4.4.
+CI (`.github/workflows/ci.yml`) runs typecheck, test, the top-level Worker dry-run, and `bun run check:server:staging` on Ubuntu with Node 22 and Bun 1.4.4. It does not deploy.
 
 ## How to verify a change
 
