@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { BackHandler, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ROOT_CONVERSATION_ID, type ConversationSummary } from "@mots/protocol";
@@ -85,7 +85,8 @@ export function SessionSheet({
   }, [liveModelId, liveProvider, pending]);
 
   useEffect(() => {
-    if (!visible) return;
+    // Calling BackHandler on web throws and takes down the sheet.
+    if (!visible || Platform.OS === "web") return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       onClose();
       return true;
