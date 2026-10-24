@@ -17,6 +17,8 @@ export {
 export const ROOT_CONVERSATION_ID = 1;
 export const MAX_PROMPT_CHARACTERS = 100_000;
 export const MAX_REQUEST_ID_CHARACTERS = 256;
+// Expo push tokens (`ExponentPushToken[...]`, `ExpoPushToken[...]`, or a legacy UUID).
+export const MAX_PUSH_TOKEN_CHARACTERS = 256;
 // JSON may escape each prompt code unit as six characters.
 export const MAX_CLIENT_FRAME_CHARACTERS =
   MAX_PROMPT_CHARACTERS * 6 + MAX_REQUEST_ID_CHARACTERS + 1024;
@@ -145,6 +147,15 @@ export type ClientCommand =
       readonly conversationId: number;
       readonly provider: string;
       readonly modelId: string;
+    }
+  | {
+      readonly type: "pushToken.register";
+      readonly requestId: string;
+      readonly token: string;
+    }
+  | {
+      readonly type: "pushToken.clear";
+      readonly requestId: string;
     };
 export type ClientCommandType = Exclude<ClientCommand["type"], "presence.typing">;
 
@@ -232,12 +243,30 @@ const requireId = (value: unknown, name: string): number => {
 const optionalId = (value: unknown, name: string): number | undefined =>
   value === undefined ? undefined : requireId(value, name);
 
+const EXPO_PUSH_TOKEN_PATTERN = /^(?:ExponentPushToken|ExpoPushToken)\[[^\s\[\]]+\]$/;
+const LEGACY_EXPO_PUSH_TOKEN_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const requirePushToken = (value: unknown): string => {
+  if (typeof value !== "string" || value.length === 0 || value.length > MAX_PUSH_TOKEN_CHARACTERS) {
+    throw new InvalidClientCommand(
+      `token must be a non-empty string of at most ${MAX_PUSH_TOKEN_CHARACTERS} characters`,
+    );
+  }
+  if (!EXPO_PUSH_TOKEN_PATTERN.test(value) && !LEGACY_EXPO_PUSH_TOKEN_PATTERN.test(value)) {
+    throw new InvalidClientCommand("token must be an Expo push token");
+  }
+  return value;
+};
+
 const commandTypes = new Set<ClientCommandType>([
   "conversation.open",
   "conversation.create",
   "conversation.fork",
   "prompt.submit",
   "conversation.setModel",
+  "pushToken.register",
+  "pushToken.clear",
 ]);
 
 const requireCommandType = (value: unknown): ClientCommandType => {
@@ -418,6 +447,10 @@ export function parseClientCommand(message: string): ClientCommand {
         modelId: value.modelId.trim(),
       };
     }
+    case "pushToken.register":
+      return { type: value.type, requestId, token: requirePushToken(value.token) };
+    case "pushToken.clear":
+      return { type: value.type, requestId };
     default:
       throw new InvalidClientCommand(`Unknown command type: ${value.type}`);
   }
