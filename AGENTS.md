@@ -28,8 +28,15 @@ Live chat needs a provider key in `apps/server/.dev.vars` (gitignored). Copy `ap
 
 | Variable | Required for |
 | --- | --- |
-| `MOTS_PROVIDER` | `kilo` (code default when unset), `openrouter`, `vercel-ai-gateway`, `nvidia` |
-| `MOTS_MODEL` | Optional. Defaults per provider are in `packages/agent/src/provider.ts` (`DEFAULT_MODELS`). |
+| `MOTS_SESSION_SECRET` | HMAC key for join codes. At least 16 characters. `POST /api/sessions` and the socket both return `503` when it is missing. Rotating it invalidates every code. |
+| `MOTS_CREATE_TOKEN` | Bearer for `POST /api/sessions`. At least 16 characters. Missing or wrong is `503` / `401`. A copy inside the app binary is extractable. |
+| `MOTS_CORS_ORIGINS` | Optional comma-separated browser origins. Unset or `*` allows every origin. Native apps send no `Origin`. |
+| `MOTS_PROVIDER` | `kilo` (code default when unset), `openrouter`, `vercel-ai-gateway`, `nvidia`. Any other value fails session startup. |
+| `MOTS_MODEL` | Optional. Defaults per provider are in `packages/agent/src/provider.ts` (`DEFAULT_MODELS`). `conversation.setModel` can only select a model the catalog actually contains. |
+| `MOTS_CREATE_LIMIT`, `MOTS_CREATE_WINDOW_SECONDS` | Optional. Default 8 creates per 10 minutes per address. Invalid values keep the default. |
+| `MOTS_CONNECT_LIMIT`, `MOTS_CONNECT_WINDOW_SECONDS` | Optional. Default 60 connects per minute per address. |
+| `MOTS_MAX_SCHEDULES` | Optional. Default 8 non-terminal delivery tasks. Range 1–100. |
+| `MOTS_MIN_RECURRENCE_SECONDS` | Optional. Default 900. Values below 60 are ignored. One-shots stay at 1 second. |
 | `KILO_API_KEY` | Kilo. If unset, local dev may read `~/.pi/agent/auth.json` or send the literal key `free`. |
 | `OPENROUTER_API_KEY` | OpenRouter |
 | `AI_GATEWAY_API_KEY` | Vercel AI Gateway. The mobile sheet text says `AI_GATEWAY_TOKEN`; that name is wrong. |
@@ -46,7 +53,7 @@ Run from the repo root unless noted.
 | --- | --- |
 | `bun install --frozen-lockfile` | Install workspace dependencies. |
 | `bun run typecheck` | `tsc` in every workspace. |
-| `bun run test` | Bun tests for protocol, client, agent, and mobile pure functions. |
+| `bun run test` | Bun tests for protocol, client, agent, the Worker gate, and mobile pure functions. |
 | `bun run check:server` | `wrangler deploy --dry-run` for the Worker. |
 | `bun run check` | Typecheck, then the Worker dry-run. This is the gate for a PR. |
 | `bun run dev:server` | `wrangler dev` on port 8787. See the Wrangler gotcha below. |
@@ -94,11 +101,13 @@ Do not "fix" a 503 by editing Worker code. Fix the runtime first.
 
 ## Gotchas
 
-- The README still says the default provider is OpenRouter and that there are 19 tests. The code defaults to `kilo` / `reflection/beam-free` (`packages/agent/src/chat.ts`, `apps/server/src/session.ts`). `bun test` currently runs 70 tests. Trust the code, then fix the README in a docs task.
+- The code defaults to `kilo` / `reflection/beam-free` (`packages/agent/src/provider.ts`, `DEFAULT_MODELS`). An unknown `MOTS_PROVIDER` fails session startup.
 - Onboarding shows the server URL and never edits it. `setApiUrl` in `apps/mobile/src/screens/OnboardingScreen.tsx` is unused. Android defaults to `http://10.0.2.2:8787`, everything else to `http://localhost:8787`, unless `EXPO_PUBLIC_MOTS_API_URL` is set at bundle time.
 - `ChatScreen` does not render `state.error`. A failed socket still looks like "connecting".
 - The model pill is local React state. It does not read the model the Durable Object actually configured.
-- Session ids are unauthenticated capabilities. The socket route accepts any `[A-Za-z0-9_-]{1,128}`, and `getByName` creates the Durable Object. Do not log session ids, prompts, or API keys.
+- The socket path still matches `[A-Za-z0-9_-]{1,128}`, but `getByName` runs only after `verifySessionCapability`. The Durable Object name is the uuid, never the full join code. `POST /api/sessions` does not create a Durable Object. Do not log session ids, prompts, or API keys.
+- Do not re-open a legacy uuid bypass. Existing installs that stored a bare uuid must create or join again. The mobile adoption steps are in the README section "Mobile client adoption". Leave `apps/mobile` to the UX work unless the task says otherwise.
+- Rate limits in `apps/server/src/rate-limit.ts` are per Worker isolate. They use `CF-Connecting-IP` only. Do not add a second Durable Object class for them without a migration plan.
 - `readStoredKiloToken()` in `packages/agent/src/provider.ts` reads `~/.pi/agent/auth.json` when `KILO_API_KEY` is unset. On a laptop that uses the developer's personal token. Do not copy that file into the repo or the cloud VM.
 - Recurring reminders do not reschedule themselves. After delivery, the model is asked to call `schedule` with `sourceScheduleId`. If it does not, the routine stops.
 - `createMotsModels` fetches the Kilo and Vercel catalogs during Durable Object startup, with no timeout, even when the selected provider is OpenRouter or NVIDIA.
@@ -112,13 +121,15 @@ Check and test need no secrets. A live Worker or a deploy does.
 
 Set these as Cursor environment secrets, then have the agent write them into `apps/server/.dev.vars` (mode `600`, gitignored). Do not put the values in `environment.json`, the workflow, or a commit.
 
+- `MOTS_SESSION_SECRET` and `MOTS_CREATE_TOKEN` before any live session. Generate each with `openssl rand -base64 32`. Do not commit them and do not reuse a placeholder.
 - `KILO_API_KEY` (optional; Kilo can fall back to a free tier)
 - `OPENROUTER_API_KEY`
 - `AI_GATEWAY_API_KEY`
 - `NVIDIA_API_KEY`
 - `MOTS_PROVIDER` and `MOTS_MODEL` if you want a non-default pair
-- `CLOUDFLARE_API_TOKEN` only if the agent is supposed to deploy. Scope it to this Worker. Prefer not to until auth and rate limits exist.
+- `MOTS_CORS_ORIGINS` before a public web client
+- `CLOUDFLARE_API_TOKEN` only if the agent is supposed to deploy. Scope it to this Worker. Do not deploy until the mobile app sends the create-token bearer.
 
-`EXPO_PUBLIC_MOTS_API_URL` is public. Set it in the environment if the web preview should target a tunnel or a deployed Worker. It is inlined into the client bundle.
+`EXPO_PUBLIC_MOTS_API_URL` is public. Set it in the environment if the web preview should target a tunnel or a deployed Worker. It is inlined into the client bundle. `EXPO_PUBLIC_MOTS_CREATE_TOKEN` would also be inlined. It is an app-wide gate, not a per-user secret.
 
 The dashboard environment for this repo is separate from the committed `.cursor/environment.json`. Saving the environment in Cursor is what makes the install script run for agents on the current environment. See the setup section of the pull request that added this file.

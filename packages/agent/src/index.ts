@@ -1,3 +1,4 @@
+export { isAllowedAgentModel, ModelNotAllowedError, type ModelCatalog } from "./allowlist.ts";
 export { createMotsHarnessOptions, type MotsHarnessOptions } from "./chat.ts";
 export {
   API_KEY_ENV,
@@ -11,10 +12,22 @@ export {
   type MotsEnvironment,
   type MotsProviderId,
   providerAuthContext,
+  resolveMotsProvider,
   toPiModel,
   VERCEL_GATEWAY_BASE_URL,
   vercelGatewayProvider,
 } from "./provider.ts";
+export {
+  apartLabel,
+  assertRecurrenceAllowed,
+  assertScheduleCapacity,
+  countOpenScheduleTasks,
+  DEFAULT_MAX_ACTIVE_SCHEDULES,
+  DEFAULT_MIN_RECURRENCE_MS,
+  recurrenceIntervalMs,
+  scheduleLimitsFromEnv,
+  type ScheduleLimits,
+} from "./schedule-limits.ts";
 export { scheduledDeadline } from "./schedule.ts";
 export {
   forgetTool,

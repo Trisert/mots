@@ -9,11 +9,11 @@ import { forgetTool, memorySection, rememberTool } from "./memory.ts";
 import {
   createMotsModels,
   DEFAULT_MODELS,
-  isMotsProviderId,
   type MotsEnvironment,
   type MotsProviderId,
 } from "./provider.ts";
 import { DeliverScheduledInstruction } from "./schedule.ts";
+import { scheduleLimitsFromEnv } from "./schedule-limits.ts";
 import { conversationSearchExtension, searchHistoryTool } from "./search.ts";
 import { createScheduleTool } from "./tools.ts";
 
@@ -28,7 +28,7 @@ export async function createMotsHarnessOptions(
   ensureWakeupAt: (timestamp: number) => Promise<void>,
   options: MotsHarnessOptions = {},
 ): Promise<HarnessOptions> {
-  const scheduleTool = createScheduleTool(ensureWakeupAt);
+  const scheduleTool = createScheduleTool(ensureWakeupAt, scheduleLimitsFromEnv(options.env));
   const motsExtension = defineExtension({
     name: "mots",
     tasks: [DeliverScheduledInstruction],
