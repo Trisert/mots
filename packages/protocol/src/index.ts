@@ -6,6 +6,14 @@ import type {
   TaskGraphState,
 } from "@earendil-works/pi-durable";
 
+export {
+  COMMAND_ERROR,
+  HTTP_ERROR,
+  parseSessionCapability,
+  SESSION_CAPABILITY_PATTERN,
+  type SessionCapability,
+} from "./session-capability.ts";
+
 export const ROOT_CONVERSATION_ID = 1;
 export const MAX_PROMPT_CHARACTERS = 100_000;
 export const MAX_REQUEST_ID_CHARACTERS = 256;

@@ -5,6 +5,18 @@ interface __BaseEnv_Env {
   NVIDIA_API_KEY?: string;
   MOTS_PROVIDER?: string;
   MOTS_MODEL?: string;
+  /** HMAC key for join codes. At least 16 characters. Rotating it invalidates every code. */
+  MOTS_SESSION_SECRET?: string;
+  /** Bearer token required on POST /api/sessions. At least 16 characters. */
+  MOTS_CREATE_TOKEN?: string;
+  /** Comma-separated browser origins. Unset or `*` allows every origin. */
+  MOTS_CORS_ORIGINS?: string;
+  MOTS_CREATE_LIMIT?: string;
+  MOTS_CREATE_WINDOW_SECONDS?: string;
+  MOTS_CONNECT_LIMIT?: string;
+  MOTS_CONNECT_WINDOW_SECONDS?: string;
+  MOTS_MAX_SCHEDULES?: string;
+  MOTS_MIN_RECURRENCE_SECONDS?: string;
   SESSIONS: DurableObjectNamespace<import("./src/index").Session>;
 }
 

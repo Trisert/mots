@@ -1,10 +1,32 @@
-# Provider: openrouter (default) | vercel-ai-gateway | nvidia
+# Provider: kilo (default when unset) | openrouter | vercel-ai-gateway | nvidia
 # MOTS_PROVIDER=vercel-ai-gateway
 # Model. Defaults per provider:
 #   openrouter          -> openai/gpt-6-luna
 #   vercel-ai-gateway   -> reflection/beam-free
 #   nvidia              -> nvidia/nemotron-3.5-lightning-30b-a3b
 # MOTS_MODEL=reflection/beam-free
+
+# Required before any session can be created or joined. At least 16 characters.
+# Generate with: openssl rand -base64 32
+# Rotating MOTS_SESSION_SECRET invalidates every existing join code.
+MOTS_SESSION_SECRET=
+# Required on POST /api/sessions as `Authorization: Bearer <token>`.
+# A public app binary can be unpacked, so this stops anonymous callers, not a determined one.
+MOTS_CREATE_TOKEN=
+
+# Browser origins allowed to call the Worker. Leave unset to allow every origin.
+# Native apps do not send Origin. Set this before exposing a web client.
+# MOTS_CORS_ORIGINS=http://localhost:8081,http://localhost:19006
+
+# Optional spend caps. Defaults: 8 creates / 10 minutes / address, 60 connects / minute,
+# 8 active schedules, recurrence no faster than every 15 minutes.
+# Limits are per Worker isolate. Put an edge rate limit in front of a public hostname.
+# MOTS_CREATE_LIMIT=8
+# MOTS_CREATE_WINDOW_SECONDS=600
+# MOTS_CONNECT_LIMIT=60
+# MOTS_CONNECT_WINDOW_SECONDS=60
+# MOTS_MAX_SCHEDULES=8
+# MOTS_MIN_RECURRENCE_SECONDS=900
 
 # openrouter
 OPENROUTER_API_KEY=
