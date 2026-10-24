@@ -5,11 +5,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ROOT_CONVERSATION_ID, type ConversationSummary } from "@mots/protocol";
 import { normalizeBaseUrl } from "../config";
 import { useTheme } from "../context/ThemeContext";
-import { presentModel, providerLabel, type PresentedModel } from "../present";
+import { presentModel, providerLabel, shortModelName, type PresentedModel } from "../present";
 import { PROVIDER_MODELS, PROVIDERS } from "../models";
-import { CheckIcon, ChevronRightIcon, CloseIcon } from "./Icon";
-import { hit, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
-import { Button } from "../ui/Button";
+import { hit, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TextField } from "../ui/TextField";
 import { ThemeSwitcher } from "../ui/ThemeSwitcher";
 
@@ -61,6 +59,8 @@ export function SessionSheet({
   const [copied, setCopied] = useState(false);
   const [draftUrl, setDraftUrl] = useState(apiUrl);
   const [urlError, setUrlError] = useState<string | undefined>();
+  const [modelsOpen, setModelsOpen] = useState(false);
+  const [serverOpen, setServerOpen] = useState(false);
 
   const liveProvider = activeModel?.provider;
   const wasVisible = useRef(false);
@@ -98,8 +98,8 @@ export function SessionSheet({
 
   const models = PROVIDER_MODELS[selectedProviderId] ?? [];
   const inUse = activeModel === undefined
-    ? "Il server non ha ancora indicato il modello."
-    : `In uso: ${providerLabel(activeModel.provider)} · ${activeModel.modelId}`;
+    ? "Modello"
+    : `${providerLabel(activeModel.provider)} · ${shortModelName(activeModel.modelId)}`;
 
   const copyCode = async () => {
     try {
@@ -136,108 +136,67 @@ export function SessionSheet({
         testID="session-sheet"
         style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}
       >
-        <View style={styles.handle} />
         <View style={styles.header}>
-          <View style={styles.headerCopy}>
-            <Text accessibilityRole="header" style={styles.title}>
-              {username !== undefined && username.length > 0 ? username : "Mots"}
-            </Text>
-            <Text style={styles.subtitle}>Conversazioni e sessione</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Chiudi menu"
-            onPress={onClose}
-            style={styles.close}
-          >
-            <CloseIcon size={16} color={colors.textPrimary} />
+          <Text accessibilityRole="header" style={styles.title}>
+            {username !== undefined && username.length > 0 ? username : "Mots"}
+          </Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Chiudi menu" onPress={onClose} style={styles.row}>
+            <Text style={styles.rowLabel}>Chiudi</Text>
           </Pressable>
         </View>
-
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.block}>
-            <Text style={styles.section}>Condivisione</Text>
-            <Text selectable accessibilityLabel={`Codice sessione ${sessionId}`} style={styles.code}>
-              {sessionId}
-            </Text>
-            <Text style={styles.body}>
-              Condividi il codice per intero. La parte dopo il trattino basso è la firma.
-            </Text>
-            <View style={styles.row}>
-              <View style={styles.rowItem}>
-                <Button
-                  label={copied ? "Copiato" : "Copia codice"}
-                  variant="secondary"
-                  onPress={() => void copyCode()}
-                />
-              </View>
-              <View style={styles.rowItem}>
-                <Button label="Condividi" variant="secondary" onPress={onShare} />
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.block}>
-            <Text style={styles.section}>Conversazioni</Text>
-            <Button
-              label="Nuova chat"
-              onPress={() => {
-                onCreate();
-                onClose();
-              }}
-            />
-            {conversations.length === 0 ? (
-              <Text style={styles.empty}>Nessuna chat ancora.</Text>
-            ) : (
-              conversations.map((conversation, index) => {
-                const active = conversation.id === activeConversationId;
-                const name = conversationName(conversation, index);
-                return (
-                  <Pressable
-                    key={conversation.id}
-                    accessibilityRole="button"
-                    accessibilityLabel={name}
-                    accessibilityState={{ selected: active }}
-                    onPress={() => {
-                      onSelect(conversation.id);
-                      onClose();
-                    }}
-                    style={({ pressed }) => [
-                      styles.item,
-                      active && styles.itemActive,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <View style={styles.itemCopy}>
-                      <Text style={[styles.itemTitle, active && styles.itemTitleActive]}>{name}</Text>
-                      <Text style={styles.itemMeta}>{active ? "Aperta" : "Apri"}</Text>
-                    </View>
-                    {active ? (
-                      <CheckIcon size={16} color={colors.textPrimary} />
-                    ) : (
-                      <ChevronRightIcon size={16} color={colors.textSecondary} />
-                    )}
-                  </Pressable>
-                );
-              })
-            )}
-          </View>
-
-          <View style={styles.block}>
-            <Text style={styles.section}>Modello</Text>
-            <Text style={styles.body}>{inUse}</Text>
-            {pending !== undefined ? (
-              <Text style={styles.body}>Richiesto {pending.modelId}. Aspetto conferma dal server.</Text>
-            ) : null}
-            <View style={styles.providers}>
+        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <Text selectable accessibilityLabel={`Codice sessione ${sessionId}`} style={styles.code}>
+            {sessionId}
+          </Text>
+          <Pressable accessibilityRole="button" onPress={() => void copyCode()} style={styles.row}>
+            <Text style={styles.rowLabel}>{copied ? "Copiato" : "Copia"}</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={onShare} style={styles.row}>
+            <Text style={styles.rowLabel}>Condividi</Text>
+          </Pressable>
+          <View style={styles.rule} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Nuova chat"
+            onPress={() => {
+              onCreate();
+              onClose();
+            }}
+            style={styles.row}
+          >
+            <Text style={styles.rowLabel}>Nuova chat</Text>
+          </Pressable>
+          {conversations.map((conversation, index) => {
+            const active = conversation.id === activeConversationId;
+            const name = conversationName(conversation, index);
+            return (
+              <Pressable
+                key={conversation.id}
+                accessibilityRole="button"
+                accessibilityLabel={name}
+                accessibilityState={{ selected: active }}
+                onPress={() => onSelect(conversation.id)}
+                style={styles.row}
+              >
+                <Text style={[styles.rowLabel, active && styles.rowActive]}>{name}</Text>
+              </Pressable>
+            );
+          })}
+          <View style={styles.rule} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={inUse}
+            accessibilityState={{ expanded: modelsOpen }}
+            onPress={() => setModelsOpen((open) => !open)}
+            style={styles.row}
+          >
+            <Text style={styles.rowLabel}>{inUse}</Text>
+          </Pressable>
+          {pending !== undefined ? <Text style={styles.note}>In attesa</Text> : null}
+          {modelsOpen ? (
+            <View>
               {PROVIDERS.map((provider) => {
                 const selected = provider.id === selectedProviderId;
-                const live = activeModel?.provider === provider.id;
                 return (
                   <Pressable
                     key={provider.id}
@@ -245,72 +204,60 @@ export function SessionSheet({
                     accessibilityLabel={provider.name}
                     accessibilityState={{ selected }}
                     onPress={() => setSelectedProviderId(provider.id)}
-                    style={[
-                      styles.provider,
-                      {
-                        backgroundColor: selected ? colors.textPrimary : colors.bgMain,
-                        borderColor: selected ? colors.textPrimary : colors.borderSubtle,
-                      },
-                    ]}
+                    style={styles.row}
                   >
-                    <Text style={[styles.providerLabel, { color: selected ? colors.bgMain : colors.textPrimary }]}>
-                      {provider.name}
-                      {live ? " · in uso" : ""}
-                    </Text>
+                    <Text style={[styles.rowLabel, selected && styles.rowActive]}>{provider.name}</Text>
+                  </Pressable>
+                );
+              })}
+              {models.map((model) => {
+                const live = activeModel?.provider === selectedProviderId && activeModel.modelId === model.id;
+                return (
+                  <Pressable
+                    key={model.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={model.name}
+                    accessibilityState={{ selected: live }}
+                    onPress={() => chooseModel(model.id)}
+                    style={styles.row}
+                  >
+                    <Text style={[styles.rowLabel, live && styles.rowActive]}>{model.name}</Text>
                   </Pressable>
                 );
               })}
             </View>
-            <Text style={styles.meta}>
-              {(PROVIDERS.find((provider) => provider.id === selectedProviderId) ?? PROVIDERS[0])?.details}
-              {" · "}
-              {(PROVIDERS.find((provider) => provider.id === selectedProviderId) ?? PROVIDERS[0])?.endpoint}
-            </Text>
-            {models.map((model) => {
-              const live = activeModel?.provider === selectedProviderId && activeModel.modelId === model.id;
-              return (
-                <Pressable
-                  key={model.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${model.name}. ${model.id}`}
-                  accessibilityState={{ selected: live }}
-                  onPress={() => chooseModel(model.id)}
-                  style={({ pressed }) => [styles.item, live && styles.itemActive, pressed && styles.pressed]}
-                >
-                  <View style={styles.itemCopy}>
-                    <Text style={styles.itemTitle}>{model.name}</Text>
-                    <Text style={styles.itemMeta}>
-                      {model.tag}
-                      {live ? " · in uso" : ""}
-                    </Text>
-                  </View>
-                  {live ? <CheckIcon size={16} color={colors.textPrimary} /> : null}
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <View style={styles.block}>
-            <Text style={styles.section}>Server</Text>
-            <TextField
-              label="Indirizzo"
-              value={draftUrl}
-              onChangeText={setDraftUrl}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              error={urlError}
-              hint="Salvare riconnette questa sessione al nuovo indirizzo."
-            />
-            <Button label="Salva server" variant="secondary" onPress={saveUrl} />
-          </View>
-
-          <View style={styles.block}>
-            <Text style={styles.section}>Tema</Text>
-            <ThemeSwitcher />
-          </View>
-
-          <Button label="Esci" variant="danger" accessibilityLabel="Esci dalla sessione" onPress={onLeave} />
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Server"
+            accessibilityState={{ expanded: serverOpen }}
+            onPress={() => setServerOpen((open) => !open)}
+            style={styles.row}
+          >
+            <Text style={styles.rowLabel}>Server</Text>
+          </Pressable>
+          {serverOpen ? (
+            <View style={styles.server}>
+              <TextField
+                label="Indirizzo"
+                value={draftUrl}
+                onChangeText={setDraftUrl}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                error={urlError}
+              />
+              <Pressable accessibilityRole="button" accessibilityLabel="Salva server" onPress={saveUrl} style={styles.row}>
+                <Text style={styles.rowLabel}>Salva</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          <View style={styles.rule} />
+          <ThemeSwitcher />
+          <View style={styles.rule} />
+          <Pressable accessibilityRole="button" accessibilityLabel="Esci dalla sessione" onPress={onLeave} style={styles.row}>
+            <Text style={styles.rowLabel}>Esci</Text>
+          </Pressable>
         </ScrollView>
       </View>
     </View>
@@ -322,150 +269,62 @@ function createStyles(colors: ThemeColors) {
     container: {
       ...StyleSheet.absoluteFill,
       zIndex: 20,
+      justifyContent: "flex-end",
     },
     backdrop: {
       ...StyleSheet.absoluteFill,
       backgroundColor: colors.overlay,
     },
     sheet: {
-      position: "absolute",
-      left: 0,
-      right: 0,
-      bottom: 0,
-      maxHeight: "92%",
-      borderTopLeftRadius: radius.xl,
-      borderTopRightRadius: radius.xl,
+      maxHeight: "88%",
       backgroundColor: colors.bgMain,
-      paddingTop: spacing.sm,
-      paddingHorizontal: spacing.lg,
-      borderWidth: 1,
-      borderColor: colors.borderSubtle,
-    },
-    handle: {
-      alignSelf: "center",
-      width: 40,
-      height: 4,
-      borderRadius: radius.pill,
-      backgroundColor: colors.borderMedium,
-      marginBottom: spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.borderSubtle,
+      paddingTop: spacing.md,
     },
     header: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      marginBottom: spacing.md,
-    },
-    headerCopy: {
-      flex: 1,
-      gap: 2,
+      paddingHorizontal: spacing.xl,
     },
     title: {
-      ...typeScale.heading,
+      ...typeScale.body,
       color: colors.textPrimary,
-    },
-    subtitle: {
-      ...typeScale.small,
-      color: colors.textSecondary,
-    },
-    close: {
-      width: hit,
-      height: hit,
-      borderRadius: hit / 2,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: colors.cardSurfacePrimary,
-    },
-    scroll: {
-      flexShrink: 1,
-    },
-    scrollContent: {
-      gap: spacing.xl,
-      paddingBottom: spacing.lg,
-    },
-    block: {
-      gap: spacing.sm,
-    },
-    section: {
-      ...typeScale.caption,
-      color: colors.textSecondary,
-      letterSpacing: 0.4,
     },
     code: {
       ...typeScale.small,
-      color: colors.textPrimary,
-      backgroundColor: colors.cardSurfacePrimary,
-      borderRadius: radius.md,
-      borderWidth: 1,
-      borderColor: colors.borderSubtle,
-      padding: spacing.md,
+      color: colors.textSecondary,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.md,
     },
     row: {
-      flexDirection: "row",
-      gap: spacing.sm,
-    },
-    rowItem: {
-      flex: 1,
-    },
-    body: {
-      ...typeScale.small,
-      color: colors.textSecondary,
-    },
-    meta: {
-      ...typeScale.caption,
-      color: colors.textFaint,
-    },
-    empty: {
-      ...typeScale.small,
-      color: colors.textSecondary,
-    },
-    providers: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: spacing.sm,
-    },
-    provider: {
       minHeight: hit,
-      borderRadius: radius.pill,
-      borderWidth: 1,
-      paddingHorizontal: spacing.md,
-      alignItems: "center",
       justifyContent: "center",
+      paddingHorizontal: spacing.xl,
     },
-    providerLabel: {
-      ...typeScale.label,
-    },
-    item: {
-      minHeight: hit,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.md,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      borderRadius: radius.md,
-      backgroundColor: colors.cardSurfacePrimary,
-      borderWidth: 1,
-      borderColor: colors.borderSubtle,
-    },
-    itemActive: {
-      borderColor: colors.textPrimary,
-    },
-    itemCopy: {
-      flex: 1,
-      gap: 2,
-    },
-    itemTitle: {
-      ...typeScale.bodyMedium,
+    rowLabel: {
+      ...typeScale.body,
       color: colors.textPrimary,
     },
-    itemTitleActive: {
-      fontWeight: "600",
+    rowActive: {
+      color: colors.textPrimary,
     },
-    itemMeta: {
-      ...typeScale.caption,
+    note: {
+      ...typeScale.small,
       color: colors.textSecondary,
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.sm,
     },
-    pressed: {
-      opacity: 0.75,
+    rule: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: colors.borderSubtle,
+      marginVertical: spacing.sm,
+      marginHorizontal: spacing.xl,
+    },
+    server: {
+      paddingHorizontal: spacing.xl,
+      gap: spacing.sm,
     },
   });
 }

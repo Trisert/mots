@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../context/ThemeContext";
-import { CloseIcon } from "../components/Icon";
-import { hit, radius, spacing, type as typeScale } from "../theme";
+import { presentCalmError } from "../present";
+import { hit, spacing, type as typeScale } from "../theme";
 
 type Props = {
   readonly message: string;
@@ -11,80 +12,71 @@ type Props = {
   readonly onDismiss?: () => void;
 };
 
-export function Banner({ message, tone = "danger", actionLabel, onAction, onDismiss }: Props) {
+export function Banner({ message, actionLabel = "Riprova", onAction, onDismiss }: Props) {
   const { colors } = useTheme();
-  const background = tone === "danger" ? colors.dangerSoft : colors.cardSurfacePrimary;
-  const foreground = tone === "danger" ? colors.danger : colors.textPrimary;
+  const calm = presentCalmError(message);
+  const [open, setOpen] = useState(false);
+  const action = onAction ?? onDismiss;
+  const actionText = onAction !== undefined ? actionLabel : onDismiss !== undefined ? "Chiudi" : undefined;
 
   return (
-    <View
-      accessibilityRole="alert"
-      accessibilityLiveRegion="polite"
-      style={[
-        styles.banner,
-        { backgroundColor: background, borderColor: colors.borderSubtle },
-      ]}
-    >
-      <Text style={[styles.message, { color: foreground }]}>{message}</Text>
+    <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.banner}>
+      <Text style={[styles.message, { color: colors.textPrimary }]}>{calm.line}</Text>
       <View style={styles.actions}>
-        {actionLabel !== undefined && onAction !== undefined ? (
+        {action !== undefined && actionText !== undefined ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={actionLabel}
-            onPress={onAction}
-            style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+            accessibilityLabel={actionText}
+            onPress={action}
+            style={styles.action}
           >
-            <Text style={[styles.actionLabel, { color: foreground }]}>{actionLabel}</Text>
+            <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>{actionText}</Text>
           </Pressable>
         ) : null}
-        {onDismiss !== undefined ? (
+        {calm.detail !== undefined ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Chiudi avviso"
-            onPress={onDismiss}
-            hitSlop={8}
-            style={({ pressed }) => [styles.dismiss, pressed && styles.pressed]}
+            accessibilityLabel="Dettagli"
+            onPress={() => setOpen((current) => !current)}
+            style={styles.action}
           >
-            <CloseIcon size={14} color={foreground} />
+            <Text style={[styles.detailLink, { color: colors.textSecondary }]}>Dettagli</Text>
           </Pressable>
         ) : null}
       </View>
+      {open && calm.detail !== undefined ? (
+        <Text selectable style={[styles.detail, { color: colors.textSecondary }]}>
+          {calm.detail}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   banner: {
-    borderRadius: radius.md,
-    borderWidth: 1,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
   },
   message: {
-    ...typeScale.small,
+    ...typeScale.body,
   },
   actions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    gap: spacing.lg,
   },
   action: {
     minHeight: hit,
     justifyContent: "center",
-    paddingHorizontal: spacing.sm,
   },
   actionLabel: {
-    ...typeScale.label,
-    fontWeight: "600",
+    ...typeScale.body,
   },
-  dismiss: {
-    width: hit,
-    height: hit,
-    alignItems: "center",
-    justifyContent: "center",
+  detailLink: {
+    ...typeScale.small,
   },
-  pressed: {
-    opacity: 0.7,
+  detail: {
+    ...typeScale.small,
   },
 });

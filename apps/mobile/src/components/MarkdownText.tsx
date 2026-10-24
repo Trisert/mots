@@ -108,7 +108,7 @@ function CodeBlockView({
         >
           {copied ? (
             <>
-              <CheckIcon size={12} color={colors.accentGreen} />
+              <CheckIcon size={12} color={colors.textSecondary} />
               <Text style={[styles.copyButtonText, styles.copiedText]}>Copiato!</Text>
             </>
           ) : (
@@ -306,7 +306,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     },
     quoteBar: {
       width: 4,
-      backgroundColor: colors.accent,
+      backgroundColor: colors.borderSubtle,
     },
     quoteBody: {
       flex: 1,
@@ -331,7 +331,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     },
     listBullet: {
       fontFamily: fonts.bold,
-      color: colors.accent,
+      color: colors.textSecondary,
       fontSize: 15,
       fontWeight: "700",
       lineHeight: 22,
@@ -384,7 +384,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       fontWeight: "600",
     },
     copiedText: {
-      color: colors.accentGreen,
+      color: colors.codeText,
     },
     codeScroll: {
       padding: spacing.md,

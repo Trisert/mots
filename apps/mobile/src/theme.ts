@@ -1,36 +1,29 @@
 import { Platform, type TextStyle } from "react-native";
 
 /**
- * Mots visual system.
- *
- * Dark is the primary theme: warm black, cream type, and a sand accent used
- * only for focus, links, and quiet status. Light is the same structure on
- * warm paper, with a darker clay accent so text stays readable. Primary
- * actions are ink and cream, not a saturated fill.
- *
- * Legacy color names (accentCoral, cardSurfaceMint, …) stay so older
- * components keep compiling. New UI should prefer the semantic names.
+ * Flat near-black and near-white. One stone accent, used only on the primary
+ * action and the send button. Legacy color names stay so unused components compile.
  */
 
-const ink = "#1C1915";
-const paper = "#F6F3EC";
-const cream = "#F4F0E8";
-const sand = "#E7C4A8";
-const clay = "#7A4632";
+const ink = "#121211";
+const paper = "#F7F7F5";
+const cream = "#F3F3F1";
+const accent = "#6E5A4C";
+const accentInk = "#F7F6F3";
 
 export const lightColors = {
   bgMain: paper,
-  cardSurfacePrimary: "#FFFFFF",
-  cardSurfaceAmber: "#F3EBE1",
-  cardSurfaceMint: "#F3F6F2",
-  cardSurfacePink: "#F8EEEB",
-  accentCoral: clay,
-  accentGreen: "#2F6B4F",
-  starHighlight: clay,
+  cardSurfacePrimary: paper,
+  cardSurfaceAmber: paper,
+  cardSurfaceMint: paper,
+  cardSurfacePink: paper,
+  accentCoral: accent,
+  accentGreen: "#3E3E3C",
+  starHighlight: ink,
   textPrimary: ink,
-  textSecondary: "#5C564F",
-  borderSubtle: "#E4DDD2",
-  borderMedium: "#D4CBBF",
+  textSecondary: "#6E6E6A",
+  borderSubtle: "#E2E2DE",
+  borderMedium: "#D0D0CC",
 
   codeSurface: ink,
   codeSurfaceHeader: "#141210",
@@ -51,45 +44,45 @@ export const lightColors = {
   avatarBlue: "#4E5A62",
   avatarGreen: "#3E5C4A",
   avatarOrange: "#8A5A3A",
-  avatarRed: clay,
+  avatarRed: accent,
   avatarTeal: "#3E5652",
 
   background: paper,
-  surface: "#FFFFFF",
-  surfaceRaised: "#FFFCF7",
-  surfaceSoft: "#F3EFE8",
-  border: "#E4DDD2",
-  borderStrong: "#C9BDB0",
+  surface: paper,
+  surfaceRaised: paper,
+  surfaceSoft: "#EEEEEC",
+  border: "#E2E2DE",
+  borderStrong: "#C8C8C4",
   text: ink,
-  textMuted: "#5C564F",
-  textFaint: "#65605A",
-  accent: clay,
-  accentSoft: "#F3EBE1",
-  accentInk: paper,
-  userBubble: "#E7E0D4",
+  textMuted: "#6E6E6A",
+  textFaint: "#8A8A86",
+  accent,
+  accentSoft: paper,
+  accentInk,
+  userBubble: "#EEEEEC",
   userBubbleText: ink,
   onAccentFaint: "#5C564F",
   danger: "#8E3E32",
   dangerSoft: "#F8EEEB",
   success: "#2F6B4F",
   overlay: "rgba(28, 25, 21, 0.42)",
-  link: clay,
-  frame: "#E6DFD4",
+  link: ink,
+  frame: paper,
 } as const;
 
 export const darkColors = {
-  bgMain: "#12110E",
-  cardSurfacePrimary: "#1C1B17",
-  cardSurfaceAmber: "#262119",
-  cardSurfaceMint: "#1A211C",
-  cardSurfacePink: "#261C1A",
-  accentCoral: sand,
-  accentGreen: "#B7D4C2",
-  starHighlight: sand,
+  bgMain: "#0E0E0D",
+  cardSurfacePrimary: "#0E0E0D",
+  cardSurfaceAmber: "#0E0E0D",
+  cardSurfaceMint: "#0E0E0D",
+  cardSurfacePink: "#0E0E0D",
+  accentCoral: accent,
+  accentGreen: "#C8C8C4",
+  starHighlight: cream,
   textPrimary: cream,
-  textSecondary: "#B7B1A6",
-  borderSubtle: "rgba(244, 240, 232, 0.10)",
-  borderMedium: "rgba(244, 240, 232, 0.18)",
+  textSecondary: "#8E8E8A",
+  borderSubtle: "#2C2C2A",
+  borderMedium: "#3A3A38",
 
   codeSurface: "#0E0D0B",
   codeSurfaceHeader: "#0A0908",
@@ -109,31 +102,31 @@ export const darkColors = {
   avatarPurple: "#A39890",
   avatarBlue: "#9AA7AE",
   avatarGreen: "#B7D4C2",
-  avatarOrange: sand,
+  avatarOrange: accent,
   avatarRed: "#E7B2A8",
   avatarTeal: "#B7D0C8",
 
-  background: "#12110E",
-  surface: "#1C1B17",
-  surfaceRaised: "#26241F",
-  surfaceSoft: "#1A1916",
-  border: "rgba(244, 240, 232, 0.10)",
-  borderStrong: "rgba(244, 240, 232, 0.22)",
+  background: "#0E0E0D",
+  surface: "#0E0E0D",
+  surfaceRaised: "#0E0E0D",
+  surfaceSoft: "#1A1A18",
+  border: "#2C2C2A",
+  borderStrong: "#3A3A38",
   text: cream,
-  textMuted: "#B7B1A6",
-  textFaint: "#8E887E",
-  accent: sand,
-  accentSoft: "rgba(231, 196, 168, 0.16)",
-  accentInk: "#1A1612",
-  userBubble: "#2A2723",
+  textMuted: "#8E8E8A",
+  textFaint: "#6E6E6A",
+  accent,
+  accentSoft: "#0E0E0D",
+  accentInk,
+  userBubble: "#1C1C1A",
   userBubbleText: cream,
   onAccentFaint: "#B7B1A6",
   danger: "#E7B2A8",
   dangerSoft: "rgba(231, 178, 168, 0.14)",
   success: "#B7D4C2",
   overlay: "rgba(0, 0, 0, 0.62)",
-  link: sand,
-  frame: "#0B0A08",
+  link: cream,
+  frame: "#0E0E0D",
 } as const;
 
 export type ThemeColors = {
@@ -258,24 +251,24 @@ export const type = {
 
 export const shadows = {
   subtle: {
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
+    shadowColor: "transparent",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   card: {
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    elevation: 3,
+    shadowColor: "transparent",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   floating: {
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.12,
-    shadowRadius: 32,
-    elevation: 6,
+    shadowColor: "transparent",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
 } as const;

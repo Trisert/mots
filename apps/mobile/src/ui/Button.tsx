@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
 import { useTheme } from "../context/ThemeContext";
-import { fonts, hit, radius, type ThemeColors } from "../theme";
+import { fonts, hit, type ThemeColors } from "../theme";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -65,13 +65,13 @@ function palettes(colors: ThemeColors): Record<
 > {
   return {
     primary: {
-      background: colors.textPrimary,
-      border: colors.textPrimary,
-      label: colors.bgMain,
+      background: colors.accent,
+      border: colors.accent,
+      label: colors.accentInk,
     },
     secondary: {
-      background: colors.cardSurfacePrimary,
-      border: colors.borderSubtle,
+      background: "transparent",
+      border: "transparent",
       label: colors.textPrimary,
     },
     ghost: {
@@ -80,9 +80,9 @@ function palettes(colors: ThemeColors): Record<
       label: colors.textSecondary,
     },
     danger: {
-      background: colors.dangerSoft,
+      background: "transparent",
       border: "transparent",
-      label: colors.danger,
+      label: colors.textPrimary,
     },
   };
 }
@@ -90,8 +90,8 @@ function palettes(colors: ThemeColors): Record<
 const styles = StyleSheet.create({
   base: {
     minHeight: hit,
-    borderRadius: radius.pill,
-    borderWidth: 1,
+    borderRadius: 2,
+    borderWidth: 0,
     paddingHorizontal: 18,
     alignItems: "center",
     justifyContent: "center",

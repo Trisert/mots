@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  presentCalmError,
   presentConnection,
   presentError,
   presentModel,
@@ -64,6 +65,23 @@ describe("presentError", () => {
     expect(presentError("That model is not available.")).toBe(
       "Quel modello non è disponibile su questo server.",
     );
+  });
+});
+
+describe("presentCalmError", () => {
+  test("keeps a short line and hides the technical text", () => {
+    const calm = presentCalmError(
+      '401: {"code":"INVALID_TOKEN","message":"Your authentication token is invalid."}',
+    );
+    expect(calm.line).toBe("Qualcosa non ha funzionato.");
+    expect(calm.detail).toContain("INVALID_TOKEN");
+  });
+
+  test("uses one sentence for a refused model", () => {
+    expect(presentCalmError("That model is not available.")).toEqual({
+      line: "Quel modello non è disponibile.",
+      detail: "Quel modello non è disponibile su questo server.",
+    });
   });
 });
 

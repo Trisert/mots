@@ -19,39 +19,18 @@ import { KeyboardAvoidingView, useKeyboardState } from "react-native-keyboard-co
 import type { TranscriptEntry } from "@mots/client";
 import { useTheme } from "../context/ThemeContext";
 import { Composer } from "../components/Composer";
-import { MenuIcon, PlusIcon } from "../components/Icon";
+import { MenuIcon } from "../components/Icon";
 import { MarkdownText } from "../components/MarkdownText";
 import { MessageBubble } from "../components/MessageBubble";
 import { SessionSheet } from "../components/SessionSheet";
 import { probeSession, type SessionAccess } from "../api";
 import { useMotsSession } from "../hooks/useMotsSession";
-import { presentConnection, presentError, presentModel } from "../present";
+import { presentConnection, presentError } from "../present";
 import { motion, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TOOL_LABELS } from "../tools";
 import type { Identity } from "../storage";
 import { Banner } from "../ui/Banner";
-import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
-import { Pill } from "../ui/Pill";
-
-const SUGGESTIONS = [
-  {
-    title: "Briefing del mattino",
-    hint: "Chiede una routine alle 08:00",
-    prompt:
-      "Pianifica la routine 'Briefing del mattino' ogni giorno alle 08:00, con le priorità del giorno.",
-  },
-  {
-    title: "Un appunto",
-    hint: "Lo tiene in memoria",
-    prompt: "Ricorda che ",
-  },
-  {
-    title: "Sintesi del lunedì",
-    hint: "Chiede un punto settimanale",
-    prompt: "Imposta la routine 'Sintesi del lunedì' alle 09:00 per fare il punto su progetti e scadenze.",
-  },
-];
 
 type AccessView = SessionAccess | "checking";
 
@@ -130,7 +109,6 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const connected = state.status === "connected";
   const canWrite = connected && activeConversationId !== undefined;
   const connection = presentConnection(state.status, state.error);
-  const model = presentModel(active?.agent);
   const showErrorBanner = state.error !== undefined && (connected || entries.length > 0);
 
   const send = useCallback(async () => {
@@ -240,11 +218,6 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     [client],
   );
 
-  const pillLabel = model === undefined ? connection.label : `${connection.label} · ${model.shortName}`;
-  const pillDescription = model === undefined
-    ? `${connection.label}. Il server non ha ancora indicato il modello.`
-    : `${connection.label}. Modello ${model.provider}, ${model.modelId}.`;
-
   const footer = (
     <View style={styles.footer}>
       {typingOthers.length > 0 ? (
@@ -278,96 +251,58 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   );
 
   const blocked = access === "unauthorized" || access === "unavailable";
+  const gateLine = access === "unauthorized" ? "Questo codice non funziona." : "Il server non è pronto.";
+  const gateDetail =
+    accessMessage ?? "Questo codice non apre la sessione. Creane una nuova, oppure entra con il codice intero.";
 
   const empty = blocked ? (
     <View testID="session-gate" style={styles.connection}>
-      <Text accessibilityRole="header" style={styles.connectionTitle}>
-        {access === "unauthorized" ? "Codice non valido" : "Server non pronto"}
-      </Text>
-      <Text style={styles.connectionBody}>
-        {accessMessage ??
-          "Questo codice non apre la sessione. Creane una nuova, oppure entra con il codice intero."}
-      </Text>
-      <Button label="Crea un nuovo spazio" onPress={() => onRestart("create")} />
-      <Button
-        label="Entra con un codice"
-        variant="secondary"
-        onPress={() => onRestart("join")}
-      />
-      {access === "unavailable" ? (
-        <Button label="Riprova" variant="ghost" onPress={() => setProbeEpoch((current) => current + 1)} />
-      ) : null}
+      <Text style={styles.connectionTitle}>{gateLine}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Riprova"
+        onPress={() => {
+          if (access === "unauthorized") onRestart("join");
+          else setProbeEpoch((current) => current + 1);
+        }}
+        style={styles.textAction}
+      >
+        <Text style={styles.textActionLabel}>Riprova</Text>
+      </Pressable>
+      <QuietDetail detail={gateDetail} />
     </View>
   ) : access === "checking" ? (
     <View testID="connection-state" style={styles.connection}>
-      <ActivityIndicator color={colors.textSecondary} />
-      <Text accessibilityRole="header" style={styles.connectionTitle}>
-        Controllo il codice
-      </Text>
+      <Text style={styles.connectionTitle}>Mi collego</Text>
     </View>
   ) : !connected ? (
     <View testID="connection-state" style={styles.connection}>
-      {connection.busy ? <ActivityIndicator color={colors.textSecondary} /> : null}
-      <Text accessibilityRole="header" style={styles.connectionTitle}>
-        {connection.title}
-      </Text>
-      <Text style={styles.connectionBody}>{connection.body}</Text>
-      {connection.canRetry ? (
-        <Button label="Riprova" variant="secondary" onPress={retry} />
+      <Text style={styles.connectionTitle}>{connection.title}</Text>
+      {connection.canRetry && !connection.busy ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Riprova"
+          onPress={retry}
+          style={styles.textAction}
+        >
+          <Text style={styles.textActionLabel}>Riprova</Text>
+        </Pressable>
       ) : null}
+      {connection.body.length > 0 ? <QuietDetail detail={connection.body} /> : null}
     </View>
   ) : (
-    <View style={styles.empty}>
-      <Text accessibilityRole="header" maxFontSizeMultiplier={1.6} style={styles.greeting}>
-        Ciao{identity.username.length > 0 ? `, ${identity.username}` : ""}
-      </Text>
-      <Text style={styles.lead}>
-        Quando vuoi. Puoi chiedermi di ricordare, di pianificare, o solo di parlare.
-      </Text>
-      <View style={styles.suggestions}>
-        {SUGGESTIONS.map((item) => (
-          <Pressable
-            key={item.title}
-            accessibilityRole="button"
-            accessibilityLabel={`${item.title}. ${item.hint}`}
-            onPress={() => setInput(item.prompt)}
-            style={({ pressed }) => [styles.suggestion, pressed && styles.pressed]}
-          >
-            <Text style={styles.suggestionTitle}>{item.title}</Text>
-            <Text style={styles.suggestionHint}>{item.hint}</Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
+    <View style={styles.empty} />
   );
 
-  const composerHint = blocked
-    ? accessMessage
-    : !connected
-      ? "L'invio resta fermo finché non torna la connessione."
-      : activeConversationId === undefined
-        ? "Aspetto la chat dal server."
-        : undefined;
-
   return (
-    <View testID="chat-screen" style={[styles.outer, isWide && styles.outerWide]}>
+    <View testID="chat-screen" style={styles.outer}>
       <View style={[styles.frame, isWide && styles.frameWide]}>
         <View style={[styles.header, { paddingTop: insets.top }]}>
+          <Text accessibilityRole="header" style={styles.brand}>
+            Mots
+          </Text>
           <IconButton label="Menu" onPress={() => setSheetOpen(true)}>
             <MenuIcon size={20} color={colors.textPrimary} />
-          </IconButton>
-          <View style={styles.headerCenter}>
-            <Text accessibilityRole="header" style={styles.brand}>
-              Mots
-            </Text>
-            <Pill label={pillLabel} tone={connection.tone} accessibilityLabel={pillDescription} />
-          </View>
-          <IconButton
-            label="Nuova chat"
-            disabled={!connected}
-            onPress={() => client.createConversation()}
-          >
-            <PlusIcon size={20} color={colors.textPrimary} />
           </IconButton>
         </View>
 
@@ -415,7 +350,6 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
               onSend={() => void send()}
               disabled={!canWrite}
               sending={sending}
-              hint={composerHint}
             />
           </View>
         </KeyboardAvoidingView>
@@ -448,6 +382,42 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     </View>
   );
 }
+
+function QuietDetail({ detail }: { readonly detail: string }) {
+  const { colors } = useTheme();
+  const [open, setOpen] = useState(false);
+  if (detail.length === 0) return null;
+  return (
+    <View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Dettagli"
+        onPress={() => setOpen((current) => !current)}
+        style={stylesQuiet.action}
+      >
+        <Text style={[stylesQuiet.link, { color: colors.textSecondary }]}>Dettagli</Text>
+      </Pressable>
+      {open ? (
+        <Text selectable style={[stylesQuiet.detail, { color: colors.textSecondary }]}>
+          {detail}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+const stylesQuiet = StyleSheet.create({
+  action: {
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  link: {
+    ...typeScale.small,
+  },
+  detail: {
+    ...typeScale.small,
+  },
+});
 
 function Thinking() {
   const { colors } = useTheme();
@@ -499,12 +469,7 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.bgMain,
     },
     frameWide: {
-      maxWidth: 440,
-      marginVertical: spacing.lg,
-      borderRadius: radius.xl,
-      overflow: "hidden",
-      borderWidth: 1,
-      borderColor: colors.borderSubtle,
+      maxWidth: 560,
     },
     flex: {
       flex: 1,
@@ -513,20 +478,13 @@ function createStyles(colors: ThemeColors) {
       minHeight: 64,
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: spacing.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.borderSubtle,
+      justifyContent: "space-between",
+      paddingLeft: spacing.xl,
+      paddingRight: spacing.sm,
       backgroundColor: colors.bgMain,
     },
-    headerCenter: {
-      flex: 1,
-      alignItems: "center",
-      gap: 4,
-      paddingHorizontal: spacing.sm,
-    },
     brand: {
-      ...typeScale.bodyMedium,
-      fontWeight: "700",
+      ...typeScale.body,
       color: colors.textPrimary,
     },
     list: {
@@ -580,7 +538,16 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: spacing.xxl,
     },
     connectionTitle: {
-      ...typeScale.heading,
+      ...typeScale.body,
+      color: colors.textPrimary,
+    },
+    textAction: {
+      minHeight: 44,
+      justifyContent: "center",
+      alignSelf: "flex-start",
+    },
+    textActionLabel: {
+      ...typeScale.body,
       color: colors.textPrimary,
     },
     connectionBody: {
@@ -629,12 +596,11 @@ function createStyles(colors: ThemeColors) {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      paddingHorizontal: spacing.lg,
-      backgroundColor: colors.dangerSoft,
+      paddingHorizontal: spacing.xl,
     },
     stripText: {
-      ...typeScale.label,
-      color: colors.danger,
+      ...typeScale.body,
+      color: colors.textPrimary,
       flex: 1,
     },
     stripAction: {
@@ -643,9 +609,8 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.sm,
     },
     stripActionLabel: {
-      ...typeScale.label,
-      fontWeight: "700",
-      color: colors.danger,
+      ...typeScale.body,
+      color: colors.textPrimary,
     },
     bannerWrap: {
       paddingHorizontal: spacing.lg,

@@ -65,6 +65,40 @@ export function presentModel(agent: AgentModelSource | undefined): PresentedMode
   return { provider, modelId, shortName: shortModelName(modelId) };
 }
 
+export type CalmError = {
+  readonly line: string;
+  readonly detail?: string;
+};
+
+const CALM_LINES: Readonly<Record<string, string>> = {
+  "The session is not connected": "Connessione interrotta.",
+  "The session connection failed": "Connessione interrotta.",
+  "The session connection failed.": "Connessione interrotta.",
+  "A prompt must contain text": "Scrivi un messaggio.",
+  "Server sent a binary protocol frame.": "Qualcosa non ha funzionato.",
+  "Server sent an invalid protocol frame.": "Qualcosa non ha funzionato.",
+  "That model is not available.": "Quel modello non è disponibile.",
+};
+
+function looksTechnical(value: string): boolean {
+  return /[{}[\]<>]|https?:\/\/|\b(401|403|429|500|503)\b|INVALID_|unauthorized|error_code/i.test(value);
+}
+
+/** One calm sentence. The longer or technical text stays in `detail`. */
+export function presentCalmError(message: string): CalmError {
+  const trimmed = message.trim();
+  const full = presentError(trimmed);
+  const mapped = CALM_LINES[trimmed];
+  if (mapped !== undefined) {
+    return full === mapped ? { line: mapped } : { line: mapped, detail: full };
+  }
+  if (trimmed.length === 0) return { line: full };
+  if (looksTechnical(trimmed) || looksTechnical(full) || full.length > 90) {
+    return { line: "Qualcosa non ha funzionato.", detail: full };
+  }
+  return full === trimmed ? { line: full } : { line: full, detail: trimmed };
+}
+
 export function presentError(message: string): string {
   const trimmed = message.trim();
   if (trimmed.length === 0) return "Qualcosa non ha funzionato.";
