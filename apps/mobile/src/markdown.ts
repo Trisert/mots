@@ -14,6 +14,8 @@ export type InlineRun = {
   readonly bold: boolean;
   readonly italic: boolean;
   readonly code: boolean;
+  /** Present only for http(s) links. Omitted otherwise so plain runs stay small. */
+  readonly href?: string;
 };
 
 export type CodeBlock = {
@@ -55,7 +57,21 @@ export type MarkdownBlock =
   | ListBlock
   | ParagraphBlock;
 
-const INLINE_PATTERN = /(\*\*[^*]+\*\*)|(\*[^*\n]+\*)|(`[^`\n]+`)/g;
+const INLINE_PATTERN =
+  /(\[[^\]\n]+\]\(https?:\/\/[^\s)]+\))|(\*\*[^*]+\*\*)|(\*[^*\n]+\*)|(`[^`\n]+`)/g;
+
+function plain(
+  text: string,
+  extra?: Partial<Pick<InlineRun, "bold" | "italic" | "code" | "href">>,
+): InlineRun {
+  return {
+    text,
+    bold: extra?.bold ?? false,
+    italic: extra?.italic ?? false,
+    code: extra?.code ?? false,
+    ...(extra?.href === undefined ? {} : { href: extra.href }),
+  };
+}
 
 export function parseInline(text: string): readonly InlineRun[] {
   const runs: InlineRun[] = [];
@@ -63,22 +79,29 @@ export function parseInline(text: string): readonly InlineRun[] {
   for (const match of text.matchAll(INLINE_PATTERN)) {
     const index = match.index ?? 0;
     if (index > lastIndex) {
-      runs.push({ text: text.slice(lastIndex, index), bold: false, italic: false, code: false });
+      runs.push(plain(text.slice(lastIndex, index)));
     }
-    const [whole, bold, italic, code] = match;
-    if (bold !== undefined) {
-      runs.push({ text: bold.slice(2, -2), bold: true, italic: false, code: false });
+    const [whole, link, bold, italic, code] = match;
+    if (link !== undefined) {
+      const parsed = /^\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)$/.exec(link);
+      if (parsed?.[1] !== undefined && parsed[2] !== undefined) {
+        runs.push(plain(parsed[1], { href: parsed[2] }));
+      } else {
+        runs.push(plain(whole));
+      }
+    } else if (bold !== undefined) {
+      runs.push(plain(bold.slice(2, -2), { bold: true }));
     } else if (italic !== undefined) {
-      runs.push({ text: italic.slice(1, -1), bold: false, italic: true, code: false });
+      runs.push(plain(italic.slice(1, -1), { italic: true }));
     } else if (code !== undefined) {
-      runs.push({ text: code.slice(1, -1), bold: false, italic: false, code: true });
+      runs.push(plain(code.slice(1, -1), { code: true }));
     } else {
-      runs.push({ text: whole, bold: false, italic: false, code: false });
+      runs.push(plain(whole));
     }
     lastIndex = index + whole.length;
   }
   if (lastIndex < text.length) {
-    runs.push({ text: text.slice(lastIndex), bold: false, italic: false, code: false });
+    runs.push(plain(text.slice(lastIndex)));
   }
   return runs;
 }

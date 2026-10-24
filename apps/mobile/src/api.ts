@@ -1,38 +1,43 @@
-import { normalizeBaseUrl } from "./config";
+import {
+  parseSessionHttpBody,
+  presentSessionHttpFailure,
+  readCreateToken,
+  sessionCreateHeaders,
+} from "./session-gate";
+import { normalizeBaseUrl, parseJoinTarget } from "./url";
 
-const SESSION_ID = /^[A-Za-z0-9_-]{1,128}$/;
+export { parseJoinTarget };
+export type { JoinTarget } from "./url";
 
-export type JoinTarget = {
-  readonly sessionId: string;
-  readonly baseUrl?: string;
+const PROBE_TIMEOUT_MS = 4_000;
+
+export type SessionAccess = "open" | "unauthorized" | "unavailable" | "unknown";
+
+export type SessionProbe = {
+  readonly access: SessionAccess;
+  readonly message?: string;
 };
 
-export function parseJoinTarget(raw: string): JoinTarget | undefined {
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return undefined;
-  if (SESSION_ID.test(trimmed)) return { sessionId: trimmed };
-
-  const scheme = /^mots:\/\/session\/([A-Za-z0-9_-]{1,128})/i.exec(trimmed);
-  if (scheme?.[1] !== undefined) return { sessionId: scheme[1] };
-
-  const http = /^(https?:\/\/[^/\s]+)\/sessions\/([A-Za-z0-9_-]{1,128})/i.exec(trimmed);
-  if (http?.[2] !== undefined) {
-    return { sessionId: http[2], baseUrl: http[1] };
+export async function createSession(
+  baseUrl: string,
+  token: string | undefined = readCreateToken({
+    EXPO_PUBLIC_MOTS_CREATE_TOKEN: process.env.EXPO_PUBLIC_MOTS_CREATE_TOKEN,
+  }),
+): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch(`${normalizeBaseUrl(baseUrl)}/api/sessions`, {
+      method: "POST",
+      headers: sessionCreateHeaders(token),
+    });
+  } catch {
+    throw new Error("Non riesco a raggiungere il server.");
   }
-
-  const loose = /\/sessions\/([A-Za-z0-9_-]{1,128})/.exec(trimmed);
-  if (loose?.[1] !== undefined) return { sessionId: loose[1] };
-
-  return undefined;
-}
-
-export async function createSession(baseUrl: string): Promise<string> {
-  const response = await fetch(`${normalizeBaseUrl(baseUrl)}/api/sessions`, {
-    method: "POST",
-    headers: { Accept: "application/json" },
-  });
   if (!response.ok) {
-    throw new Error(`Il server ha risposto con ${response.status}`);
+    const body = parseSessionHttpBody(await response.json().catch(() => undefined));
+    throw new Error(
+      presentSessionHttpFailure(response.status, body, "create", response.headers.get("Retry-After")),
+    );
   }
   const body: unknown = await response.json();
   if (
@@ -43,4 +48,37 @@ export async function createSession(baseUrl: string): Promise<string> {
     throw new Error("Il server ha restituito una sessione non valida");
   }
   return (body as { sessionId: string }).sessionId;
+}
+
+/** A plain GET returns 426 for a code the server will open, and 401 for a bad one. */
+export async function probeSession(baseUrl: string, sessionId: string): Promise<SessionProbe> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  try {
+    const response = await fetch(
+      `${normalizeBaseUrl(baseUrl)}/api/sessions/${encodeURIComponent(sessionId)}`,
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      },
+    );
+    if (response.status === 426 || response.status === 101) return { access: "open" };
+    const body = parseSessionHttpBody(await response.json().catch(() => undefined));
+    const message = presentSessionHttpFailure(
+      response.status,
+      body,
+      "open",
+      response.headers.get("Retry-After"),
+    );
+    if (response.status === 401) return { access: "unauthorized", message };
+    if (response.status === 429 || response.status === 503 || response.status === 403) {
+      return { access: "unavailable", message };
+    }
+    return { access: "unknown" };
+  } catch {
+    return { access: "unknown" };
+  } finally {
+    clearTimeout(timer);
+  }
 }

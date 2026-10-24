@@ -19,12 +19,14 @@ import {
 import { openDurableObjectSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/cloudflare";
 import {
   createMotsHarnessOptions,
-  isMotsProviderId,
+  isAllowedAgentModel,
+  ModelNotAllowedError,
   type MotsEnvironment,
-  type MotsProviderId,
+  resolveMotsProvider,
   scheduledDeadline,
 } from "@mots/agent";
 import {
+  COMMAND_ERROR,
   InvalidClientCommand,
   MAX_CLIENT_FRAME_CHARACTERS,
   parseClientCommand,
@@ -160,6 +162,7 @@ const conversationSummary = (conversation: ConversationRecord): ConversationSumm
 
 export class Session extends DurableObject<Env> {
   #harness!: Harness;
+  #models!: { getModel(provider: string, id: string): unknown };
   #activity!: AttachedReplicatedState<TaskGraph>;
   readonly #eventStreams = new Map<WebSocket, AgentEventStream>();
   readonly #typingConnections = new Set<WebSocket>();
@@ -174,9 +177,13 @@ export class Session extends DurableObject<Env> {
 
   async #initialize(): Promise<void> {
     const storage = await openDurableObjectSqliteStorage(this.ctx.storage);
-    const provider = isMotsProviderId(this.env.MOTS_PROVIDER ?? "")
-      ? (this.env.MOTS_PROVIDER as MotsProviderId)
-      : "kilo";
+    let provider;
+    try {
+      provider = resolveMotsProvider(this.env.MOTS_PROVIDER);
+    } catch (error) {
+      reportError("MOTS_PROVIDER is not supported", error);
+      throw error;
+    }
     const chatOptions = await createMotsHarnessOptions(
       (timestamp) => this.#setAlarmNoLaterThan(timestamp),
       {
@@ -185,6 +192,7 @@ export class Session extends DurableObject<Env> {
         env: this.env as unknown as MotsEnvironment,
       },
     );
+    this.#models = chatOptions.models;
     const harness = await Harness.open(
       storage,
       {
@@ -306,14 +314,19 @@ export class Session extends DurableObject<Env> {
     } catch (error) {
       reportError("Session command failed", error, { command: command.type });
       if (command.type === "presence.typing") return;
+      const refused = error instanceof ModelNotAllowedError;
       this.#send(socket, {
         type: "command.result",
         command: command.type,
         requestId: command.requestId,
         ok: false,
         error: {
-          code: "command_failed",
-          message: error instanceof Error ? error.message : "Command failed",
+          code: refused ? COMMAND_ERROR.modelNotAllowed : COMMAND_ERROR.commandFailed,
+          message: refused
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : "Command failed",
         },
       });
     }
@@ -479,6 +492,9 @@ export class Session extends DurableObject<Env> {
         return;
       }
       case "conversation.setModel": {
+        if (!isAllowedAgentModel(this.#models, command.provider, command.modelId)) {
+          throw new ModelNotAllowedError();
+        }
         await this.#harness.commit(async (tx) => {
           await configure(tx, command.conversationId as ConversationId, {
             model: {

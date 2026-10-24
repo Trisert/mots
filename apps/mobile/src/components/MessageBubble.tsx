@@ -149,8 +149,8 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
       >
         {isScheduled ? (
           <View style={styles.scheduledHeader}>
-            <ClockIcon size={14} color={colors.accentCoral} />
-            <Text style={styles.scheduledLabel}>ROUTINE PROGRAMMATA</Text>
+            <ClockIcon size={14} color={colors.accent} />
+            <Text style={styles.scheduledLabel}>Routine</Text>
           </View>
         ) : null}
 
@@ -181,11 +181,8 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
               ]}
             >
               <View style={styles.reasoningTitleRow}>
-                <SparkleIcon size={14} color={colors.starHighlight} />
+                <SparkleIcon size={14} color={colors.accent} />
                 <Text style={styles.reasoningTitle}>Ragionamento</Text>
-                <View style={styles.reasoningPill}>
-                  <Text style={styles.reasoningPillText}>✦ autonomo</Text>
-                </View>
               </View>
               {reasoningExpanded ? (
                 <ChevronUpIcon size={14} color={colors.reasoningText} />
@@ -229,7 +226,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Copia risposta"
-                hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
+                hitSlop={4}
                 onPress={() => void copyMessage()}
                 style={({ pressed }) => [
                   styles.iconActionButton,
@@ -247,7 +244,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Dirama da questo messaggio"
-                  hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
+                  hitSlop={4}
                   onPress={() => onFork(entry)}
                   style={({ pressed }) => [
                     styles.iconActionButton,
@@ -297,10 +294,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       alignSelf: "flex-end",
       maxWidth: "84%",
       backgroundColor: colors.userBubble,
-      borderRadius: 20,
-      borderTopLeftRadius: 20,
-      borderBottomLeftRadius: 20,
-      borderBottomRightRadius: 6,
+      borderRadius: 22,
       paddingHorizontal: 16,
       paddingVertical: 11,
       elevation: 1,
@@ -337,7 +331,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     },
     scheduledLabel: {
       fontFamily: fonts.bold,
-      color: colors.accentCoral,
+      color: colors.accent,
       fontSize: 10,
       fontWeight: "700",
       letterSpacing: 1.2,
@@ -368,9 +362,9 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       gap: 6,
     },
     iconActionButton: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: "transparent",
@@ -429,18 +423,6 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       fontSize: 12,
       fontWeight: "700",
       letterSpacing: 0.2,
-    },
-    reasoningPill: {
-      backgroundColor: colors.badgeAmberBg,
-      borderRadius: radius.pill,
-      paddingHorizontal: 6,
-      paddingVertical: 1,
-    },
-    reasoningPillText: {
-      fontFamily: fonts.semiBold,
-      color: colors.badgeAmberText,
-      fontSize: 10,
-      fontWeight: "600",
     },
     reasoningContent: {
       paddingHorizontal: spacing.md,

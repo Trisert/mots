@@ -1,131 +1,146 @@
-import { Platform } from "react-native";
+import { Platform, type TextStyle } from "react-native";
+
+/**
+ * Mots visual system.
+ *
+ * Dark is the primary theme: warm black, cream type, and a sand accent used
+ * only for focus, links, and quiet status. Light is the same structure on
+ * warm paper, with a darker clay accent so text stays readable. Primary
+ * actions are ink and cream, not a saturated fill.
+ *
+ * Legacy color names (accentCoral, cardSurfaceMint, …) stay so older
+ * components keep compiling. New UI should prefer the semantic names.
+ */
+
+const ink = "#1C1915";
+const paper = "#F6F3EC";
+const cream = "#F4F0E8";
+const sand = "#E7C4A8";
+const clay = "#7A4632";
 
 export const lightColors = {
-  // Editorial Greeting & Anti-slop palette (from .taste-skill/direction.json)
-  bgMain: "#ffffff",
-  cardSurfacePrimary: "#f9f9f9",
-  cardSurfaceAmber: "#fbf8ef",
-  cardSurfaceMint: "#f0f8f3",
-  cardSurfacePink: "#fdf2f2",
-  accentCoral: "#1b6e66",
-  accentGreen: "#2e7d32",
-  starHighlight: "#d97706",
-  textPrimary: "#1f201d",
-  textSecondary: "#636361",
-  borderSubtle: "#eaeaea",
-  borderMedium: "#d9d9d6",
+  bgMain: paper,
+  cardSurfacePrimary: "#FFFFFF",
+  cardSurfaceAmber: "#F3EBE1",
+  cardSurfaceMint: "#F3F6F2",
+  cardSurfacePink: "#F8EEEB",
+  accentCoral: clay,
+  accentGreen: "#2F6B4F",
+  starHighlight: clay,
+  textPrimary: ink,
+  textSecondary: "#5C564F",
+  borderSubtle: "#E4DDD2",
+  borderMedium: "#D4CBBF",
 
-  // Autonomous Agent tokens (Grok Bot & Editorial style)
-  codeSurface: "#1a1b1e",
-  codeSurfaceHeader: "#131416",
-  codeText: "#f4f4f5",
-  codeMuted: "#8e8e93",
-  reasoningSurface: "#f9f9f8",
-  reasoningBorder: "#eaeaea",
-  reasoningText: "#424240",
-  cardBorderSubtle: "#eaeaea",
-  badgeMintBg: "#dcfae5",
-  badgeMintText: "#04250e",
-  badgeAmberBg: "#fffbeb",
-  badgeAmberText: "#92400e",
-  badgePinkBg: "#fdecea",
-  badgePinkText: "#7a1d14",
+  codeSurface: ink,
+  codeSurfaceHeader: "#141210",
+  codeText: cream,
+  codeMuted: "#B7B1A6",
+  reasoningSurface: "#F3EFE8",
+  reasoningBorder: "#E4DDD2",
+  reasoningText: "#3E3A35",
+  cardBorderSubtle: "#E4DDD2",
+  badgeMintBg: "#E5F0E8",
+  badgeMintText: "#1E4632",
+  badgeAmberBg: "#F3EBE1",
+  badgeAmberText: "#6A4528",
+  badgePinkBg: "#F8EEEB",
+  badgePinkText: "#7A3328",
 
-  // Agent Avatar Colors
-  avatarPurple: "#6366f1",
-  avatarBlue: "#2563eb",
-  avatarGreen: "#16a34a",
-  avatarOrange: "#ea580c",
-  avatarRed: "#dc2626",
-  avatarTeal: "#0d9488",
+  avatarPurple: "#5C534A",
+  avatarBlue: "#4E5A62",
+  avatarGreen: "#3E5C4A",
+  avatarOrange: "#8A5A3A",
+  avatarRed: clay,
+  avatarTeal: "#3E5652",
 
-  // Backward-compatible aliases
-  background: "#ffffff",
-  surface: "#f9f9f9",
-  surfaceRaised: "#ffffff",
-  surfaceSoft: "#f3f3f3",
-  border: "#eaeaea",
-  borderStrong: "#1f201d",
-  text: "#1f201d",
-  textMuted: "#636361",
-  textFaint: "#8c8c88",
-  accent: "#1b6e66",
-  accentSoft: "#dcfae5",
-  accentInk: "#ffffff",
-  userBubble: "#1f201d",
-  userBubbleText: "#ffffff",
-  onAccentFaint: "#636361",
-  danger: "#b42318",
-  dangerSoft: "#fdecea",
-  success: "#2e7d32",
-  overlay: "rgba(0, 0, 0, 0.4)",
+  background: paper,
+  surface: "#FFFFFF",
+  surfaceRaised: "#FFFCF7",
+  surfaceSoft: "#F3EFE8",
+  border: "#E4DDD2",
+  borderStrong: "#C9BDB0",
+  text: ink,
+  textMuted: "#5C564F",
+  textFaint: "#65605A",
+  accent: clay,
+  accentSoft: "#F3EBE1",
+  accentInk: paper,
+  userBubble: "#E7E0D4",
+  userBubbleText: ink,
+  onAccentFaint: "#5C564F",
+  danger: "#8E3E32",
+  dangerSoft: "#F8EEEB",
+  success: "#2F6B4F",
+  overlay: "rgba(28, 25, 21, 0.42)",
+  link: clay,
+  frame: "#E6DFD4",
 } as const;
 
 export const darkColors = {
-  // Editorial Greeting & Dark Mode OLED palette (Material 3 / Grok / ChatGPT style)
-  bgMain: "#0D0E12",
-  cardSurfacePrimary: "#16171D",
-  cardSurfaceAmber: "#1E1B14",
-  cardSurfaceMint: "#121E17",
-  cardSurfacePink: "#221417",
-  accentCoral: "#2DD4BF",
-  accentGreen: "#4ADE80",
-  starHighlight: "#FBBF24",
-  textPrimary: "#F5F5F7",
-  textSecondary: "#9E9EA4",
-  borderSubtle: "rgba(255, 255, 255, 0.08)",
-  borderMedium: "rgba(255, 255, 255, 0.16)",
+  bgMain: "#12110E",
+  cardSurfacePrimary: "#1C1B17",
+  cardSurfaceAmber: "#262119",
+  cardSurfaceMint: "#1A211C",
+  cardSurfacePink: "#261C1A",
+  accentCoral: sand,
+  accentGreen: "#B7D4C2",
+  starHighlight: sand,
+  textPrimary: cream,
+  textSecondary: "#B7B1A6",
+  borderSubtle: "rgba(244, 240, 232, 0.10)",
+  borderMedium: "rgba(244, 240, 232, 0.18)",
 
-  // Autonomous Agent tokens (Grok Bot & High Contrast Dark)
-  codeSurface: "#101116",
-  codeSurfaceHeader: "#0A0B0E",
-  codeText: "#F4F4F5",
-  codeMuted: "#71717A",
-  reasoningSurface: "#13141A",
-  reasoningBorder: "rgba(255, 255, 255, 0.08)",
-  reasoningText: "#D4D4D8",
-  cardBorderSubtle: "rgba(255, 255, 255, 0.08)",
-  badgeMintBg: "rgba(74, 222, 128, 0.16)",
-  badgeMintText: "#4ADE80",
-  badgeAmberBg: "rgba(251, 191, 36, 0.16)",
-  badgeAmberText: "#FBBF24",
-  badgePinkBg: "rgba(248, 113, 113, 0.16)",
-  badgePinkText: "#F87171",
+  codeSurface: "#0E0D0B",
+  codeSurfaceHeader: "#0A0908",
+  codeText: cream,
+  codeMuted: "#B7B1A6",
+  reasoningSurface: "#1A1916",
+  reasoningBorder: "rgba(244, 240, 232, 0.10)",
+  reasoningText: "#D9D3C8",
+  cardBorderSubtle: "rgba(244, 240, 232, 0.10)",
+  badgeMintBg: "rgba(183, 212, 194, 0.14)",
+  badgeMintText: "#D5E8DC",
+  badgeAmberBg: "rgba(231, 196, 168, 0.14)",
+  badgeAmberText: "#F0D7C4",
+  badgePinkBg: "rgba(231, 178, 168, 0.14)",
+  badgePinkText: "#F0D0C8",
 
-  // Agent Avatar Colors (calibrated for dark background)
-  avatarPurple: "#818CF8",
-  avatarBlue: "#60A5FA",
-  avatarGreen: "#4ADE80",
-  avatarOrange: "#FB923C",
-  avatarRed: "#F87171",
-  avatarTeal: "#2DD4BF",
+  avatarPurple: "#A39890",
+  avatarBlue: "#9AA7AE",
+  avatarGreen: "#B7D4C2",
+  avatarOrange: sand,
+  avatarRed: "#E7B2A8",
+  avatarTeal: "#B7D0C8",
 
-  // Backward-compatible aliases
-  background: "#0D0E12",
-  surface: "#16171D",
-  surfaceRaised: "#202129",
-  surfaceSoft: "#1A1B22",
-  border: "rgba(255, 255, 255, 0.08)",
-  borderStrong: "rgba(255, 255, 255, 0.24)",
-  text: "#F5F5F7",
-  textMuted: "#9E9EA4",
-  textFaint: "#71717A",
-  accent: "#2DD4BF",
-  accentSoft: "rgba(45, 212, 191, 0.16)",
-  accentInk: "#0D0E12",
-  userBubble: "#2A2B35",
-  userBubbleText: "#F5F5F7",
-  onAccentFaint: "#9E9EA4",
-  danger: "#F87171",
-  dangerSoft: "rgba(248, 113, 113, 0.16)",
-  success: "#4ADE80",
-  overlay: "rgba(0, 0, 0, 0.7)",
+  background: "#12110E",
+  surface: "#1C1B17",
+  surfaceRaised: "#26241F",
+  surfaceSoft: "#1A1916",
+  border: "rgba(244, 240, 232, 0.10)",
+  borderStrong: "rgba(244, 240, 232, 0.22)",
+  text: cream,
+  textMuted: "#B7B1A6",
+  textFaint: "#8E887E",
+  accent: sand,
+  accentSoft: "rgba(231, 196, 168, 0.16)",
+  accentInk: "#1A1612",
+  userBubble: "#2A2723",
+  userBubbleText: cream,
+  onAccentFaint: "#B7B1A6",
+  danger: "#E7B2A8",
+  dangerSoft: "rgba(231, 178, 168, 0.14)",
+  success: "#B7D4C2",
+  overlay: "rgba(0, 0, 0, 0.62)",
+  link: sand,
+  frame: "#0B0A08",
 } as const;
 
 export type ThemeColors = {
   [K in keyof typeof lightColors]: string;
 };
 
+/** @deprecated Prefer useTheme().colors. This is the light palette for unused legacy components. */
 export const colors: ThemeColors = lightColors;
 
 export const spacing = {
@@ -135,47 +150,132 @@ export const spacing = {
   lg: 16,
   xl: 24,
   xxl: 32,
+  xxxl: 48,
 } as const;
 
 export const radius = {
-  xs: 6,
-  sm: 8,
-  md: 12,
-  lg: 18,
-  xl: 22,
-  card: 22,
-  cardLarge: 24,
+  xs: 8,
+  sm: 10,
+  md: 14,
+  lg: 20,
+  xl: 28,
+  card: 24,
+  cardLarge: 28,
   pill: 9999,
 } as const;
 
-export const fonts = {
-  regular: Platform.select({ web: "Instrument Sans, system-ui, sans-serif", default: "InstrumentSans_400Regular" }),
-  medium: Platform.select({ web: "Instrument Sans, system-ui, sans-serif", default: "InstrumentSans_500Medium" }),
-  semiBold: Platform.select({ web: "Instrument Sans, system-ui, sans-serif", default: "InstrumentSans_600SemiBold" }),
-  bold: Platform.select({ web: "Instrument Sans, system-ui, sans-serif", default: "InstrumentSans_700Bold" }),
-  extraBold: Platform.select({ web: "Instrument Sans, system-ui, sans-serif", default: "InstrumentSans_700Bold" }),
+export const hit = 44;
+
+export const motion = {
+  fast: 140,
+  base: 220,
+  slow: 380,
 } as const;
+
+export const fonts = {
+  regular: Platform.select({
+    web: "Instrument Sans, system-ui, sans-serif",
+    default: "InstrumentSans_400Regular",
+  }),
+  medium: Platform.select({
+    web: "Instrument Sans, system-ui, sans-serif",
+    default: "InstrumentSans_500Medium",
+  }),
+  semiBold: Platform.select({
+    web: "Instrument Sans, system-ui, sans-serif",
+    default: "InstrumentSans_600SemiBold",
+  }),
+  bold: Platform.select({
+    web: "Instrument Sans, system-ui, sans-serif",
+    default: "InstrumentSans_700Bold",
+  }),
+  extraBold: Platform.select({
+    web: "Instrument Sans, system-ui, sans-serif",
+    default: "InstrumentSans_700Bold",
+  }),
+} as const;
+
+const weight = {
+  regular: "400",
+  medium: "500",
+  semiBold: "600",
+  bold: "700",
+} as const;
+
+export const type = {
+  display: {
+    fontFamily: fonts.bold,
+    fontSize: 40,
+    lineHeight: 46,
+    letterSpacing: -1.2,
+    fontWeight: weight.bold,
+  },
+  title: {
+    fontFamily: fonts.bold,
+    fontSize: 28,
+    lineHeight: 34,
+    letterSpacing: -0.6,
+    fontWeight: weight.bold,
+  },
+  heading: {
+    fontFamily: fonts.semiBold,
+    fontSize: 20,
+    lineHeight: 26,
+    letterSpacing: -0.3,
+    fontWeight: weight.semiBold,
+  },
+  body: {
+    fontFamily: fonts.regular,
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: weight.regular,
+  },
+  bodyMedium: {
+    fontFamily: fonts.medium,
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: weight.medium,
+  },
+  small: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: weight.regular,
+  },
+  label: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: weight.medium,
+  },
+  caption: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: weight.medium,
+  },
+} as const satisfies Record<string, TextStyle>;
 
 export const shadows = {
   subtle: {
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
     elevation: 1,
   },
   card: {
     shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 3,
   },
   floating: {
     shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.12,
+    shadowRadius: 32,
+    elevation: 6,
   },
 } as const;

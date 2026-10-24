@@ -2,7 +2,7 @@
 
 Mots è un compagno AI mobile-first: ricorda le cose importanti, organizza promemoria, cerca nelle conversazioni passate e resta nella tua tasca. L'obiettivo è un'architettura platform-agnostic con un'app mobile come primo client, costruita sopra [Pi Durable](https://github.com/earendil-works/pi/tree/main/packages/durable) e Cloudflare Durable Objects.
 
-> **Stato: MVP in sviluppo attivo.** Monorepo funzionante. Typecheck di tutti i workspace, test di protocollo/client, dry-run del Worker e bundle Android verificati. Autenticazione, copertura E2E con LLM reale e deploy pubblico sono i prossimi passi.
+> **Stato: MVP in sviluppo attivo.** Monorepo funzionante. Typecheck di tutti i workspace, suite `bun run test`, dry-run del Worker e bundle Android verificati. Il Worker rifiuta sessioni anonime. Account utente, copertura E2E con LLM reale e deploy pubblico restano i prossimi passi.
 
 ## Cosa c'è già
 
@@ -40,8 +40,8 @@ Mots è un compagno AI mobile-first: ricorda le cose importanti, organizza prome
         @mots/protocol · @mots/client
 ```
 
-- Una **sessione** è identificata da un UUID e vive in un singolo Durable Object.
-- Il Worker crea l'ID ma non conserva stato: la sessione esiste quando il DO viene contattato.
+- Una **sessione** è un codice firmato (`uuid` + HMAC). L'uuid è il nome del Durable Object; la firma è ciò che autorizza l'apertura.
+- `POST /api/sessions` emette il codice e non crea il Durable Object. Il DO nasce solo quando un WebSocket presenta un codice valido.
 - Il client apre un WebSocket e riceve snapshot, eventi dell'agente, presenza e conferme dei comandi.
 - I comandi di creazione/fork sono ritentabili tramite outbox; i prompt hanno una ricevuta con `submissionId`.
 - I promemoria usano gli alarm del Durable Object; la memoria usa un documento Pi con scope sessione.
@@ -75,12 +75,16 @@ bun install
 Copy-Item apps/server/.dev.vars.example apps/server/.dev.vars
 ```
 
-Apri `apps/server/.dev.vars` e inserisci la chiave del provider scelto:
+Apri `apps/server/.dev.vars`. Servono due segreti di almeno 16 caratteri, più la chiave del provider. Generali con `openssl rand -base64 32` (due volte) e non riusare l'esempio vuoto del repository:
 
 ```dotenv
+MOTS_SESSION_SECRET=...
+MOTS_CREATE_TOKEN=...
 OPENROUTER_API_KEY=sk-or-...
 # MOTS_MODEL=openai/gpt-6-luna
 ```
+
+`MOTS_SESSION_SECRET` firma i codici di ingresso: ruotarlo invalida ogni codice già condiviso. `MOTS_CREATE_TOKEN` è il bearer di `POST /api/sessions`. Senza uno dei due il Worker risponde `503` e non apre sessioni.
 
 Con un provider diverso cambia `MOTS_PROVIDER` e la variabile della chiave:
 
@@ -119,11 +123,13 @@ L'anteprima usa `http://localhost:8787` come server; l'URL resta modificabile da
 
 ```powershell
 cd apps/server
+bunx wrangler secret put MOTS_SESSION_SECRET
+bunx wrangler secret put MOTS_CREATE_TOKEN
 bunx wrangler secret put OPENROUTER_API_KEY
 bunx wrangler deploy
 ```
 
-Sostituisci `OPENROUTER_API_KEY` con la chiave del provider usato (`AI_GATEWAY_API_KEY` o `NVIDIA_API_KEY`). Il provider si sceglie con `MOTS_PROVIDER` (`bunx wrangler secret put MOTS_PROVIDER`), che di default è `openrouter`; `MOTS_MODEL` è opzionale e di default dipende dal provider.
+Sostituisci `OPENROUTER_API_KEY` con la chiave del provider usato (`KILO_API_KEY`, `AI_GATEWAY_API_KEY` o `NVIDIA_API_KEY`). Il provider si sceglie con `MOTS_PROVIDER` (`bunx wrangler secret put MOTS_PROVIDER`). Se la variabile manca, il codice usa `kilo`. Un valore sconosciuto fa fallire l'avvio della sessione invece di tornare in silenzio a Kilo. `MOTS_MODEL` è opzionale. Non fare il deploy finché l'app mobile non invia il bearer di creazione: un client vecchio riceve `401`.
 
 Poi nell'app usa l'URL pubblico del Worker come server.
 
@@ -131,8 +137,18 @@ Poi nell'app usa l'URL pubblico del Worker come server.
 
 | Variabile | Dove | Descrizione |
 | --- | --- | --- |
-| `MOTS_PROVIDER` | server | Provider LLM: `openrouter` (predefinito), `vercel-ai-gateway` o `nvidia`. |
-| `MOTS_MODEL` | server | Modello del provider scelto. Default: `openai/gpt-6-luna` (OpenRouter), `reflection/beam-free` (Vercel AI Gateway), `nvidia/nemotron-3.5-lightning-30b-a3b` (NVIDIA). |
+| `MOTS_SESSION_SECRET` | server | Segreto HMAC dei codici di sessione. Minimo 16 caratteri. Obbligatorio. |
+| `MOTS_CREATE_TOKEN` | server | Bearer richiesto da `POST /api/sessions`. Minimo 16 caratteri. Obbligatorio. |
+| `MOTS_CORS_ORIGINS` | server | Origini browser separate da virgola. Vuoto o `*` consente ogni origine. Le app native non inviano `Origin`. |
+| `MOTS_CREATE_LIMIT` | server | Creazioni per indirizzo nella finestra. Default `8`. Valori non validi restano sul default. |
+| `MOTS_CREATE_WINDOW_SECONDS` | server | Finestra delle creazioni, in secondi. Default `600`. |
+| `MOTS_CONNECT_LIMIT` | server | Tentativi di connessione per indirizzo. Default `60`. |
+| `MOTS_CONNECT_WINDOW_SECONDS` | server | Finestra delle connessioni, in secondi. Default `60`. |
+| `MOTS_MAX_SCHEDULES` | server | Routine attive non terminate. Default `8`, tra `1` e `100`. |
+| `MOTS_MIN_RECURRENCE_SECONDS` | server | Distanza minima di una ricorrenza nuova. Default `900`. Il pavimento è `60`. |
+| `MOTS_PROVIDER` | server | Provider LLM: `kilo` (predefinito se assente), `openrouter`, `vercel-ai-gateway` o `nvidia`. Un valore sconosciuto è un errore. |
+| `MOTS_MODEL` | server | Modello del provider scelto. Default: `reflection/beam-free` (Kilo e Vercel), `openai/gpt-6-luna` (OpenRouter), `nvidia/nemotron-3.5-lightning-30b-a3b` (NVIDIA). |
+| `KILO_API_KEY` | server (`apps/server/.dev.vars` o secret Cloudflare) | Chiave del provider `kilo`. Non viene mai inviata al client. |
 | `OPENROUTER_API_KEY` | server (`apps/server/.dev.vars` o secret Cloudflare) | Chiave del provider `openrouter`. Non viene mai inviata al client. |
 | `AI_GATEWAY_API_KEY` | server (`apps/server/.dev.vars` o secret Cloudflare) | Chiave del provider `vercel-ai-gateway`. Non viene mai inviata al client. |
 | `NVIDIA_API_KEY` | server (`apps/server/.dev.vars` o secret Cloudflare) | Chiave del provider `nvidia`. Non viene mai inviata al client. |
@@ -146,7 +162,8 @@ Il provider non è fissato nel codice: si seleziona con `MOTS_PROVIDER` e il mod
 
 | `MOTS_PROVIDER` | Chiave API | Modello predefinito |
 | --- | --- | --- |
-| `openrouter` (predefinito) | `OPENROUTER_API_KEY` | `openai/gpt-6-luna` |
+| `kilo` (predefinito se assente) | `KILO_API_KEY` | `reflection/beam-free` |
+| `openrouter` | `OPENROUTER_API_KEY` | `openai/gpt-6-luna` |
 | `vercel-ai-gateway` | `AI_GATEWAY_API_KEY` | `reflection/beam-free` |
 | `nvidia` | `NVIDIA_API_KEY` | `nvidia/nemotron-3.5-lightning-30b-a3b` |
 
@@ -199,8 +216,8 @@ I tool dell'agente (`remember`, `forget`, `schedule`, `search_history`) richiedo
 | Metodo | Percorso | Descrizione |
 | --- | --- | --- |
 | `GET` | `/api/health` | Health check. |
-| `POST` | `/api/sessions` | Crea un UUID di sessione. Risponde `201` con `{ sessionId, url, socketPath }`. |
-| `GET` | `/api/sessions/:id` | Upgrade WebSocket verso il Durable Object della sessione. |
+| `POST` | `/api/sessions` | Emette un codice firmato. Richiede `Authorization: Bearer <MOTS_CREATE_TOKEN>`. Risponde `201` con `{ sessionId, url, socketPath }`. `sessionId` è il codice intero. Non crea il Durable Object. |
+| `GET` | `/api/sessions/:id` | Upgrade WebSocket. `:id` deve essere il codice firmato. Il nome del Durable Object è solo l'uuid, dopo la verifica. |
 
 Il protocollo applicativo vive in `packages/protocol`: comandi client (`conversation.open`, `conversation.create`, `conversation.fork`, `prompt.submit`, `presence.typing`) ed eventi server (snapshot, eventi conversazione, inbox, presenza, risultati comandi, errori).
 
@@ -223,9 +240,9 @@ La persona dell'agente, l'orologio e la memoria vengono iniettati come sezioni d
 - [x] Agente con memoria, promemoria e ricerca, su provider LLM configurabile (OpenRouter, Vercel AI Gateway, NVIDIA).
 - [x] App mobile con onboarding, chat, sessioni e fork.
 - [x] Typecheck, dry-run Worker, bundle Android.
-- [x] Test automatici di protocollo e client (19 test).
+- [x] Suite automatica (`bun run test`): protocollo, client, agent, gate del Worker e funzioni pure del mobile.
 - [x] Verifica end-to-end locale: health, creazione sessione, WebSocket e nuova conversazione.
-- [ ] Autenticazione, rate limiting e policy CORS.
+- [x] Gate di sessione: codice firmato, token di creazione, rate limit per isolate, CORS da ambiente, allowlist di `conversation.setModel`, tetto sul numero di routine e sulla cadenza. Non sono account utente.
 - [ ] Notifiche push per i promemoria.
 - [ ] Markdown, immagini e messaggi vocali.
 - [ ] Build iOS e deploy demo.
@@ -234,12 +251,33 @@ Per seguire l'avanzamento: questa sezione, `git log --oneline` e i comandi di ve
 
 ## Sicurezza e limiti dell'MVP
 
-- Non c'è autenticazione: chi conosce l'UUID della sessione può accedervi. L'UUID va trattato come una capability segreta.
-- CORS è aperto a tutte le origini.
-- Non ci sono rate limit né quote per utente.
+- Creare una sessione richiede `MOTS_CREATE_TOKEN`. Aprire una sessione richiede il codice firmato con `MOTS_SESSION_SECRET`. Un uuid nudo, o una firma alterata, risponde `401` e non crea il Durable Object.
+- Il codice condiviso resta il modo di entrare: chi lo possiede può connettersi, senza il token di creazione. Va trattato come un segreto.
+- `MOTS_CREATE_TOKEN` dentro un binario pubblico si può estrarre. Ferma i client anonimi su internet, non chi spacchetta l'app. Gli account utente non ci sono ancora.
+- CORS: senza `MOTS_CORS_ORIGINS`, o con `*`, ogni origine è ammessa. Un elenco esplicito rimanda solo quelle origini e risponde `403` alle altre. Una richiesta senza `Origin` (app nativa, curl) passa.
+- I rate limit sono per isolate del Worker, non globali. I default sono 8 creazioni ogni 10 minuti e 60 connessioni al minuto, per `CF-Connecting-IP` (in locale, `local`). Davanti a un hostname pubblico serve anche un rate limit di edge.
+- `conversation.setModel` accetta solo un provider Mots il cui modello è nel catalogo registrato. Il rifiuto è `command.result` con `error.code` `model_not_allowed`.
+- Le routine nuove non possono essere più di `MOTS_MAX_SCHEDULES` (default 8) tra i task di consegna non terminati, e una ricorrenza nuova non può essere più frequente di `MOTS_MIN_RECURRENCE_SECONDS` (default 15 minuti, mai sotto i 60 secondi). Un one-shot resta da 1 secondo. La ricorrenza già creata continua, anche se era al minuto: il successore è ammesso finché il task sorgente è ancora aperto.
 - La chiave API del provider resta lato server.
 - I dati non sono cifrati end-to-end: sono nello storage del Durable Object.
-- Mots non è pronto per la produzione finché questi punti non sono risolti.
+- Mots non è un servizio pubblico finché i due segreti non sono impostati, l'app invia il bearer, e un rate limit di edge copre il hostname.
+
+## Mobile client adoption
+
+The mobile app adopts this gate. `packages/client` does not take a new socket parameter. The contract is:
+
+1. `POST /api/sessions` must send `Authorization: Bearer <MOTS_CREATE_TOKEN>`. Keep reading `sessionId` from the JSON body. That string is now the full join code (`{uuid}_{hmac}`, 80 characters, alphabet `[A-Za-z0-9_-]`). Store it unchanged. Do not strip the signature, lowercase it, or keep only the uuid.
+2. The WebSocket URL stays `/api/sessions/${sessionId}`. `MotsClient` already builds that path. No query parameter and no second header on the socket.
+3. Share and join the full `sessionId`. `parseJoinTarget` already accepts it. Joining does not send the create token.
+4. A bare uuid saved by a current install is rejected with `401`. Send that person through onboarding again. Do not add a legacy bypass.
+5. `conversation.setModel` can now fail with `command.result` `ok: false` and `error.code === "model_not_allowed"`. The protocol shape is unchanged. The reducer stores `event.error.message` on `state.error`, and the chat banner shows the Italian refusal. The header pill stays on `snapshot.agent.model` until the server reports that model.
+6. A schedule over the cap, or a new recurrence under the minimum cadence, fails inside the tool. No client frame changes.
+7. Native apps send no `Origin`, so CORS does not affect them. A web preview must use an origin listed in `MOTS_CORS_ORIGINS` once that variable is set. Until it is set, every origin is allowed.
+8. `429` bodies are `{ error: "rate_limited", message }` and include a `Retry-After` header in seconds. `401` is `{ error: "unauthorized", message }`. `503` means a server secret is missing (`session_secret_unconfigured` or `create_token_unconfigured`).
+9. `EXPO_PUBLIC_MOTS_CREATE_TOKEN`, when set, is compiled into the app bundle. It is not a confidential secret. It only stops callers who do not have the app. When it is unset, `createSession` omits `Authorization` so a local Worker that does not check a token still works.
+10. The share sheet and the session menu show the entire `sessionId`. A sliced label is not a join code.
+
+`apps/mobile/src/api.ts` `createSession` sends the bearer. A plain `GET` of the socket path distinguishes `426` (open the socket), `401` (offer a new space or a join), and `503` / `429` / `403` (the server is not ready). Anything else, including a network failure, still tries the socket so local dev without the gate keeps working. `apps/mobile/src/storage.ts` already accepts the new code shape.
 
 ## Licenza
 

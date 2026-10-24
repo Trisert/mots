@@ -1,5 +1,6 @@
 import { Type } from "@earendil-works/pi-ai";
 import { defineDoc, type ToolRegistration } from "@earendil-works/pi-durable";
+import { MAX_PROMPT_CHARACTERS } from "@mots/protocol";
 import {
   DeliverScheduledInstruction,
   nextRecurrenceRunAt,
@@ -7,7 +8,14 @@ import {
   type ScheduledInstruction,
   ScheduleDeliveries,
 } from "./schedule.ts";
-import { MAX_PROMPT_CHARACTERS } from "@mots/protocol";
+import {
+  apartLabel,
+  assertRecurrenceAllowed,
+  assertScheduleCapacity,
+  DEFAULT_MAX_ACTIVE_SCHEDULES,
+  DEFAULT_MIN_RECURRENCE_MS,
+  type ScheduleLimits,
+} from "./schedule-limits.ts";
 
 export const SCHEDULE_TOOL_NAME = "schedule";
 
@@ -101,11 +109,16 @@ const scheduleResult = (scheduled: ScheduledInstruction, now: number) => {
 
 export function createScheduleTool(
   ensureWakeupAt: (timestamp: number) => Promise<void>,
+  limits: ScheduleLimits = {
+    maxActive: DEFAULT_MAX_ACTIVE_SCHEDULES,
+    minRecurrenceMs: DEFAULT_MIN_RECURRENCE_MS,
+  },
 ): ToolRegistration {
   return {
     name: SCHEDULE_TOOL_NAME,
     description:
-      "Schedule an autonomous routine, cronjob, or recurring task to be delivered to this conversation at a later time or on a recurring cadence. When the routine fires, the model resumes in this conversation with the instruction, reasons through it, executes tools, and reports back. Use this whenever the user wants scheduled briefings, periodic checks, recurring summaries, or delayed actions.",
+      "Schedule an autonomous routine, cronjob, or recurring task to be delivered to this conversation at a later time or on a recurring cadence. When the routine fires, the model resumes in this conversation with the instruction, reasons through it, executes tools, and reports back. Use this whenever the user wants scheduled briefings, periodic checks, recurring summaries, or delayed actions. " +
+      `A one-shot may run after at least 1 second. A recurring routine must be at least ${apartLabel(limits.minRecurrenceMs)} apart. At most ${limits.maxActive} routines can be active at once.`,
     parameters: Type.Object({
       instruction: Type.String({
         minLength: 1,
@@ -194,6 +207,7 @@ export function createScheduleTool(
             throw new Error("the source schedule has no structured recurrence policy");
           }
           if (source.successor !== undefined) return copyScheduledInstruction(source.successor);
+          await assertScheduleCapacity(tx, limits, true);
           const sourceRecurrence: ScheduleRecurrence = {
             cadence: {
               unit: source.recurrence.cadence.unit,
@@ -219,6 +233,7 @@ export function createScheduleTool(
         }, context);
       } else {
         const recurrence = validateRecurrence(args.recurrence);
+        assertRecurrenceAllowed(recurrence, limits);
         const requested: ScheduledInstruction = {
           id: `schedule:${api.taskId}`,
           conversationId: api.conversationId,
@@ -239,6 +254,7 @@ export function createScheduleTool(
         persisted = await api.commit(async (tx) => {
           const intent = await tx.doc(ScheduleIntent, api.taskId);
           if (intent.scheduled !== undefined) return intent.scheduled;
+          await assertScheduleCapacity(tx, limits, false);
           intent.scheduled = requested;
           await tx.createTask(DeliverScheduledInstruction, requested, {
             ownership: { kind: "conversation" },

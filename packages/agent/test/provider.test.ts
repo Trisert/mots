@@ -7,6 +7,7 @@ import {
   isFreeGatewayModel,
   isMotsProviderId,
   providerAuthContext,
+  resolveMotsProvider,
   toPiModel,
   type GatewayModel,
 } from "../src/provider.ts";
@@ -277,6 +278,19 @@ describe("isMotsProviderId", () => {
     expect(isMotsProviderId("anthropic")).toBe(false);
     expect(isMotsProviderId("")).toBe(false);
     expect(isMotsProviderId("OpenRouter")).toBe(false);
+  });
+});
+
+describe("resolveMotsProvider", () => {
+  test("defaults a blank value to kilo and keeps a known id", () => {
+    expect(resolveMotsProvider(undefined)).toBe("kilo");
+    expect(resolveMotsProvider("  ")).toBe("kilo");
+    expect(resolveMotsProvider("nvidia")).toBe("nvidia");
+  });
+
+  test("rejects an unknown provider instead of falling back", () => {
+    expect(() => resolveMotsProvider("anthropic")).toThrow("MOTS_PROVIDER");
+    expect(() => resolveMotsProvider("Kilo")).toThrow("MOTS_PROVIDER");
   });
 });
 
