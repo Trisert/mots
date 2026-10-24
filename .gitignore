@@ -7,3 +7,16 @@ dist/
 .DS_Store
 .captures/
 .taste-skill/
+
+# Native projects and signing material. apps/mobile/.gitignore covers the Expo
+# app; these patterns cover the rest of the repo.
+ios/
+android/
+*.mobileprovision
+*.p12
+*.p8
+*.cer
+*.pem
+*.key
+*.jks
+credentials.json

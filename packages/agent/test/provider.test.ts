@@ -1,15 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import {
   API_KEY_ENV,
+  CATALOG_TIMEOUT_MS,
   DEFAULT_MODELS,
+  KILO_GATEWAY_MODELS_URL,
   MOTS_PROVIDERS,
   VERCEL_GATEWAY_BASE_URL,
+  VERCEL_GATEWAY_MODELS_URL,
+  createMotsModels,
   isFreeGatewayModel,
   isMotsProviderId,
   providerAuthContext,
   resolveMotsProvider,
   toPiModel,
+  type CatalogFetch,
   type GatewayModel,
+  type MotsProviderId,
 } from "../src/provider.ts";
 
 const gatewayModel = (overrides: Partial<GatewayModel> = {}): GatewayModel => ({
@@ -308,6 +314,193 @@ describe("provider configuration", () => {
     for (const provider of MOTS_PROVIDERS) {
       expect(DEFAULT_MODELS[provider]).toBeTruthy();
       expect(API_KEY_ENV[provider]).toBeTruthy();
+    }
+  });
+});
+
+const jsonResponse = (body: unknown, status = 200): Response =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+
+const withDeadline = async <T>(work: Promise<T>, message: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), 1_000);
+  });
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const hangUntilAbort: CatalogFetch = (_url, init) =>
+  new Promise((_resolve, reject) => {
+    const signal = init.signal;
+    const fail = () =>
+      reject(signal.reason instanceof Error ? signal.reason : new Error("aborted"));
+    if (signal.aborted) fail();
+    else signal.addEventListener("abort", fail, { once: true });
+  });
+
+const kiloCatalog = {
+  data: [
+    {
+      id: "custom/from-catalog",
+      name: "From catalog",
+      context_length: 32_000,
+      supported_parameters: ["tools"],
+      pricing: { prompt: "0", completion: "0" },
+      architecture: { input_modalities: ["text"] },
+    },
+  ],
+};
+
+const vercelCatalog = {
+  data: [
+    {
+      id: "custom/vercel",
+      name: "From gateway",
+      supported_parameters: ["tools"],
+      context_window: 8_000,
+      max_tokens: 1_000,
+      pricing: { input: "0", output: "0" },
+    },
+  ],
+};
+
+describe("createMotsModels", () => {
+  test("bounds a catalog fetch to a few seconds", () => {
+    expect(CATALOG_TIMEOUT_MS).toBeGreaterThanOrEqual(2_000);
+    expect(CATALOG_TIMEOUT_MS).toBeLessThanOrEqual(5_000);
+  });
+
+  test("does not fetch a catalog for an OpenRouter session", async () => {
+    const urls: string[] = [];
+    const fetchImpl: CatalogFetch = async (url) => {
+      urls.push(url);
+      throw new Error("unexpected catalog fetch");
+    };
+    const models = await withDeadline(
+      createMotsModels({}, "openrouter", { fetch: fetchImpl }),
+      "OpenRouter startup waited on a catalog",
+    );
+    expect(urls).toEqual([]);
+    expect(models.getModels("openrouter").length).toBeGreaterThan(0);
+    expect(models.getModels("nvidia").length).toBeGreaterThan(0);
+    expect(models.getModels("kilo")).toEqual([]);
+    expect(models.getModels("vercel-ai-gateway")).toEqual([]);
+  });
+
+  test("does not fetch a catalog for an NVIDIA session", async () => {
+    const urls: string[] = [];
+    const fetchImpl: CatalogFetch = async (url) => {
+      urls.push(url);
+      throw new Error("unexpected catalog fetch");
+    };
+    const models = await withDeadline(
+      createMotsModels({}, "nvidia", { fetch: fetchImpl }),
+      "NVIDIA startup waited on a catalog",
+    );
+    expect(urls).toEqual([]);
+    expect(models.getModels("nvidia").length).toBeGreaterThan(0);
+    expect(models.getModels("kilo")).toEqual([]);
+    expect(models.getModels("vercel-ai-gateway")).toEqual([]);
+  });
+
+  test("fetches only the Kilo catalog when Kilo is selected", async () => {
+    const urls: string[] = [];
+    const fetchImpl: CatalogFetch = async (url, init) => {
+      urls.push(url);
+      expect(init.signal).toBeDefined();
+      if (url !== KILO_GATEWAY_MODELS_URL) return hangUntilAbort(url, init);
+      return jsonResponse(kiloCatalog);
+    };
+    const models = await withDeadline(
+      createMotsModels({}, "kilo", { fetch: fetchImpl, timeoutMs: 50 }),
+      "Kilo startup waited on another catalog",
+    );
+    expect(urls).toEqual([KILO_GATEWAY_MODELS_URL]);
+    expect(models.getModel("kilo", "custom/from-catalog")).toBeDefined();
+    expect(models.getModel("kilo", "kilo-auto/free")).toBeUndefined();
+    expect(models.getModels("vercel-ai-gateway")).toEqual([]);
+  });
+
+  test("fetches only the Vercel catalog when Vercel is selected", async () => {
+    const urls: string[] = [];
+    const fetchImpl: CatalogFetch = async (url, init) => {
+      urls.push(url);
+      if (url !== VERCEL_GATEWAY_MODELS_URL) return hangUntilAbort(url, init);
+      return jsonResponse(vercelCatalog);
+    };
+    const models = await withDeadline(
+      createMotsModels({}, "vercel-ai-gateway", { fetch: fetchImpl, timeoutMs: 50 }),
+      "Vercel startup waited on another catalog",
+    );
+    expect(urls).toEqual([VERCEL_GATEWAY_MODELS_URL]);
+    expect(models.getModel("vercel-ai-gateway", "custom/vercel")).toBeDefined();
+    expect(models.getModels("kilo")).toEqual([]);
+  });
+
+  test("falls back to the hardcoded Kilo models when the catalog times out", async () => {
+    const urls: string[] = [];
+    const fetchImpl: CatalogFetch = async (url, init) => {
+      urls.push(url);
+      return hangUntilAbort(url, init);
+    };
+    const models = await withDeadline(
+      createMotsModels({}, "kilo", { fetch: fetchImpl, timeoutMs: 50 }),
+      "Kilo catalog fetch blocked startup",
+    );
+    expect(urls).toEqual([KILO_GATEWAY_MODELS_URL]);
+    expect(models.getModel("kilo", "reflection/beam-free")).toBeDefined();
+    expect(models.getModel("kilo", "kilo-auto/free")).toBeDefined();
+    expect(models.getModels("vercel-ai-gateway")).toEqual([]);
+  });
+
+  test("falls back to the hardcoded Kilo models when the catalog request fails", async () => {
+    const urls: string[] = [];
+    const fetchImpl: CatalogFetch = async (url) => {
+      urls.push(url);
+      return jsonResponse({ error: "down" }, 503);
+    };
+    const models = await createMotsModels({}, "kilo", { fetch: fetchImpl, timeoutMs: 50 });
+    expect(urls).toEqual([KILO_GATEWAY_MODELS_URL]);
+    expect(models.getModel("kilo", "reflection/beam-free")).toBeDefined();
+    expect(models.getModel("kilo", "kilo-auto/free")).toBeDefined();
+  });
+
+  test("does not wait on a hung Vercel catalog past the timeout", async () => {
+    const urls: string[] = [];
+    const fetchImpl: CatalogFetch = async (url, init) => {
+      urls.push(url);
+      return hangUntilAbort(url, init);
+    };
+    const models = await withDeadline(
+      createMotsModels({}, "vercel-ai-gateway", { fetch: fetchImpl, timeoutMs: 50 }),
+      "Vercel catalog fetch blocked startup",
+    );
+    expect(urls).toEqual([VERCEL_GATEWAY_MODELS_URL]);
+    expect(models.getModels("vercel-ai-gateway")).toEqual([]);
+    expect(models.getModels("kilo")).toEqual([]);
+    expect(models.getModels("openrouter").length).toBeGreaterThan(0);
+  });
+
+  test("attaches an abort signal when the caller does not override the timeout", async () => {
+    const signals: AbortSignal[] = [];
+    const fetchImpl: CatalogFetch = async (_url, init) => {
+      signals.push(init.signal);
+      return jsonResponse({ data: [] });
+    };
+    const providers: readonly MotsProviderId[] = ["kilo", "vercel-ai-gateway"];
+    for (const provider of providers) {
+      const before = signals.length;
+      await createMotsModels({}, provider, { fetch: fetchImpl });
+      const signal = signals[before];
+      expect(signal).toBeDefined();
+      expect(signal?.aborted).toBe(false);
     }
   });
 });

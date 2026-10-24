@@ -17,6 +17,11 @@ interface __BaseEnv_Env {
   MOTS_CONNECT_WINDOW_SECONDS?: string;
   MOTS_MAX_SCHEDULES?: string;
   MOTS_MIN_RECURRENCE_SECONDS?: string;
+  /**
+   * Test-only. `stub` replaces the model port with a local reply and skips catalog fetches.
+   * Leave unset everywhere except the hermetic Worker smoke.
+   */
+  MOTS_FAKE_LLM?: string;
   SESSIONS: DurableObjectNamespace<import("./src/index").Session>;
 }
 
