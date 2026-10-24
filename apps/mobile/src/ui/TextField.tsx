@@ -47,15 +47,15 @@ export function TextField({
         autoFocus={autoFocus}
         maxLength={maxLength}
         keyboardType={keyboardType}
-        selectionColor={colors.accent}
+        selectionColor={colors.textPrimary}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         style={[
           styles.input,
           {
             color: colors.textPrimary,
-            backgroundColor: colors.bgMain,
-            borderColor: error !== undefined ? colors.danger : focused ? colors.accent : colors.borderSubtle,
+            backgroundColor: colors.surfaceSoft,
+            borderColor: focused ? colors.textPrimary : colors.borderSubtle,
           },
         ]}
       />
@@ -79,9 +79,9 @@ const styles = StyleSheet.create({
   },
   input: {
     minHeight: 48,
-    borderWidth: 1,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     fontFamily: fonts.regular,
     fontSize: 16,

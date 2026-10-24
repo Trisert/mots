@@ -11,7 +11,7 @@ const OPTIONS: readonly { readonly id: ThemeMode; readonly label: string }[] = [
 export function ThemeSwitcher() {
   const { mode, setMode, colors } = useTheme();
   return (
-    <View accessibilityLabel="Tema" style={styles.row}>
+    <View accessibilityLabel="Tema">
       {OPTIONS.map((option) => {
         const selected = mode === option.id;
         return (
@@ -21,19 +21,12 @@ export function ThemeSwitcher() {
             accessibilityLabel={`Tema ${option.label}`}
             accessibilityState={{ selected }}
             onPress={() => setMode(option.id)}
-            style={({ pressed }) => [
-              styles.chip,
-              {
-                backgroundColor: selected ? colors.textPrimary : colors.cardSurfacePrimary,
-                borderColor: selected ? colors.textPrimary : colors.borderSubtle,
-              },
-              pressed && styles.pressed,
-            ]}
+            style={[styles.row, selected && { backgroundColor: colors.surfaceSoft }]}
           >
             <Text
               style={[
                 styles.label,
-                { color: selected ? colors.bgMain : colors.textSecondary },
+                { color: selected ? colors.textPrimary : colors.textSecondary },
               ]}
             >
               {option.label}
@@ -47,23 +40,14 @@ export function ThemeSwitcher() {
 
 const styles = StyleSheet.create({
   row: {
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-  chip: {
-    flex: 1,
     minHeight: hit,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    alignItems: "center",
     justifyContent: "center",
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
+    marginHorizontal: -spacing.sm,
+    borderRadius: radius.md,
   },
   label: {
-    ...typeScale.label,
-    fontWeight: "600",
-  },
-  pressed: {
-    opacity: 0.8,
+    ...typeScale.body,
   },
 });

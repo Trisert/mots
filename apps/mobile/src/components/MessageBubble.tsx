@@ -6,17 +6,6 @@ import { useTheme } from "../context/ThemeContext";
 import { formatTime as formatTimestamp } from "../format";
 import { fonts, radius, spacing, type ThemeColors } from "../theme";
 import { TOOL_LABELS, toolSummary } from "../tools";
-import {
-  BookmarkIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  ClockIcon,
-  CopyIcon,
-  ForkIcon,
-  SearchIcon,
-  SparkleIcon,
-} from "./Icon";
 import { MarkdownText } from "./MarkdownText";
 
 function extractThinkingAndText(raw: string): { thinking?: string; text: string } {
@@ -32,22 +21,6 @@ function extractThinkingAndText(raw: string): { thinking?: string; text: string 
   }
 
   return { text: clean };
-}
-
-function ToolIcon({ name, isError }: { readonly name: string; readonly isError?: boolean }) {
-  const { colors } = useTheme();
-  const color = isError ? colors.danger : colors.textPrimary;
-  switch (name) {
-    case "schedule":
-      return <ClockIcon size={16} color={color} />;
-    case "remember":
-    case "forget":
-      return <BookmarkIcon size={16} color={color} />;
-    case "search_history":
-      return <SearchIcon size={16} color={color} />;
-    default:
-      return <SparkleIcon size={16} color={color} />;
-  }
 }
 
 type Props = {
@@ -66,16 +39,9 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
 
   if (entry.role === "compaction" || entry.role === "reset") {
     return (
-      <View style={styles.systemRow}>
-        <View style={styles.systemRule} />
-        <View style={styles.systemBadge}>
-          <SparkleIcon size={12} color={colors.starHighlight} />
-          <Text style={styles.systemText}>
-            {entry.role === "compaction" ? "Contesto compattato" : "Nuovo contesto"}
-          </Text>
-        </View>
-        <View style={styles.systemRule} />
-      </View>
+      <Text style={styles.systemText}>
+        {entry.role === "compaction" ? "Contesto compattato" : "Nuovo contesto"}
+      </Text>
     );
   }
 
@@ -87,36 +53,10 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
     const isError = entry.toolResult?.isError === true;
 
     return (
-      <View style={styles.toolRow}>
-        <View style={[styles.toolCard, isError && styles.toolCardError]}>
-          <View style={styles.toolHeader}>
-            <View style={styles.toolIconWrap}>
-              <ToolIcon name={name} isError={isError} />
-            </View>
-            <View style={styles.toolTitleBlock}>
-              <Text style={styles.toolName}>{TOOL_LABELS[name] ?? name}</Text>
-              {detail !== undefined && detail.length > 0 ? (
-                <Text style={styles.toolSummary}>{detail}</Text>
-              ) : null}
-            </View>
-            <View
-              style={[
-                styles.toolStatusBadge,
-                isError ? styles.toolBadgeError : styles.toolBadgeSuccess,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.toolStatusText,
-                  isError ? styles.toolStatusTextError : styles.toolStatusTextSuccess,
-                ]}
-              >
-                {isError ? "Errore" : "Eseguito"}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
+      <Text style={[styles.toolLine, isError && styles.toolLineError]}>
+        {TOOL_LABELS[name] ?? name}
+        {detail !== undefined && detail.length > 0 ? `  ${detail}` : ""}
+      </Text>
     );
   }
 
@@ -147,25 +87,12 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
           isScheduled && styles.bubbleScheduled,
         ]}
       >
-        {isScheduled ? (
-          <View style={styles.scheduledHeader}>
-            <ClockIcon size={14} color={colors.accent} />
-            <Text style={styles.scheduledLabel}>Routine</Text>
-          </View>
-        ) : null}
+        {isScheduled ? <Text style={styles.scheduledLabel}>Routine</Text> : null}
 
-        {/* Autonomous tool call chips on assistant message */}
         {entry.toolCalls !== undefined && entry.toolCalls.length > 0 ? (
-          <View style={styles.toolCalls}>
-            {entry.toolCalls.map((call) => (
-              <View key={call.callId} style={styles.toolChip}>
-                <ToolIcon name={call.name} />
-                <Text style={styles.toolChipText}>
-                  {TOOL_LABELS[call.name] ?? call.name}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <Text style={styles.toolLine}>
+            {entry.toolCalls.map((call) => TOOL_LABELS[call.name] ?? call.name).join("  ")}
+          </Text>
         ) : null}
 
         {/* Grok-style Thinking / Reasoning Accordion */}
@@ -175,20 +102,9 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
               accessibilityRole="button"
               accessibilityLabel="Dettagli ragionamento"
               onPress={() => setReasoningExpanded(!reasoningExpanded)}
-              style={({ pressed }) => [
-                styles.reasoningHeader,
-                pressed && styles.reasoningHeaderPressed,
-              ]}
+              style={styles.reasoningHeader}
             >
-              <View style={styles.reasoningTitleRow}>
-                <SparkleIcon size={14} color={colors.accent} />
-                <Text style={styles.reasoningTitle}>Ragionamento</Text>
-              </View>
-              {reasoningExpanded ? (
-                <ChevronUpIcon size={14} color={colors.reasoningText} />
-              ) : (
-                <ChevronDownIcon size={14} color={colors.reasoningText} />
-              )}
+              <Text style={styles.reasoningTitle}>Ragionamento</Text>
             </Pressable>
 
             {reasoningExpanded ? (
@@ -226,32 +142,20 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Copia risposta"
-                hitSlop={4}
                 onPress={() => void copyMessage()}
-                style={({ pressed }) => [
-                  styles.iconActionButton,
-                  pressed && styles.actionButtonPressed,
-                ]}
+                style={styles.iconActionButton}
               >
-                {copied ? (
-                  <CheckIcon size={14} color={colors.accentGreen} />
-                ) : (
-                  <CopyIcon size={14} color={colors.textSecondary} />
-                )}
+                <Text style={styles.actionText}>{copied ? "Copiato" : "Copia"}</Text>
               </Pressable>
 
               {entry.canFork && onFork !== undefined ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Dirama da questo messaggio"
-                  hitSlop={4}
                   onPress={() => onFork(entry)}
-                  style={({ pressed }) => [
-                    styles.iconActionButton,
-                    pressed && styles.actionButtonPressed,
-                  ]}
+                  style={styles.iconActionButton}
                 >
-                  <ForkIcon size={14} color={colors.textSecondary} />
+                  <Text style={styles.actionText}>Dirama</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -287,32 +191,17 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     bubbleAssistant: {
       width: "100%",
       backgroundColor: "transparent",
-      paddingHorizontal: 2,
       paddingVertical: 6,
     },
     bubbleUser: {
       alignSelf: "flex-end",
       maxWidth: "84%",
       backgroundColor: colors.userBubble,
-      borderRadius: 22,
-      paddingHorizontal: 16,
-      paddingVertical: 11,
-      elevation: 1,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: isDark ? 0.25 : 0.05,
-      shadowRadius: 3,
-      borderWidth: isDark ? 1 : 0,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "transparent",
-    },
-    bubbleScheduled: {
-      backgroundColor: colors.cardSurfaceAmber,
-      borderRadius: 16,
+      borderRadius: radius.lg,
       paddingHorizontal: 14,
       paddingVertical: 10,
-      borderWidth: 1,
-      borderColor: colors.reasoningBorder,
     },
+    bubbleScheduled: {},
     text: {
       fontFamily: fonts.medium,
       color: colors.textPrimary,
@@ -330,11 +219,27 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       marginBottom: spacing.xs,
     },
     scheduledLabel: {
-      fontFamily: fonts.bold,
-      color: colors.accent,
-      fontSize: 10,
-      fontWeight: "700",
-      letterSpacing: 1.2,
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+      marginBottom: spacing.xs,
+    },
+    toolLine: {
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+      marginTop: spacing.sm,
+    },
+    toolLineError: {
+      color: colors.textPrimary,
+    },
+    actionText: {
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
     },
     time: {
       fontFamily: fonts.medium,
@@ -343,11 +248,12 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       opacity: 0.8,
     },
     timeUser: {
-      fontFamily: fonts.medium,
+      fontFamily: fonts.regular,
       marginTop: 4,
       alignSelf: "flex-end",
-      color: isDark ? "rgba(245, 245, 247, 0.55)" : "rgba(255, 255, 255, 0.55)",
-      fontSize: 10.5,
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
     },
     assistantFooter: {
       flexDirection: "row",
@@ -364,7 +270,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     iconActionButton: {
       width: 44,
       height: 44,
-      borderRadius: 22,
+      borderRadius: radius.full,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: "transparent",

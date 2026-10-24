@@ -25,18 +25,15 @@ import {
   saveIdentity,
   type Identity,
 } from "./src/storage";
-import { spacing, type as typeScale } from "./src/theme";
-import { BrandMark } from "./src/ui/BrandMark";
+import { inset, spacing, type as typeScale } from "./src/theme";
 
 function Splash() {
   const { colors } = useTheme();
   return (
     <View style={[styles.splash, { backgroundColor: colors.bgMain }]}>
-      <BrandMark size={56} />
       <Text accessibilityRole="header" style={[styles.wordmark, { color: colors.textPrimary }]}>
         Mots
       </Text>
-      <ActivityIndicator color={colors.textSecondary} />
     </View>
   );
 }
@@ -103,14 +100,14 @@ function MainApp() {
       if (document.documentElement) {
         document.documentElement.style.backgroundColor = colors.bgMain;
         document.documentElement.style.colorScheme = isDark ? "dark" : "light";
-        document.documentElement.style.setProperty("--mots-focus", colors.accent);
+        document.documentElement.style.setProperty("--mots-focus", colors.textPrimary);
       }
       const root = document.getElementById("root");
       if (root) {
         root.style.backgroundColor = colors.bgMain;
       }
     }
-  }, [colors.accent, colors.bgMain, isDark]);
+  }, [colors.bgMain, colors.textPrimary, isDark]);
 
   const handleReady = async (next: Identity) => {
     await saveIdentity(next);
@@ -178,7 +175,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.md,
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: inset,
   },
   wordmark: {
     ...typeScale.display,
