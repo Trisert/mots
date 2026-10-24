@@ -17,6 +17,8 @@ interface __BaseEnv_Env {
   MOTS_CONNECT_WINDOW_SECONDS?: string;
   MOTS_MAX_SCHEDULES?: string;
   MOTS_MIN_RECURRENCE_SECONDS?: string;
+  /** Optional Expo access token for reminder pushes. See apps/server/.dev.vars.example. */
+  EXPO_ACCESS_TOKEN?: string;
   SESSIONS: DurableObjectNamespace<import("./src/index").Session>;
 }
 
