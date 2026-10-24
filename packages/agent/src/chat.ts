@@ -1,3 +1,4 @@
+import type { Models } from "@earendil-works/pi-ai";
 import {
   configure,
   createRegistry,
@@ -22,6 +23,11 @@ export type MotsHarnessOptions = {
   readonly provider?: MotsProviderId;
   /** The Worker's environment; the provider API key is read from here and never leaves the Worker. */
   readonly env?: MotsEnvironment;
+  /**
+   * Replaces the catalog from `createMotsModels`. Unset keeps that catalog, including its fetches.
+   * The hermetic Worker smoke passes a local stub so startup does not touch the network.
+   */
+  readonly models?: Models;
 };
 
 export async function createMotsHarnessOptions(
@@ -63,7 +69,7 @@ export async function createMotsHarnessOptions(
   registry.install(conversationSearchExtension);
   const provider = options.provider ?? "kilo";
   const modelId = options.modelId ?? DEFAULT_MODELS[provider];
-  const models = await createMotsModels(options.env ?? {}, provider);
+  const models = options.models ?? (await createMotsModels(options.env ?? {}, provider));
   const defaultAgent = {
     model: { provider, modelId },
     thinkingLevel: "off" as const,
