@@ -19,6 +19,7 @@ import {
 import { openDurableObjectSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/cloudflare";
 import {
   createMotsHarnessOptions,
+  createStubModels,
   isAllowedAgentModel,
   ModelNotAllowedError,
   type MotsEnvironment,
@@ -184,13 +185,18 @@ export class Session extends DurableObject<Env> {
       reportError("MOTS_PROVIDER is not supported", error);
       throw error;
     }
+    const harnessInput = {
+      modelId: this.env.MOTS_MODEL,
+      provider,
+      env: this.env as unknown as MotsEnvironment,
+    };
+    // MOTS_FAKE_LLM=stub is the hermetic test seam. Any other value, including unset,
+    // keeps the production catalog and provider calls.
     const chatOptions = await createMotsHarnessOptions(
       (timestamp) => this.#setAlarmNoLaterThan(timestamp),
-      {
-        modelId: this.env.MOTS_MODEL,
-        provider,
-        env: this.env as unknown as MotsEnvironment,
-      },
+      this.env.MOTS_FAKE_LLM === "stub"
+        ? { ...harnessInput, models: createStubModels() }
+        : harnessInput,
     );
     this.#models = chatOptions.models;
     const harness = await Harness.open(
