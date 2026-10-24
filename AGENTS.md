@@ -54,7 +54,7 @@ Run from the repo root unless noted.
 | --- | --- |
 | `bun install --frozen-lockfile` | Install workspace dependencies. |
 | `bun run typecheck` | `tsc` in every workspace. |
-| `bun run test` | Bun tests for protocol, client, agent, the Worker gate, and mobile pure functions. |
+| `bun run test` | Bun tests for protocol, client, agent, the Worker gate, and mobile pure functions. The suite is 134 tests. |
 | `bun run check:server` | `wrangler deploy --dry-run` for the Worker. |
 | `bun run check` | Typecheck, then the Worker dry-run. This is the gate for a PR. |
 | `bun run dev:server` | `wrangler dev` on port 8787. See the Wrangler gotcha below. |

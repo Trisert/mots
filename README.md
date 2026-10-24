@@ -2,17 +2,17 @@
 
 Mots è un compagno AI mobile-first: ricorda le cose importanti, organizza promemoria, cerca nelle conversazioni passate e resta nella tua tasca. L'obiettivo è un'architettura platform-agnostic con un'app mobile come primo client, costruita sopra [Pi Durable](https://github.com/earendil-works/pi/tree/main/packages/durable) e Cloudflare Durable Objects.
 
-> **Stato: MVP in sviluppo attivo.** Monorepo funzionante. Typecheck di tutti i workspace, suite `bun run test`, dry-run del Worker e bundle Android verificati. Il Worker rifiuta sessioni anonime. Account utente, copertura E2E con LLM reale e deploy pubblico restano i prossimi passi.
+> **Stato: MVP in sviluppo attivo.** Monorepo funzionante. Typecheck di tutti i workspace, suite `bun run test` (134 test), dry-run del Worker e bundle Android verificati. Il Worker rifiuta sessioni anonime. Account utente, copertura E2E con LLM reale e deploy pubblico restano i prossimi passi.
 
 ## Cosa c'è già
 
 - **App mobile Expo** con onboarding, creazione/ingresso in una sessione, chat in streaming, lista conversazioni, condivisione del codice, fork da un messaggio e stato di connessione.
 - **Server Cloudflare Worker** con una sessione per Durable Object, storage SQLite, WebSocket hibernabili e alarm.
-- **Agente Mots** basato sull'harness di Pi Durable, con provider LLM configurabile (OpenRouter, Vercel AI Gateway, NVIDIA).
+- **Agente Mots** basato sull'harness di Pi Durable, con provider LLM configurabile. Se `MOTS_PROVIDER` manca, il codice usa Kilo. OpenRouter, Vercel AI Gateway e NVIDIA si scelgono dall'ambiente.
 - **Memoria durevole** per sessione: preferenze e fatti sopravvivono alle conversazioni.
 - **Promemoria** programmati con tool `schedule`, ricorrenze e risveglio via alarm.
 - **Ricerca nella storia** delle conversazioni tramite subagent.
-- **Client SDK condiviso** con riconnessione automatica, coda comandi affidabile e stato React compatibile con `useSyncExternalStore`.
+- **Client SDK condiviso** con riconnessione automatica, outbox che ritenta i comandi già spediti e non ancora confermati, e stato React compatibile con `useSyncExternalStore`.
 
 ## Architettura
 
@@ -43,7 +43,7 @@ Mots è un compagno AI mobile-first: ricorda le cose importanti, organizza prome
 - Una **sessione** è un codice firmato (`uuid` + HMAC). L'uuid è il nome del Durable Object; la firma è ciò che autorizza l'apertura.
 - `POST /api/sessions` emette il codice e non crea il Durable Object. Il DO nasce solo quando un WebSocket presenta un codice valido.
 - Il client apre un WebSocket e riceve snapshot, eventi dell'agente, presenza e conferme dei comandi.
-- I comandi di creazione/fork sono ritentabili tramite outbox; i prompt hanno una ricevuta con `submissionId`.
+- Creazione, fork, prompt e `conversation.setModel` restano in outbox dopo un invio riuscito. Un prompt confermato porta `submissionId`.
 - I promemoria usano gli alarm del Durable Object; la memoria usa un documento Pi con scope sessione.
 
 ## Struttura del repository
@@ -62,7 +62,7 @@ packages/
 
 - [Bun](https://bun.sh/) 1.4 o successivo per install, typecheck, test ed Expo.
 - [Node.js](https://nodejs.org/) 22 o successivo nel `PATH` per eseguire Wrangler. Wrangler non funziona correttamente se viene avviato dal runtime di Bun: in quel caso `wrangler dev` risponde `503`.
-- Una chiave API per il provider scelto: [OpenRouter](https://openrouter.ai/keys), Vercel AI Gateway o NVIDIA. Vedi [Provider LLM](#provider-llm).
+- Una chiave API per il provider scelto. Il predefinito è Kilo. In alternativa [OpenRouter](https://openrouter.ai/keys), Vercel AI Gateway (`AI_GATEWAY_API_KEY`, host `https://ai-gateway.vercel.sh/v1`) o NVIDIA. Vedi [Provider LLM](#provider-llm).
 - Per il telefono: Expo Go oppure un emulatore Android / simulatore iOS.
 - Un account Cloudflare solo per il deploy del Worker.
 
@@ -75,18 +75,24 @@ bun install
 Copy-Item apps/server/.dev.vars.example apps/server/.dev.vars
 ```
 
-Apri `apps/server/.dev.vars`. Servono due segreti di almeno 16 caratteri, più la chiave del provider. Generali con `openssl rand -base64 32` (due volte) e non riusare l'esempio vuoto del repository:
+Apri `apps/server/.dev.vars`. Servono due segreti di almeno 16 caratteri. Generali con `openssl rand -base64 32` (due volte) e non riusare l'esempio vuoto del repository. Se `MOTS_PROVIDER` manca, il codice usa `kilo` e il modello `reflection/beam-free` (`DEFAULT_MODELS` in `packages/agent/src/provider.ts`):
 
 ```dotenv
 MOTS_SESSION_SECRET=...
 MOTS_CREATE_TOKEN=...
+# KILO_API_KEY=...
+# MOTS_MODEL=reflection/beam-free
+```
+
+`MOTS_SESSION_SECRET` firma i codici di ingresso: ruotarlo invalida ogni codice già condiviso. `MOTS_CREATE_TOKEN` è il bearer di `POST /api/sessions`. Senza uno dei due il Worker risponde `503` e non apre sessioni. Senza `KILO_API_KEY` il processo locale può leggere `~/.pi/agent/auth.json`, oppure inviare la chiave letterale `free`.
+
+Per un altro provider imposta `MOTS_PROVIDER` e la chiave di quel provider. Con `openrouter` il modello predefinito è `openai/gpt-6-luna`:
+
+```dotenv
+MOTS_PROVIDER=openrouter
 OPENROUTER_API_KEY=sk-or-...
 # MOTS_MODEL=openai/gpt-6-luna
 ```
-
-`MOTS_SESSION_SECRET` firma i codici di ingresso: ruotarlo invalida ogni codice già condiviso. `MOTS_CREATE_TOKEN` è il bearer di `POST /api/sessions`. Senza uno dei due il Worker risponde `503` e non apre sessioni.
-
-Con un provider diverso cambia `MOTS_PROVIDER` e la variabile della chiave:
 
 ```dotenv
 MOTS_PROVIDER=vercel-ai-gateway
@@ -104,8 +110,8 @@ bun run dev:mobile
 ```
 
 - Server locale: `http://localhost:8787` (`GET /api/health`).
-- Se il server risponde `503`, controlla che `node --version` funzioni e che Node preceda Bun nel `PATH`: `wrangler dev` deve girare su Node.
-- Nell'app premi **Crea il tuo spazio**.
+- Se `GET /api/health` risponde `503`, controlla che `node --version` funzioni e che Node preceda Bun nel `PATH`: `wrangler dev` deve girare su Node. Un `503` su `POST /api/sessions`, con il dev server già su Node, indica che manca `MOTS_SESSION_SECRET` o `MOTS_CREATE_TOKEN`.
+- Nell'app premi **Crea uno spazio**. Il campo Server è modificabile: è lo stesso valore che l'onboarding salva con l'identità.
 - Android emulator: usa `http://10.0.2.2:8787` (già impostato come default).
 - iOS simulator: `http://localhost:8787`.
 - Telefono fisico sulla stessa rete: avvia `bun run dev:server:lan` (binding `0.0.0.0`), inserisci nell'app l'indirizzo LAN del computer, ad esempio `http://192.168.1.10:8787`, e consenti Node/Expo nel firewall Windows.
@@ -125,11 +131,11 @@ L'anteprima usa `http://localhost:8787` come server; l'URL resta modificabile da
 cd apps/server
 bunx wrangler secret put MOTS_SESSION_SECRET
 bunx wrangler secret put MOTS_CREATE_TOKEN
-bunx wrangler secret put OPENROUTER_API_KEY
+bunx wrangler secret put KILO_API_KEY
 bunx wrangler deploy
 ```
 
-Sostituisci `OPENROUTER_API_KEY` con la chiave del provider usato (`KILO_API_KEY`, `AI_GATEWAY_API_KEY` o `NVIDIA_API_KEY`). Il provider si sceglie con `MOTS_PROVIDER` (`bunx wrangler secret put MOTS_PROVIDER`). Se la variabile manca, il codice usa `kilo`. Un valore sconosciuto fa fallire l'avvio della sessione invece di tornare in silenzio a Kilo. `MOTS_MODEL` è opzionale. Non fare il deploy finché l'app mobile non invia il bearer di creazione: un client vecchio riceve `401`.
+Il provider predefinito è `kilo`, con modello `reflection/beam-free`. Per OpenRouter, Vercel o NVIDIA metti al posto di `KILO_API_KEY` la variabile `OPENROUTER_API_KEY`, `AI_GATEWAY_API_KEY` o `NVIDIA_API_KEY`, e imposta `MOTS_PROVIDER` con `bunx wrangler secret put MOTS_PROVIDER`. Se `MOTS_PROVIDER` manca, il codice usa `kilo`. Un valore sconosciuto fa fallire l'avvio della sessione. `MOTS_MODEL` è opzionale. Non fare il deploy finché l'app mobile non invia il bearer di creazione: un client vecchio riceve `401`.
 
 Poi nell'app usa l'URL pubblico del Worker come server.
 
@@ -205,7 +211,7 @@ I tool dell'agente (`remember`, `forget`, `schedule`, `search_history`) richiedo
 | `bun run dev:mobile` | Avvia Expo. |
 | `bun run dev:web` | Avvia l'anteprima web di Expo. |
 | `bun run typecheck` | Typecheck di tutti i package. |
-| `bun run test` | Test di protocollo e client. |
+| `bun run test` | 134 test: protocollo, client, agent, gate del Worker e funzioni pure del mobile. |
 | `bun run check` | Typecheck + dry-run del Worker. |
 | `bun run check:server` | Solo `wrangler deploy --dry-run`. |
 | `bun run build:mobile` | Export Android con Metro. |
@@ -219,7 +225,7 @@ I tool dell'agente (`remember`, `forget`, `schedule`, `search_history`) richiedo
 | `POST` | `/api/sessions` | Emette un codice firmato. Richiede `Authorization: Bearer <MOTS_CREATE_TOKEN>`. Risponde `201` con `{ sessionId, url, socketPath }`. `sessionId` è il codice intero. Non crea il Durable Object. |
 | `GET` | `/api/sessions/:id` | Upgrade WebSocket. `:id` deve essere il codice firmato. Il nome del Durable Object è solo l'uuid, dopo la verifica. |
 
-Il protocollo applicativo vive in `packages/protocol`: comandi client (`conversation.open`, `conversation.create`, `conversation.fork`, `prompt.submit`, `presence.typing`) ed eventi server (snapshot, eventi conversazione, inbox, presenza, risultati comandi, errori).
+Il protocollo applicativo vive in `packages/protocol`: comandi client (`conversation.open`, `conversation.create`, `conversation.fork`, `prompt.submit`, `conversation.setModel`, `presence.typing`) ed eventi server (snapshot, eventi conversazione, inbox, presenza, risultati comandi, errori).
 
 ## Tool dell'agente
 
@@ -237,10 +243,10 @@ La persona dell'agente, l'orologio e la memoria vengono iniettati come sezioni d
 - [x] Monorepo Bun + TypeScript con workspace.
 - [x] Protocollo, client SDK e reducer condivisi.
 - [x] Worker + Durable Object con SQLite, WebSocket e alarm.
-- [x] Agente con memoria, promemoria e ricerca, su provider LLM configurabile (OpenRouter, Vercel AI Gateway, NVIDIA).
+- [x] Agente con memoria, promemoria e ricerca. Provider predefinito: Kilo. Alternative da ambiente: OpenRouter, Vercel AI Gateway, NVIDIA.
 - [x] App mobile con onboarding, chat, sessioni e fork.
 - [x] Typecheck, dry-run Worker, bundle Android.
-- [x] Suite automatica (`bun run test`): protocollo, client, agent, gate del Worker e funzioni pure del mobile.
+- [x] Suite automatica (`bun run test`, 134 test): protocollo, client, agent, gate del Worker e funzioni pure del mobile.
 - [x] Verifica end-to-end locale: health, creazione sessione, WebSocket e nuova conversazione.
 - [x] Gate di sessione: codice firmato, token di creazione, rate limit per isolate, CORS da ambiente, allowlist di `conversation.setModel`, tetto sul numero di routine e sulla cadenza. Non sono account utente.
 - [ ] Notifiche push per i promemoria.
@@ -274,10 +280,10 @@ The mobile app adopts this gate. `packages/client` does not take a new socket pa
 6. A schedule over the cap, or a new recurrence under the minimum cadence, fails inside the tool. No client frame changes.
 7. Native apps send no `Origin`, so CORS does not affect them. A web preview must use an origin listed in `MOTS_CORS_ORIGINS` once that variable is set. Until it is set, every origin is allowed.
 8. `429` bodies are `{ error: "rate_limited", message }` and include a `Retry-After` header in seconds. `401` is `{ error: "unauthorized", message }`. `503` means a server secret is missing (`session_secret_unconfigured` or `create_token_unconfigured`).
-9. `EXPO_PUBLIC_MOTS_CREATE_TOKEN`, when set, is compiled into the app bundle. It is not a confidential secret. It only stops callers who do not have the app. When it is unset, `createSession` omits `Authorization` so a local Worker that does not check a token still works.
+9. `EXPO_PUBLIC_MOTS_CREATE_TOKEN`, when set, is compiled into the app bundle. It is not a confidential secret. It only stops callers who do not have the app. When it is unset, `createSession` omits `Authorization`. This Worker still requires the bearer: a request without it is `401`, and a server without `MOTS_CREATE_TOKEN` is `503`.
 10. The share sheet and the session menu show the entire `sessionId`. A sliced label is not a join code.
 
-`apps/mobile/src/api.ts` `createSession` sends the bearer. A plain `GET` of the socket path distinguishes `426` (open the socket), `401` (offer a new space or a join), and `503` / `429` / `403` (the server is not ready). Anything else, including a network failure, still tries the socket so local dev without the gate keeps working. `apps/mobile/src/storage.ts` already accepts the new code shape.
+`apps/mobile/src/api.ts` `createSession` sends the bearer when `EXPO_PUBLIC_MOTS_CREATE_TOKEN` is set. A plain `GET` of the socket path distinguishes `426` (open the socket), `401` (offer a new space or a join), and `503` / `429` / `403` (the server is not ready). Any other result, including a network failure, still tries the socket. `apps/mobile/src/storage.ts` already accepts the new code shape.
 
 ## Licenza
 
