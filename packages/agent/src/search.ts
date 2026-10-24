@@ -4,6 +4,7 @@ import {
   AssistantEntry,
   configure,
   type ConversationId,
+  type ConversationRecord,
   type Cursor,
   defineExtension,
   type EntryRecord,
@@ -17,7 +18,11 @@ export const SEARCH_HISTORY_TOOL_NAME = "search_history";
 
 const PAGE_SIZE = 50;
 const MAX_MATCHES = 20;
+/** Rows read from ownerless transcripts for one search. Inherited fork rows count; the page was already read. */
+export const MAX_SCAN_ENTRIES = 500;
 const SNIPPET_RADIUS = 80;
+/** Newest conversations first, so the entry budget is spent on recent history. */
+const CONVERSATIONS_NEWEST_FIRST = { order: "descending" } as const;
 
 export type ConversationMatch = {
   readonly conversationId: number;
@@ -65,10 +70,43 @@ function match(entry: EntryRecord, term: string): ConversationMatch | undefined 
   };
 }
 
+type ConversationPage = {
+  readonly items: readonly ConversationRecord[];
+  readonly next?: Cursor;
+};
+
+/**
+ * True when scan order still has an ownerless conversation after `conversationIndex`. Reads conversation rows only,
+ * never entries, so the entry budget stays closed while `truncated` stays honest about leftover history.
+ */
+async function ownerlessRemains(
+  api: Pick<ToolExecutionApi, "commit">,
+  context: Context,
+  page: ConversationPage,
+  conversationIndex: number,
+): Promise<boolean> {
+  for (let index = conversationIndex + 1; index < page.items.length; index++) {
+    if (page.items[index]?.owner === undefined) return true;
+  }
+  let cursor = page.next;
+  while (cursor !== undefined) {
+    const pageCursor = cursor;
+    const nextPage = await api.commit(
+      (tx) => tx.scanConversations(CONVERSATIONS_NEWEST_FIRST, PAGE_SIZE, pageCursor),
+      context,
+    );
+    if (nextPage.items.some((item) => item.owner === undefined)) return true;
+    cursor = nextPage.next;
+  }
+  return false;
+}
+
 /**
  * Case-insensitive substring search over ordinary turns in ownerless conversations. Owned conversations (subagents)
  * and every turn that invokes history search are skipped, so search questions and answers derived from earlier searches never
  * become evidence. Each page is read in its own commit so a scan never holds the Session's commit line for long.
+ * The scan reads at most MAX_SCAN_ENTRIES rows, newest conversations first. `truncated` is true when the match
+ * cap or that budget stops the scan before ownerless history is exhausted.
  */
 export async function searchConversations(
   api: Pick<ToolExecutionApi, "commit">,
@@ -88,29 +126,49 @@ export async function searchConversations(
     }
     return false;
   };
+  let scannedEntries = 0;
   let conversationCursor: Cursor | undefined;
   do {
+    const pageCursor = conversationCursor;
     const conversations = await api.commit(
-      (tx) => tx.scanConversations({}, PAGE_SIZE, conversationCursor),
+      (tx) => tx.scanConversations(CONVERSATIONS_NEWEST_FIRST, PAGE_SIZE, pageCursor),
       context,
     );
-    for (const conversation of conversations.items) {
-      if (conversation.owner !== undefined) continue;
+    for (let conversationIndex = 0; conversationIndex < conversations.items.length; conversationIndex++) {
+      const conversation = conversations.items[conversationIndex];
+      if (conversation === undefined || conversation.owner !== undefined) continue;
       let turn: EntryRecord[] = [];
       let entryCursor: Cursor | undefined;
       do {
+        const entryPageCursor = entryCursor;
         const entries = await api.commit(
-          (tx) => tx.scanEntries({ conversationId: conversation.id }, PAGE_SIZE, entryCursor),
+          (tx) =>
+            tx.scanEntries({ conversationId: conversation.id }, PAGE_SIZE, entryPageCursor),
           context,
         );
-        for (const entry of entries.items) {
-          // A fork's scan includes its inherited history; count each entry once, in the conversation that wrote it.
-          if (entry.conversationId !== conversation.id) continue;
-          // Entries are newest-first. Reaching the user entry completes one whole turn.
-          turn.push(entry);
-          if (UserEntry.is(entry)) {
+        for (let index = 0; index < entries.items.length; index++) {
+          const entry = entries.items[index];
+          if (entry === undefined) continue;
+          scannedEntries += 1;
+          // A fork page repeats inherited history. Those rows are not matches, and they still spend the budget.
+          if (entry.conversationId === conversation.id) {
+            // Entries are newest-first. Reaching the user entry completes one whole turn.
+            turn.push(entry);
+            if (UserEntry.is(entry)) {
+              if (appendTurn(turn)) return { matches, truncated: true };
+              turn = [];
+            }
+          }
+          if (scannedEntries >= MAX_SCAN_ENTRIES) {
+            const unreadInConversation =
+              index + 1 < entries.items.length || entries.next !== undefined;
+            // An open turn stays unmatched: a later row could still be the search_history call that excludes it.
+            if (unreadInConversation) return { matches, truncated: true };
             if (appendTurn(turn)) return { matches, truncated: true };
-            turn = [];
+            if (await ownerlessRemains(api, context, conversations, conversationIndex)) {
+              return { matches, truncated: true };
+            }
+            return { matches, truncated: false };
           }
         }
         entryCursor = entries.next;
@@ -126,7 +184,8 @@ export const searchConversationsTool: ToolRegistration = {
   name: SEARCH_CONVERSATIONS_TOOL_NAME,
   description:
     "Find user and assistant messages containing a term in ordinary top-level conversation turns. " +
-    `Case-insensitive substring match; returns at most ${MAX_MATCHES} matches with snippets.`,
+    `Case-insensitive substring match; returns at most ${MAX_MATCHES} matches with snippets. ` +
+    `Reads at most ${MAX_SCAN_ENTRIES} entries, newest conversations first, and sets truncated when history remains.`,
   parameters: Type.Object({
     term: Type.String({ description: "Word or phrase to find, for example postgres" }),
   }),
@@ -182,7 +241,8 @@ export const searchHistoryTool: ToolRegistration = {
         type: "input",
         content:
           `Answer this question using search_conversations: ${question}\n\n` +
-          "Try a few relevant terms. Reply briefly, cite conversation IDs, and say so if nothing relevant was found.",
+          "Try a few relevant terms. If truncated is true, say the scan did not read the whole history. " +
+          "Reply briefly, cite conversation IDs, and say so if nothing relevant was found.",
         // The task ID is stable across reruns, so a rerun gets back this submission.
         requestId: `search-history:${api.taskId}`,
       },
