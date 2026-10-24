@@ -281,8 +281,13 @@ describe("isMotsProviderId", () => {
 });
 
 describe("provider configuration", () => {
-  test("lists the three supported providers", () => {
-    expect([...MOTS_PROVIDERS]).toEqual(["openrouter", "vercel-ai-gateway", "nvidia"]);
+  test("lists the supported providers", () => {
+    expect([...MOTS_PROVIDERS]).toEqual([
+      "kilo",
+      "openrouter",
+      "vercel-ai-gateway",
+      "nvidia",
+    ]);
   });
 
   test("gives every provider a default model and an API key variable", () => {

@@ -14,11 +14,20 @@ export const VERCEL_GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh/v1";
 /** The unauthenticated catalog endpoint. */
 const VERCEL_GATEWAY_MODELS_URL = "https://ai-gateway.vercel.sh/v1/models";
 
-export const MOTS_PROVIDERS = ["openrouter", "vercel-ai-gateway", "nvidia"] as const;
+/**
+ * Kilo Gateway (https://kilo.ai) provider configuration.
+ * Supported by official extension: https://github.com/Kilo-Org/kilo-pi-provider
+ */
+export const KILO_API_BASE = "https://api.kilo.ai";
+export const KILO_GATEWAY_BASE_URL = "https://api.kilo.ai/api/gateway";
+export const KILO_GATEWAY_MODELS_URL = "https://api.kilo.ai/api/gateway/models";
+
+export const MOTS_PROVIDERS = ["kilo", "openrouter", "vercel-ai-gateway", "nvidia"] as const;
 
 export type MotsProviderId = (typeof MOTS_PROVIDERS)[number];
 
 export const DEFAULT_MODELS: Readonly<Record<MotsProviderId, string>> = {
+  kilo: "reflection/beam-free",
   openrouter: "openai/gpt-6-luna",
   "vercel-ai-gateway": "reflection/beam-free",
   nvidia: "nvidia/nemotron-3.5-lightning-30b-a3b",
@@ -26,6 +35,7 @@ export const DEFAULT_MODELS: Readonly<Record<MotsProviderId, string>> = {
 
 /** Environment variable holding the API key for each provider. */
 export const API_KEY_ENV: Readonly<Record<MotsProviderId, string>> = {
+  kilo: "KILO_API_KEY",
   openrouter: "OPENROUTER_API_KEY",
   "vercel-ai-gateway": "AI_GATEWAY_API_KEY",
   nvidia: "NVIDIA_API_KEY",
@@ -301,21 +311,221 @@ export const providerAuthContext = (env: MotsEnvironment): AuthContext => ({
   },
 });
 
+function readStoredKiloToken(): string | undefined {
+  try {
+    if (typeof process === "undefined" || !process.env) return undefined;
+    const home = process.env.HOME || process.env.USERPROFILE;
+    if (!home) return undefined;
+    const fs = require("node:fs");
+    const path = require("node:path");
+    const authPath = path.join(home, ".pi", "agent", "auth.json");
+    if (!fs.existsSync(authPath)) return undefined;
+    const auth = JSON.parse(fs.readFileSync(authPath, "utf8"));
+    const token = auth?.kilo?.access;
+    return typeof token === "string" && token.length > 0 ? token : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export const toKiloPiModel = (
+  model: GatewayModel,
+  baseUrl: string = KILO_GATEWAY_BASE_URL,
+): Model<"openai-completions"> | undefined => {
+  if (model.supported_parameters && !model.supported_parameters.includes("tools")) {
+    return undefined;
+  }
+  const supportsReasoning = Boolean(model.supported_parameters?.includes("reasoning"));
+  const tiers = toCostTiers(model);
+  const piModel: Model<"openai-completions"> = {
+    id: model.id,
+    name: model.name ?? model.id,
+    api: "openai-completions",
+    provider: "kilo",
+    baseUrl,
+    input: model.modalities?.input?.includes("image") ? ["text", "image"] : ["text"],
+    cost: {
+      input: pricePerMillion(model.pricing?.input),
+      output: pricePerMillion(model.pricing?.output),
+      cacheRead: pricePerMillion(model.pricing?.input_cache_read),
+      cacheWrite: pricePerMillion(model.pricing?.input_cache_write),
+      ...(tiers.length > 0 ? { tiers } : {}),
+    },
+    reasoning: supportsReasoning,
+    contextWindow: model.context_window ?? 128_000,
+    maxTokens: model.max_tokens ?? 8_192,
+    type: "chat",
+    compat: {
+      maxTokensField: "max_tokens",
+      supportsStore: false,
+      supportsDeveloperRole: false,
+      supportsReasoningEffort: supportsReasoning,
+      thinkingFormat: "openrouter",
+    },
+  };
+  return piModel;
+};
+
+export const kiloGatewayProvider = (
+  models: readonly Model<"openai-completions">[],
+): Provider<"openai-completions"> => ({
+  id: "kilo",
+  name: "Kilo Gateway",
+  baseUrl: KILO_GATEWAY_BASE_URL,
+  auth: {
+    apiKey: {
+      name: "Kilo Gateway API key",
+      login: async (interaction) => {
+        interaction.signal.throwIfAborted();
+        const key = await interaction.prompt({
+          type: "secret",
+          message: "Enter Kilo Gateway API key",
+        });
+        interaction.signal.throwIfAborted();
+        return { type: "api_key", key };
+      },
+      resolve: async ({ ctx, credential, signal }) => {
+        signal.throwIfAborted();
+        if (credential?.key) return { auth: { apiKey: credential.key }, source: "stored credential" };
+        const value = await ctx.env(API_KEY_ENV.kilo);
+        signal.throwIfAborted();
+        if (value) return { auth: { apiKey: value }, source: API_KEY_ENV.kilo };
+        const local = readStoredKiloToken();
+        if (local) return { auth: { apiKey: local }, source: "~/.pi/agent/auth.json" };
+        return { auth: { apiKey: "free" }, source: "kilo-free" };
+      },
+    },
+  },
+  getModels: () => models,
+  getAllModels: () => models,
+  stream: (model, context, options) => openAICompletionsApi().stream(model, context, options),
+  streamSimple: (model, context, options) => openAICompletionsApi().streamSimple(model, context, options),
+});
+
+let cachedKiloModels: readonly Model<"openai-completions">[] | undefined;
+let cachedKiloFetch: Promise<readonly Model<"openai-completions">[]> | undefined;
+
+export const kiloModels = async (): Promise<readonly Model<"openai-completions">[]> => {
+  if (cachedKiloModels !== undefined) return cachedKiloModels;
+  cachedKiloFetch ??= (async () => {
+    try {
+      const response = await fetch(KILO_GATEWAY_MODELS_URL, { headers: { accept: "application/json" } });
+      if (!response.ok) throw new Error(`Kilo Gateway catalog request failed: ${response.status}`);
+      const body = (await response.json()) as { readonly data?: readonly any[] };
+      const models = (body.data ?? [])
+        .map((model) => {
+          const adapted: GatewayModel = {
+            id: model.id,
+            name: model.name,
+            context_window: model.context_length,
+            max_tokens: model.top_provider?.max_completion_tokens ?? model.max_completion_tokens,
+            pricing: {
+              input: model.pricing?.prompt,
+              output: model.pricing?.completion,
+              input_cache_read: model.pricing?.input_cache_read,
+              input_cache_write: model.pricing?.input_cache_write,
+            },
+            modalities: { input: model.architecture?.input_modalities },
+            supported_parameters: model.supported_parameters,
+          };
+          return toKiloPiModel(adapted);
+        })
+        .filter((model): model is Model<"openai-completions"> => model !== undefined);
+      if (models.length > 0) {
+        cachedKiloModels = models;
+        return models;
+      }
+    } catch {
+      // fallback
+    }
+    const fallback: Model<"openai-completions">[] = [
+      {
+        id: "reflection/beam-free",
+        name: "Reflection Beam (Free)",
+        api: "openai-completions",
+        provider: "kilo",
+        baseUrl: KILO_GATEWAY_BASE_URL,
+        input: ["text", "image"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        reasoning: true,
+        contextWindow: 128_000,
+        maxTokens: 8_192,
+        type: "chat",
+        compat: {
+          maxTokensField: "max_tokens",
+          supportsStore: false,
+          supportsDeveloperRole: false,
+          supportsReasoningEffort: true,
+          thinkingFormat: "openrouter",
+        },
+      },
+      {
+        id: "kilo-auto/free",
+        name: "Kilo Auto Free",
+        api: "openai-completions",
+        provider: "kilo",
+        baseUrl: KILO_GATEWAY_BASE_URL,
+        input: ["text", "image"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        reasoning: true,
+        contextWindow: 128_000,
+        maxTokens: 8_192,
+        type: "chat",
+        compat: {
+          maxTokensField: "max_tokens",
+          supportsStore: false,
+          supportsDeveloperRole: false,
+          supportsReasoningEffort: true,
+          thinkingFormat: "openrouter",
+        },
+      },
+    ];
+    cachedKiloModels = fallback;
+    return fallback;
+  })().catch((error: unknown) => {
+    cachedKiloFetch = undefined;
+    throw error;
+  });
+  return cachedKiloFetch;
+};
+
 /**
  * Build the model catalog used by the Agent. The provider is selected by `MOTS_PROVIDER` and the model
  * by `MOTS_MODEL`, so switching away from a provider that ran out of quota needs no code change.
  */
 export const createMotsModels = async (
   env: MotsEnvironment,
-  provider: MotsProviderId,
+  _provider?: MotsProviderId,
 ): Promise<MutableModels> => {
   const models = createModels({ authContext: providerAuthContext(env) });
-  if (provider === "vercel-ai-gateway") {
-    models.setProvider(vercelGatewayProvider(await gatewayModels()));
-  } else if (provider === "nvidia") {
-    models.setProvider(nvidiaProvider());
-  } else {
-    models.setProvider(openrouterProvider());
+
+  // Register Kilo Gateway (default)
+  try {
+    models.setProvider(kiloGatewayProvider(await kiloModels()));
+  } catch {
+    // fallback or offline
   }
+
+  // Register OpenRouter
+  try {
+    models.setProvider(openrouterProvider());
+  } catch {
+    // ignore
+  }
+
+  // Register NVIDIA NIM
+  try {
+    models.setProvider(nvidiaProvider());
+  } catch {
+    // ignore
+  }
+
+  // Register Vercel AI Gateway
+  try {
+    models.setProvider(vercelGatewayProvider(await gatewayModels()));
+  } catch {
+    // ignore
+  }
+
   return models;
 };

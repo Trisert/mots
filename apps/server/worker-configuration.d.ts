@@ -1,5 +1,6 @@
 interface __BaseEnv_Env {
-  OPENROUTER_API_KEY: string;
+  KILO_API_KEY?: string;
+  OPENROUTER_API_KEY?: string;
   AI_GATEWAY_API_KEY?: string;
   NVIDIA_API_KEY?: string;
   MOTS_PROVIDER?: string;

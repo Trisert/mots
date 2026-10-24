@@ -37,12 +37,14 @@ export async function createMotsHarnessOptions(
       section(
         "preamble",
         () =>
-          "You are Mots, a warm, sharp personal companion living in the user's pocket. " +
-          "You help people think, remember, plan, and get things done. Reply in the user's language. " +
+          "You are Mots, an autonomous personal companion living in the user's pocket. " +
+          "You help people think, plan, remember, and run automated routines. Reply in the user's language. " +
           "Be concise by default and go deeper when the user asks. " +
-          "You have durable memory, reminders, and search across past conversations: " +
+          "You have durable memory, autonomous routines (scheduled cronjobs where you execute tasks and report back), and search across past conversations: " +
           "use remember for lasting facts and preferences, forget when asked to remove one, " +
-          "schedule for anything that should happen later, and search_history for earlier discussions. " +
+          "schedule for autonomous routines, scheduled cronjobs, and tasks that should happen later, and search_history for earlier discussions. " +
+          "When setting up a routine or scheduled task, specify clear instructions for what you must execute. " +
+          "When a scheduled routine fires, carry it out autonomously using your reasoning and tools, then report the results. " +
           "Never claim to have remembered, forgotten, or scheduled something unless the matching tool ran. " +
           "User messages may begin with a display name in brackets; treat it as speaker attribution.",
         { tag: false },
@@ -59,7 +61,7 @@ export async function createMotsHarnessOptions(
   const registry = createRegistry();
   registry.install(motsExtension);
   registry.install(conversationSearchExtension);
-  const provider = options.provider ?? "openrouter";
+  const provider = options.provider ?? "kilo";
   const modelId = options.modelId ?? DEFAULT_MODELS[provider];
   const models = await createMotsModels(options.env ?? {}, provider);
   const defaultAgent = {

@@ -1,8 +1,22 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import {
+  useFonts,
+  InstrumentSans_400Regular,
+  InstrumentSans_500Medium,
+  InstrumentSans_600SemiBold,
+  InstrumentSans_700Bold,
+} from "@expo-google-fonts/instrument-sans";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
 import { ChatScreen } from "./src/screens/ChatScreen";
 import { OnboardingScreen } from "./src/screens/OnboardingScreen";
 import {
@@ -11,26 +25,65 @@ import {
   saveIdentity,
   type Identity,
 } from "./src/storage";
-import { colors, radius, spacing } from "./src/theme";
+import { fonts, spacing } from "./src/theme";
 
 function Splash() {
+  const { colors } = useTheme();
   return (
-    <View style={styles.splash}>
+    <View style={[styles.splash, { backgroundColor: colors.bgMain }]}>
       <View style={styles.brandRow}>
-        <Text style={styles.wordmark}>mots</Text>
-        <View style={styles.brandDot} />
+        <Text style={[styles.wordmark, { color: colors.textPrimary }]}>mots</Text>
+        <View style={[styles.brandDot, { backgroundColor: colors.accentCoral }]} />
       </View>
-      <ActivityIndicator color={colors.accent} />
+      <ActivityIndicator color={colors.accentCoral} />
     </View>
   );
 }
 
-export default function App() {
+function MainApp() {
+  const { colors, isDark } = useTheme();
+  const [fontsLoaded, fontError] = useFonts({
+    InstrumentSans_400Regular,
+    InstrumentSans_500Medium,
+    InstrumentSans_600SemiBold,
+    InstrumentSans_700Bold,
+  });
+
   const [identity, setIdentity] = useState<Identity | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      const fontLinkId = "mots-google-font-instrument-sans";
+      if (!document.getElementById(fontLinkId)) {
+        const link = document.createElement("link");
+        link.id = fontLinkId;
+        link.rel = "stylesheet";
+        link.href =
+          "https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap";
+        document.head.appendChild(link);
+      }
+
+      const styleId = "mots-web-outline-reset";
+      if (!document.getElementById(styleId)) {
+        const style = document.createElement("style");
+        style.id = styleId;
+        style.textContent = `
+          *:focus, *:focus-visible {
+            outline: none !important;
+            -webkit-tap-highlight-color: transparent !important;
+          }
+          html, body, #root {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: 'Instrument Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
     void loadIdentity().then((stored) => {
       if (!alive) return;
       setIdentity(stored);
@@ -40,6 +93,20 @@ export default function App() {
       alive = false;
     };
   }, []);
+
+  // Synchronize HTML body & root background color on web when theme changes
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      document.body.style.backgroundColor = colors.bgMain;
+      if (document.documentElement) {
+        document.documentElement.style.backgroundColor = colors.bgMain;
+      }
+      const root = document.getElementById("root");
+      if (root) {
+        root.style.backgroundColor = colors.bgMain;
+      }
+    }
+  }, [colors.bgMain]);
 
   const handleReady = async (next: Identity) => {
     await saveIdentity(next);
@@ -51,29 +118,44 @@ export default function App() {
     setIdentity(undefined);
   };
 
+  if ((!fontsLoaded && !fontError) || loading) {
+    return <Splash />;
+  }
+
+  const content =
+    identity !== undefined ? (
+      <ChatScreen identity={identity} onLeave={handleLeave} />
+    ) : (
+      <OnboardingScreen onReady={handleReady} />
+    );
+
+  return (
+    <KeyboardProvider>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      <View style={[styles.root, { backgroundColor: colors.bgMain }]}>{content}</View>
+    </KeyboardProvider>
+  );
+}
+
+export default function App() {
   return (
     <SafeAreaProvider>
-      <KeyboardProvider>
-        <StatusBar style="light" />
-        {loading ? (
-          <Splash />
-        ) : identity !== undefined ? (
-          <ChatScreen identity={identity} onLeave={handleLeave} />
-        ) : (
-          <OnboardingScreen onReady={handleReady} />
-        )}
-      </KeyboardProvider>
+      <ThemeProvider>
+        <MainApp />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   splash: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.xl,
-    backgroundColor: colors.background,
   },
   brandRow: {
     flexDirection: "row",
@@ -81,16 +163,14 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   wordmark: {
-    color: colors.text,
+    fontFamily: fonts.bold,
     fontSize: 44,
-    fontWeight: "700",
     letterSpacing: -2,
   },
   brandDot: {
-    width: 9,
-    height: 9,
-    borderRadius: radius.pill,
-    backgroundColor: colors.accent,
-    marginBottom: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginBottom: 10,
   },
 });

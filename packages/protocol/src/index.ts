@@ -19,6 +19,7 @@ const RECURRENCE_NOTE_PREFIX = "\n\nThis instruction recurs.";
 export function formatScheduledInstruction(scheduled: {
   readonly id: string;
   readonly instruction: string;
+  readonly name?: string;
   readonly recurrence?: {
     readonly cadence: {
       readonly unit: "minute" | "hour" | "day" | "week" | "month";
@@ -27,7 +28,8 @@ export function formatScheduledInstruction(scheduled: {
     readonly timezone: string;
   };
 }): string {
-  const text = `${SCHEDULED_INSTRUCTION_PREFIX}${scheduled.instruction}`;
+  const prefix = scheduled.name ? `Autonomous routine [${scheduled.name}] due now: ` : SCHEDULED_INSTRUCTION_PREFIX;
+  const text = `${prefix}${scheduled.instruction}`;
   if (scheduled.recurrence === undefined) return text;
   const { interval, unit } = scheduled.recurrence.cadence;
   const cadence = `${interval} ${unit}${interval === 1 ? "" : "s"}`;
@@ -36,10 +38,24 @@ export function formatScheduledInstruction(scheduled: {
 
 /** The instruction text of a scheduled delivery input, or `undefined` for ordinary input. */
 export function parseScheduledInstruction(content: string): string | undefined {
-  if (!content.startsWith(SCHEDULED_INSTRUCTION_PREFIX)) return undefined;
-  const text = content.slice(SCHEDULED_INSTRUCTION_PREFIX.length);
-  const note = text.lastIndexOf(RECURRENCE_NOTE_PREFIX);
-  return note === -1 ? text : text.slice(0, note);
+  if (content.startsWith(SCHEDULED_INSTRUCTION_PREFIX)) {
+    const text = content.slice(SCHEDULED_INSTRUCTION_PREFIX.length);
+    const note = text.lastIndexOf(RECURRENCE_NOTE_PREFIX);
+    return note === -1 ? text : text.slice(0, note);
+  }
+  const match = /^Autonomous routine \[[^\]]+\] due now: ([\s\S]*)$/.exec(content);
+  if (match) {
+    const text = match[1];
+    const note = text.lastIndexOf(RECURRENCE_NOTE_PREFIX);
+    return note === -1 ? text : text.slice(0, note);
+  }
+  return undefined;
+}
+
+/** Extract the routine title if this is an autonomous routine delivery. */
+export function parseScheduledRoutineName(content: string): string | undefined {
+  const match = /^Autonomous routine \[([^\]]+)\] due now:/.exec(content);
+  return match ? match[1] : undefined;
 }
 
 /** Display text of queued user input content: a string or text/image parts. */
@@ -114,6 +130,13 @@ export type ClientCommand =
       readonly requestId: string;
       readonly conversationId: number;
       readonly content: string;
+    }
+  | {
+      readonly type: "conversation.setModel";
+      readonly requestId: string;
+      readonly conversationId: number;
+      readonly provider: string;
+      readonly modelId: string;
     };
 export type ClientCommandType = Exclude<ClientCommand["type"], "presence.typing">;
 
@@ -206,6 +229,7 @@ const commandTypes = new Set<ClientCommandType>([
   "conversation.create",
   "conversation.fork",
   "prompt.submit",
+  "conversation.setModel",
 ]);
 
 const requireCommandType = (value: unknown): ClientCommandType => {
@@ -369,6 +393,21 @@ export function parseClientCommand(message: string): ClientCommand {
         requestId,
         conversationId: requireId(value.conversationId, "conversationId"),
         content: value.content,
+      };
+    }
+    case "conversation.setModel": {
+      if (typeof value.provider !== "string" || value.provider.trim().length === 0) {
+        throw new InvalidClientCommand("provider must be a non-empty string");
+      }
+      if (typeof value.modelId !== "string" || value.modelId.trim().length === 0) {
+        throw new InvalidClientCommand("modelId must be a non-empty string");
+      }
+      return {
+        type: value.type,
+        requestId,
+        conversationId: requireId(value.conversationId, "conversationId"),
+        provider: value.provider.trim(),
+        modelId: value.modelId.trim(),
       };
     }
     default:

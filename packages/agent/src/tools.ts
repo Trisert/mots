@@ -24,6 +24,7 @@ const ScheduleIntent = defineDoc<{ scheduled?: ScheduledInstruction }>({
 
 type ScheduleArguments = {
   readonly instruction: string;
+  readonly name?: string;
   readonly delaySeconds?: number;
   readonly at?: string;
   readonly recurrence?: ScheduleRecurrence;
@@ -61,6 +62,7 @@ function copyScheduledInstruction(scheduled: ScheduledInstruction): ScheduledIns
     id: scheduled.id,
     conversationId: scheduled.conversationId,
     instruction: scheduled.instruction,
+    name: scheduled.name,
     runAt: scheduled.runAt,
     ...(scheduled.recurrence === undefined
       ? {}
@@ -79,15 +81,17 @@ function copyScheduledInstruction(scheduled: ScheduledInstruction): ScheduledIns
 const scheduleResult = (scheduled: ScheduledInstruction, now: number) => {
   const runAt = new Date(scheduled.runAt).toISOString();
   const seconds = Math.max(0, Math.round((scheduled.runAt - now) / 1000));
+  const label = scheduled.name ? `Routine "${scheduled.name}"` : "Scheduled";
   return {
     output: [
       {
         type: "text" as const,
-        text: `Scheduled. At ${runAt} (in ${seconds} seconds) this conversation will receive: ${JSON.stringify(scheduled.instruction)}. Nothing further is needed now.`,
+        text: `${label} set. At ${runAt} (in ${seconds} seconds) this conversation will autonomously receive: ${JSON.stringify(scheduled.instruction)}. Nothing further is needed now.`,
       },
     ],
     details: {
       id: scheduled.id,
+      name: scheduled.name ?? "Routine autonoma",
       instruction: scheduled.instruction,
       runAt,
       ...(scheduled.recurrence === undefined ? {} : { recurrence: scheduled.recurrence }),
@@ -101,14 +105,21 @@ export function createScheduleTool(
   return {
     name: SCHEDULE_TOOL_NAME,
     description:
-      "Schedule an instruction to be delivered to this conversation at a later time. The conversation resumes then with the instruction as its input and carries it out with its normal tools. Use this whenever the user wants something to happen later; scheduling is the complete response to such a request.",
+      "Schedule an autonomous routine, cronjob, or recurring task to be delivered to this conversation at a later time or on a recurring cadence. When the routine fires, the model resumes in this conversation with the instruction, reasons through it, executes tools, and reports back. Use this whenever the user wants scheduled briefings, periodic checks, recurring summaries, or delayed actions.",
     parameters: Type.Object({
       instruction: Type.String({
         minLength: 1,
         maxLength: MAX_PROMPT_CHARACTERS,
         description:
-          "What to do when the schedule fires, phrased as a self-contained request without timing words, e.g. 'Check the weather in London'",
+          "What to execute when the routine fires, phrased as a self-contained autonomous directive, e.g. 'Synthesize today's schedule and check weather' or 'Review unread notifications'",
       }),
+      name: Type.Optional(
+        Type.String({
+          maxLength: 80,
+          description:
+            "Human-readable title for this autonomous routine, e.g. 'Briefing mattutino' or 'Pulizia serale'",
+        }),
+      ),
       delaySeconds: Type.Optional(
         Type.Integer({
           minimum: 1,
@@ -194,6 +205,7 @@ export function createScheduleTool(
             id: `schedule:${api.taskId}`,
             conversationId: api.conversationId,
             instruction: source.instruction,
+            name: source.name,
             runAt: nextRecurrenceRunAt(source.runAt, sourceRecurrence, now),
             recurrence: sourceRecurrence,
           };
@@ -211,6 +223,7 @@ export function createScheduleTool(
           id: `schedule:${api.taskId}`,
           conversationId: api.conversationId,
           instruction: args.instruction,
+          name: args.name,
           runAt: resolveRunAt(args, now),
           ...(recurrence === undefined ? {} : { recurrence }),
         };

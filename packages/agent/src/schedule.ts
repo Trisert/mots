@@ -22,6 +22,7 @@ export type ScheduledInstruction = {
   readonly id: string;
   readonly conversationId: ConversationId;
   readonly instruction: string;
+  readonly name?: string;
   /** Unix timestamp in milliseconds. */
   readonly runAt: number;
   readonly recurrence?: ScheduleRecurrence;
@@ -202,6 +203,7 @@ export const ScheduleDeliveries = defineDoc<{
     scheduleId: string;
     conversationId: ConversationId;
     instruction: string;
+    name?: string;
     runAt: number;
     recurrence?: ScheduleRecurrence;
     successor?: ScheduledInstruction;
@@ -227,6 +229,7 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
             scheduleId: task.input.id,
             conversationId: task.input.conversationId,
             instruction: task.input.instruction,
+            name: task.input.name,
             runAt: task.input.runAt,
             ...(task.input.recurrence === undefined ? {} : { recurrence: task.input.recurrence }),
           });

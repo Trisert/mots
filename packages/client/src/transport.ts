@@ -211,6 +211,22 @@ export class MotsClient {
     });
   }
 
+  setModel(conversationId: number, provider: string, modelId: string): Promise<boolean> {
+    const command = {
+      type: "conversation.setModel",
+      requestId: newRequestId(),
+      conversationId,
+      provider,
+      modelId,
+    } satisfies Extract<ClientCommand, { readonly type: "conversation.setModel" }>;
+    return new Promise((resolve) => {
+      this.#outbox.enqueue(command, resolve);
+      if (!this.#send(command)) {
+        this.#outbox.cancel(command.requestId);
+      }
+    });
+  }
+
   clearError(): void {
     if (this.#state.error === undefined) return;
     this.#dispatch({ type: "clear-error" });

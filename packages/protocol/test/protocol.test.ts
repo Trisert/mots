@@ -84,6 +84,26 @@ describe("client commands", () => {
     });
   });
 
+  test("accepts a valid setModel command", () => {
+    expect(
+      parseClientCommand(
+        JSON.stringify({
+          type: "conversation.setModel",
+          requestId: "req-model-1",
+          conversationId: 1,
+          provider: "openrouter",
+          modelId: "anthropic/claude-3.5-sonnet",
+        }),
+      ),
+    ).toEqual({
+      type: "conversation.setModel",
+      requestId: "req-model-1",
+      conversationId: 1,
+      provider: "openrouter",
+      modelId: "anthropic/claude-3.5-sonnet",
+    });
+  });
+
   test("rejects empty prompts and invalid ids", () => {
     expect(() =>
       parseClientCommand(

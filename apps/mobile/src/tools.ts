@@ -2,9 +2,9 @@
 import { formatDateTime } from "./format";
 
 export const TOOL_LABELS: Record<string, string> = {
-  remember: "salvataggio",
+  remember: "memoria",
   forget: "cancellazione",
-  schedule: "promemoria",
+  schedule: "routine autonoma",
   search_history: "ricerca",
 };
 
@@ -37,8 +37,15 @@ export function toolSummary(name: string, details: unknown): string | undefined 
             : `Dimenticate ${info.removed} memorie`
         : undefined;
     case "schedule": {
+      const name = typeof info.name === "string" ? info.name : undefined;
       const when = typeof info.runAt === "string" ? formatWhen(info.runAt) : undefined;
-      return when === undefined ? "Promemoria impostato" : `Promemoria: ${when}`;
+      if (name !== undefined && when !== undefined) {
+        return `Routine "${name}": ${when}`;
+      }
+      if (name !== undefined) {
+        return `Routine "${name}" pianificata`;
+      }
+      return when === undefined ? "Routine autonoma pianificata" : `Routine: ${when}`;
     }
     case "search_history":
       return "Ricerca completata";

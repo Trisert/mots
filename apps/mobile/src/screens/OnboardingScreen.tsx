@@ -1,12 +1,24 @@
-import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { createSession, parseJoinTarget } from "../api";
 import { DEFAULT_API_URL, normalizeBaseUrl } from "../config";
+import { useTheme } from "../context/ThemeContext";
 import type { Identity } from "../storage";
-import { colors, radius, spacing } from "../theme";
-import { SparkleView } from "../components/SparkleView";
+import { fonts, radius, spacing, type ThemeColors } from "../theme";
+import { Mascot } from "../components/Mascot";
+import { CloseIcon } from "../components/Icon";
 
 type Props = {
   readonly onReady: (identity: Identity) => void | Promise<void>;
@@ -14,18 +26,22 @@ type Props = {
 
 type Busy = "create" | "join" | undefined;
 
-const WALL_WORDS = ["Memoria", "Promemoria", "Ricordi", "Conversazioni", "Idee", "Compagno", "Focus"];
-
 export function OnboardingScreen({ onReady }: Props) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 840;
+
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   const [username, setUsername] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [apiUrl, setApiUrl] = useState(DEFAULT_API_URL);
-  const [showServer, setShowServer] = useState(false);
   const [busy, setBusy] = useState<Busy>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  const name = username.trim().length > 0 ? username.trim() : "Tu";
+  const name = username.trim().length > 0 ? username.trim() : "Utente";
 
   const create = async () => {
     const baseUrl = normalizeBaseUrl(apiUrl);
@@ -42,7 +58,7 @@ export function OnboardingScreen({ onReady }: Props) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "Non riesco a creare lo spazio. Controlla il server.",
+          : "Non riesco a creare lo spazio. Controlla che il server sia attivo.",
       );
     } finally {
       setBusy(undefined);
@@ -52,7 +68,7 @@ export function OnboardingScreen({ onReady }: Props) {
   const join = async () => {
     const target = parseJoinTarget(joinCode);
     if (target === undefined) {
-      setError("Codice non valido. Incolla il codice o il link ricevuto.");
+      setError("Codice non valido. Incolla il codice o il link della sessione.");
       return;
     }
     const baseUrl = normalizeBaseUrl(target.baseUrl ?? apiUrl);
@@ -63,6 +79,7 @@ export function OnboardingScreen({ onReady }: Props) {
     setBusy("join");
     setError(undefined);
     try {
+      setModalOpen(false);
       await onReady({ sessionId: target.sessionId, username: name, apiUrl: baseUrl });
     } catch {
       setError("Non riesco a salvare la sessione su questo dispositivo.");
@@ -72,284 +89,459 @@ export function OnboardingScreen({ onReady }: Props) {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.root} behavior="padding">
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.wallContainer}>
-          {WALL_WORDS.map((word) => (
-            <Text key={word} style={styles.wallWord}>
-              {word}
-            </Text>
-          ))}
-          <View style={styles.sparkleContainer}>
-            <SparkleView size={120} color={colors.starHighlight} backgroundColor={colors.accentCoral} />
-            <Text style={styles.wallWordMots}>Mots.</Text>
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={[
+        styles.scrollContent,
+        {
+          paddingTop: insets.top + spacing.xl,
+          paddingBottom: insets.bottom + spacing.xl,
+        },
+      ]}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={[styles.container, isDesktop && styles.desktopGrid]}>
+        {/* Left / Hero Column */}
+        <View style={[styles.heroPanel, isDesktop && styles.heroPanelDesktop]}>
+          <View style={styles.mascotContainer}>
+            <Mascot size={isDesktop ? 80 : 64} state="idle" interactive={true} />
           </View>
+
+          <Text
+            accessibilityRole="header"
+            aria-level={1}
+            style={[styles.title, isDesktop && styles.titleDesktop]}
+          >
+            Mots
+          </Text>
+
+          <Text style={styles.statement}>
+            Il tuo compagno autonomo per routine programmate, memoria duratura e focus quotidiano.
+          </Text>
+
+          {isDesktop && (
+            <View style={styles.featureList}>
+              <View style={styles.featureItem}>
+                <View style={[styles.featureDot, { backgroundColor: colors.accentCoral }]} />
+                <Text style={styles.featureText}>Routine cron asincrone ad esecuzione autonoma</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <View style={[styles.featureDot, { backgroundColor: colors.accentGreen }]} />
+                <Text style={styles.featureText}>Supporto multi-provider: Kilo, OpenRouter, NVIDIA</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <View style={[styles.featureDot, { backgroundColor: colors.avatarPurple }]} />
+                <Text style={styles.featureText}>Memoria permanente sincronizzata su Cloudflare Edge</Text>
+              </View>
+            </View>
+          )}
         </View>
 
-        <ScrollView
-          style={styles.formScroll}
-          contentContainerStyle={[
-            styles.formContent,
-            { paddingBottom: insets.bottom + spacing.xl },
-          ]}
-          keyboardShouldPersistTaps="handled"
-        >
-          <TextInput
-            value={username}
-            onChangeText={setUsername}
-            placeholder="Il tuo nome"
-            placeholderTextColor={colors.textSecondary}
-            style={styles.input}
-            maxLength={40}
-            autoCapitalize="words"
-            autoCorrect={false}
-            selectionColor={colors.textPrimary}
-          />
+        {/* Right / Access Action Card */}
+        <View style={[styles.card, isDesktop && styles.cardDesktop]}>
+          <Text style={styles.cardHeaderTitle}>Inizia una sessione</Text>
+          <Text style={styles.cardHeaderSubtitle}>
+            Inserisci il tuo nome per iniziare subito o riprendere un agente.
+          </Text>
 
+          {/* Username Input */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Il tuo nome</Text>
+            <TextInput
+              value={username}
+              onChangeText={setUsername}
+              placeholder="Nicola"
+              placeholderTextColor={colors.textSecondary}
+              style={styles.textInput}
+              maxLength={40}
+              autoCapitalize="words"
+              autoCorrect={false}
+              selectionColor={colors.accentCoral}
+            />
+          </View>
+
+          {/* Primary Action Button */}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Crea il tuo spazio"
             disabled={busy !== undefined}
             onPress={() => void create()}
             style={({ pressed }) => [
-              styles.primaryCta,
-              busy !== undefined && styles.disabled,
+              styles.primaryButton,
               pressed && styles.pressed,
             ]}
           >
             {busy === "create" ? (
               <ActivityIndicator size="small" color={colors.accentInk} />
             ) : (
-              <Text style={styles.primaryCtaText}>Crea il tuo spazio</Text>
+              <Text style={styles.primaryButtonText}>Crea il tuo spazio</Text>
             )}
           </Pressable>
 
-          <View style={styles.divider}>
-            <View style={styles.dividerRule} />
-            <Text style={styles.dividerText}>oppure</Text>
-            <View style={styles.dividerRule} />
-          </View>
-
-          <TextInput
-            value={joinCode}
-            onChangeText={setJoinCode}
-            placeholder="Codice o link della sessione"
-            placeholderTextColor={colors.textSecondary}
-            style={styles.input}
-            maxLength={512}
-            autoCapitalize="none"
-            autoCorrect={false}
-            selectionColor={colors.textPrimary}
-          />
+          {/* Secondary Action */}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Entra"
-            disabled={busy !== undefined}
-            onPress={() => void join()}
-            style={({ pressed }) => [
-              styles.outlineCta,
-              busy !== undefined && styles.disabled,
-              pressed && styles.pressed,
-            ]}
+            accessibilityLabel="Entra in una sessione esistente"
+            onPress={() => setModalOpen(true)}
+            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
           >
-            {busy === "join" ? (
-              <ActivityIndicator size="small" color={colors.textPrimary} />
-            ) : (
-              <>
-                <Text style={styles.outlineCtaText}>Entra</Text>
-                <View style={styles.arrowContainer}>
-                  <View style={styles.arrowLine} />
-                  <View style={styles.arrowHead} />
-                </View>
-              </>
-            )}
+            <Text style={styles.secondaryButtonText}>Entra con codice sessione</Text>
           </Pressable>
 
-          {error !== undefined ? <Text style={styles.error}>{error}</Text> : null}
-
-          <Pressable onPress={() => setShowServer((current) => !current)}>
-            <Text style={styles.serverSummary}>
-              Server · {apiUrl || "non impostato"}{" "}
-              <Text style={styles.serverAction}>
-                {showServer ? "chiudi" : "modifica"}
-              </Text>
-            </Text>
-          </Pressable>
-
-          {showServer ? (
-            <TextInput
-              value={apiUrl}
-              onChangeText={setApiUrl}
-              placeholder="http://192.168.1.10:8787"
-              placeholderTextColor={colors.textSecondary}
-              style={[styles.input, styles.serverInput]}
-              maxLength={300}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              selectionColor={colors.textPrimary}
-            />
+          {error !== undefined ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
           ) : null}
 
-          <Text style={styles.footnote}>
-            Prototipo self-hosted. Le conversazioni restano sul tuo server Mots.
-          </Text>
-        </ScrollView>
+          <View style={styles.serverRow}>
+            <View style={styles.serverDot} />
+            <Text style={styles.serverText}>Server: {apiUrl}</Text>
+          </View>
+        </View>
       </View>
-    </KeyboardAvoidingView>
+
+      {/* Footer reassurance bar to close the canvas */}
+      <View style={styles.footerRow}>
+        <Text style={styles.footerText}>
+          Mots · Protocollo autonomo con esecuzione edge e routine persistenti
+        </Text>
+      </View>
+
+      {/* Join Session Modal */}
+      {modalOpen ? (
+        <Modal
+          visible={modalOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setModalOpen(false)}
+        >
+          <KeyboardAvoidingView style={styles.modalBackdrop} behavior="padding">
+            <Pressable style={styles.modalOverlay} onPress={() => setModalOpen(false)} />
+            <View style={styles.modalSheet}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Entra nella sessione</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Chiudi"
+                  onPress={() => setModalOpen(false)}
+                  style={styles.modalCloseButton}
+                >
+                  <CloseIcon size={14} color={colors.textPrimary} />
+                </Pressable>
+              </View>
+
+              <View style={styles.modalBody}>
+                <Text style={styles.modalSubtitle}>
+                  Incolla il codice o il link della sessione condivisa:
+                </Text>
+                <TextInput
+                  value={joinCode}
+                  onChangeText={setJoinCode}
+                  placeholder="es. 100d5bc8-fbcd-..."
+                  placeholderTextColor={colors.textSecondary}
+                  style={styles.textInput}
+                  autoFocus
+                  maxLength={512}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  selectionColor={colors.accentCoral}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Entra"
+                  disabled={busy === "join"}
+                  onPress={() => void join()}
+                  style={({ pressed }) => [
+                    styles.primaryButton,
+                    { marginTop: spacing.md },
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  {busy === "join" ? (
+                    <ActivityIndicator size="small" color={colors.accentInk} />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>Entra nella sessione</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+      ) : null}
+    </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.accentCoral,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: colors.accentCoral,
-  },
-  wallContainer: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: spacing.xl,
-    overflow: "hidden",
-  },
-  wallWord: {
-    fontSize: 44,
-    lineHeight: 46,
-    fontWeight: "600",
-    color: "rgba(28, 28, 30, 0.25)",
-  },
-  sparkleContainer: {
-    position: "relative",
-    alignItems: "flex-start",
-    marginTop: spacing.md,
-  },
-  wallWordMots: {
-    fontSize: 44,
-    lineHeight: 46,
-    fontWeight: "600",
-    color: colors.textPrimary,
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-  },
-  formScroll: {
-    maxHeight: "45%",
-  },
-  formContent: {
-    paddingHorizontal: spacing.xl,
-    gap: spacing.sm,
-  },
-  input: {
-    backgroundColor: colors.cardSurfacePrimary,
-    borderRadius: radius.pill,
-    height: 60,
-    paddingHorizontal: 24,
-    color: colors.textPrimary,
-    fontSize: 16,
-  },
-  primaryCta: {
-    height: 64,
-    borderRadius: radius.pill,
-    backgroundColor: colors.cardSurfaceAmber,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.lg,
-  },
-  primaryCtaText: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    marginVertical: spacing.sm,
-  },
-  dividerRule: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(28, 28, 30, 0.2)",
-  },
-  dividerText: {
-    color: colors.textSecondary,
-    fontSize: 11,
-  },
-  outlineCta: {
-    height: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    backgroundColor: "transparent",
-    paddingHorizontal: spacing.xl,
-  },
-  outlineCtaText: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  arrowContainer: {
-    position: "absolute",
-    right: spacing.lg,
-    width: 16,
-    height: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  arrowLine: {
-    position: "absolute",
-    width: 10,
-    height: 2,
-    backgroundColor: colors.textPrimary,
-    borderRadius: 1,
-  },
-  arrowHead: {
-    position: "absolute",
-    right: 0,
-    width: 6,
-    height: 6,
-    borderTopWidth: 2,
-    borderRightWidth: 2,
-    borderColor: colors.textPrimary,
-    transform: [{ rotate: "45deg" }],
-  },
-  error: {
-    marginTop: spacing.md,
-    color: colors.textPrimary,
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  serverSummary: {
-    marginTop: spacing.md,
-    color: colors.textSecondary,
-    fontSize: 12,
-  },
-  serverAction: {
-    color: colors.textPrimary,
-    fontWeight: "600",
-  },
-  serverInput: {
-    marginTop: spacing.sm,
-    fontSize: 14,
-  },
-  footnote: {
-    marginTop: spacing.md,
-    color: colors.textSecondary,
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  pressed: {
-    opacity: 0.75,
-  },
-});
+function createStyles(colors: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.bgMain,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: spacing.lg,
+    },
+    container: {
+      width: "100%",
+      maxWidth: 440,
+      alignItems: "center",
+    },
+    desktopGrid: {
+      maxWidth: 880,
+      flexDirection: "row",
+      alignItems: "stretch",
+      gap: spacing.xl,
+    },
+    heroPanel: {
+      width: "100%",
+      backgroundColor: colors.cardSurfacePrimary,
+      borderRadius: radius.card,
+      padding: spacing.xl,
+      borderWidth: 1,
+      borderColor: colors.cardBorderSubtle,
+      alignItems: "center",
+      marginBottom: spacing.md,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: isDark ? 0.3 : 0.04,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    heroPanelDesktop: {
+      flex: 1,
+      marginBottom: 0,
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+    },
+    card: {
+      width: "100%",
+      backgroundColor: colors.cardSurfacePrimary,
+      borderRadius: radius.card,
+      padding: spacing.xl,
+      borderWidth: 1,
+      borderColor: colors.cardBorderSubtle,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: isDark ? 0.3 : 0.04,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    cardDesktop: {
+      width: 380,
+      justifyContent: "center",
+    },
+    cardHeaderTitle: {
+      fontFamily: fonts.semiBold,
+      fontSize: 16,
+      color: colors.textPrimary,
+      fontWeight: "600",
+      marginBottom: 4,
+    },
+    cardHeaderSubtitle: {
+      fontFamily: fonts.regular,
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.textSecondary,
+      marginBottom: spacing.lg,
+    },
+    mascotContainer: {
+      marginBottom: spacing.md,
+    },
+    title: {
+      fontFamily: fonts.bold,
+      fontSize: 24,
+      lineHeight: 30,
+      color: colors.textPrimary,
+      fontWeight: "700",
+      letterSpacing: -0.5,
+      textAlign: "center",
+      marginBottom: spacing.xs,
+    },
+    titleDesktop: {
+      fontSize: 28,
+      lineHeight: 34,
+      textAlign: "left",
+    },
+    statement: {
+      fontFamily: fonts.regular,
+      fontSize: 14,
+      lineHeight: 20,
+      color: colors.textSecondary,
+      textAlign: "center",
+      marginBottom: spacing.lg,
+      maxWidth: 340,
+    },
+    featureList: {
+      width: "100%",
+      gap: spacing.sm,
+      marginTop: spacing.md,
+      paddingTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderSubtle,
+    },
+    featureItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+    },
+    featureDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+    },
+    featureText: {
+      fontFamily: fonts.regular,
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    inputGroup: {
+      width: "100%",
+      marginBottom: spacing.md,
+    },
+    inputLabel: {
+      fontFamily: fonts.semiBold,
+      fontSize: 12,
+      color: colors.textPrimary,
+      fontWeight: "600",
+      marginBottom: 6,
+    },
+    textInput: {
+      width: "100%",
+      height: 44,
+      backgroundColor: isDark ? "#121318" : colors.bgMain,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.md,
+      fontFamily: fonts.medium,
+      fontSize: 14,
+      color: colors.textPrimary,
+      borderWidth: 1,
+      borderColor: colors.cardBorderSubtle,
+    },
+    primaryButton: {
+      width: "100%",
+      height: 44,
+      backgroundColor: colors.accentCoral,
+      borderRadius: radius.pill,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: spacing.sm,
+    },
+    primaryButtonText: {
+      fontFamily: fonts.bold,
+      fontSize: 14,
+      color: colors.accentInk,
+      fontWeight: "700",
+    },
+    secondaryButton: {
+      width: "100%",
+      height: 40,
+      backgroundColor: "transparent",
+      borderRadius: radius.pill,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    secondaryButtonText: {
+      fontFamily: fonts.medium,
+      fontSize: 13,
+      color: colors.textSecondary,
+      fontWeight: "500",
+    },
+    errorBox: {
+      width: "100%",
+      backgroundColor: colors.cardSurfacePink,
+      padding: spacing.sm,
+      borderRadius: radius.sm,
+      marginTop: spacing.sm,
+    },
+    errorText: {
+      fontFamily: fonts.regular,
+      fontSize: 12,
+      color: colors.danger,
+      textAlign: "center",
+    },
+    serverRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginTop: spacing.md,
+    },
+    serverDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: colors.accentGreen,
+    },
+    serverText: {
+      fontFamily: fonts.regular,
+      fontSize: 11,
+      color: colors.textSecondary,
+    },
+    pressed: {
+      opacity: 0.85,
+    },
+    modalBackdrop: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: colors.overlay,
+      padding: spacing.lg,
+    },
+    modalOverlay: {
+      ...StyleSheet.absoluteFill,
+    },
+    modalSheet: {
+      width: "100%",
+      maxWidth: 420,
+      backgroundColor: colors.cardSurfacePrimary,
+      borderRadius: radius.xl,
+      padding: spacing.lg,
+      borderWidth: 1,
+      borderColor: colors.cardBorderSubtle,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDark ? 0.4 : 0.1,
+      shadowRadius: 16,
+      elevation: 6,
+    },
+    modalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: spacing.md,
+    },
+    modalTitle: {
+      fontFamily: fonts.bold,
+      fontSize: 16,
+      color: colors.textPrimary,
+      fontWeight: "700",
+    },
+    modalCloseButton: {
+      padding: spacing.xs,
+    },
+    modalBody: {
+      gap: spacing.sm,
+    },
+    footerRow: {
+      marginTop: spacing.xl,
+      paddingTop: spacing.md,
+      alignItems: "center",
+    },
+    footerText: {
+      fontFamily: fonts.regular,
+      fontSize: 12,
+      color: colors.textSecondary,
+      textAlign: "center",
+    },
+    modalSubtitle: {
+      fontFamily: fonts.regular,
+      fontSize: 13,
+      color: colors.textSecondary,
+      lineHeight: 18,
+      marginBottom: spacing.xs,
+    },
+  });
+}

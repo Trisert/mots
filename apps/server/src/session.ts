@@ -7,6 +7,7 @@ import {
   type ConversationId,
   type ConversationRecord,
   type Cursor,
+  configure,
   defineDocFamily,
   type EntryId,
   Harness,
@@ -175,7 +176,7 @@ export class Session extends DurableObject<Env> {
     const storage = await openDurableObjectSqliteStorage(this.ctx.storage);
     const provider = isMotsProviderId(this.env.MOTS_PROVIDER ?? "")
       ? (this.env.MOTS_PROVIDER as MotsProviderId)
-      : "openrouter";
+      : "kilo";
     const chatOptions = await createMotsHarnessOptions(
       (timestamp) => this.#setAlarmNoLaterThan(timestamp),
       {
@@ -475,6 +476,25 @@ export class Session extends DurableObject<Env> {
         } catch (error) {
           reportError("Prompt alarm reconciliation failed", error);
         }
+        return;
+      }
+      case "conversation.setModel": {
+        await this.#harness.commit(async (tx) => {
+          await configure(tx, command.conversationId as ConversationId, {
+            model: {
+              provider: command.provider,
+              modelId: command.modelId,
+            },
+          });
+        }, BACKGROUND_CONTEXT);
+        this.#send(socket, {
+          type: "command.result",
+          command: command.type,
+          requestId: command.requestId,
+          ok: true,
+          conversationId: command.conversationId,
+        });
+        return;
       }
     }
   }

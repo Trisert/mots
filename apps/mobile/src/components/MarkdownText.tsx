@@ -1,6 +1,18 @@
-import { StyleSheet, Text, View, type StyleProp, type TextStyle } from "react-native";
-import { colors } from "../theme";
-import { parseInline } from "../markdown";
+import { useMemo, useState } from "react";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type TextStyle,
+} from "react-native";
+import * as Clipboard from "expo-clipboard";
+import { useTheme } from "../context/ThemeContext";
+import { CheckIcon, CopyIcon } from "./Icon";
+import { parseMarkdownBlocks, type InlineRun } from "../markdown";
+import { fonts, radius, spacing, type ThemeColors } from "../theme";
 
 type Props = {
   readonly text: string;
@@ -8,57 +20,357 @@ type Props = {
   readonly selectable?: boolean;
 };
 
-/** Renders the assistant's text, with markdown runs styled and paragraphs kept apart. */
-export function MarkdownText({ text, style, selectable }: Props) {
-  const paragraphs = text.split(/\n{2,}/);
+function InlineText({
+  runs,
+  style,
+  selectable,
+  styles,
+}: {
+  readonly runs: readonly InlineRun[];
+  readonly style?: StyleProp<TextStyle>;
+  readonly selectable?: boolean;
+  readonly styles: ReturnType<typeof createStyles>;
+}) {
   return (
-    <>
-      {paragraphs.map((paragraph, index) => (
+    <Text style={[styles.inlineBase, style]} selectable={selectable}>
+      {runs.map((run, index) => (
         <Text
           key={index}
-          style={[styles.paragraph, index > 0 && styles.paragraphGap, style]}
-          selectable={selectable}
+          style={[
+            run.bold && styles.bold,
+            run.italic && styles.italic,
+            run.code && styles.inlineCode,
+          ]}
         >
-          {parseInline(paragraph).map((run, runIndex) => (
-            <Text
-              key={runIndex}
-              style={[
-                run.bold && styles.bold,
-                run.italic && styles.italic,
-                // The code run keeps the colour of the bubble it sits in. Giving it the accent
-                // colour made it invisible in the amber user bubble (accent on accent, 1:1).
-                run.code && styles.code,
-              ]}
-            >
-              {run.text}
-            </Text>
-          ))}
+          {run.text}
         </Text>
       ))}
-    </>
+    </Text>
   );
 }
 
-const styles = StyleSheet.create({
-  paragraph: {
-    lineHeight: 23,
-  },
-  paragraphGap: {
-    marginTop: 8,
-  },
-  bold: {
-    fontWeight: "700",
-  },
-  italic: {
-    fontStyle: "italic",
-  },
-  code: {
-    fontFamily: "monospace",
-    backgroundColor: colors.cardSurfaceAmber,
-    borderRadius: 16,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    color: colors.textPrimary,
-    fontSize: 13,
-  },
-});
+function CodeBlockView({
+  code,
+  language,
+  styles,
+  colors,
+}: {
+  readonly code: string;
+  readonly language: string;
+  readonly styles: ReturnType<typeof createStyles>;
+  readonly colors: ThemeColors;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await Clipboard.setStringAsync(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore clipboard errors
+    }
+  };
+
+  const label = language.length > 0 ? language.toUpperCase() : "CODE";
+
+  return (
+    <View style={styles.codeBlock}>
+      <View style={styles.codeHeader}>
+        <Text style={styles.codeLanguage}>{label}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Copia codice"
+          onPress={() => void copy()}
+          style={({ pressed }) => [
+            styles.copyButton,
+            pressed && styles.copyButtonPressed,
+          ]}
+        >
+          {copied ? (
+            <>
+              <CheckIcon size={12} color={colors.accentGreen} />
+              <Text style={[styles.copyButtonText, styles.copiedText]}>Copiato!</Text>
+            </>
+          ) : (
+            <>
+              <CopyIcon size={12} color={colors.codeMuted} />
+              <Text style={styles.copyButtonText}>Copia</Text>
+            </>
+          )}
+        </Pressable>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.codeScroll}
+      >
+        <Text style={styles.codeText} selectable>
+          {code}
+        </Text>
+      </ScrollView>
+    </View>
+  );
+}
+
+export function MarkdownText({ text, style, selectable = true }: Props) {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const blocks = parseMarkdownBlocks(text);
+
+  return (
+    <View style={styles.container}>
+      {blocks.map((block, index) => {
+        if (block.type === "code") {
+          return (
+            <CodeBlockView
+              key={index}
+              code={block.code}
+              language={block.language}
+              styles={styles}
+              colors={colors}
+            />
+          );
+        }
+
+        if (block.type === "heading") {
+          const headingStyle =
+            block.level === 1
+              ? styles.h1
+              : block.level === 2
+                ? styles.h2
+                : styles.h3;
+          return (
+            <Text
+              key={index}
+              style={[headingStyle, style]}
+              selectable={selectable}
+            >
+              {block.text}
+            </Text>
+          );
+        }
+
+        if (block.type === "quote") {
+          return (
+            <View key={index} style={styles.quoteCard}>
+              <View style={styles.quoteBar} />
+              <View style={styles.quoteBody}>
+                <InlineText
+                  runs={block.runs}
+                  style={[styles.quoteText, style]}
+                  selectable={selectable}
+                  styles={styles}
+                />
+              </View>
+            </View>
+          );
+        }
+
+        if (block.type === "list") {
+          return (
+            <View key={index} style={styles.list}>
+              {block.items.map((item, itemIndex) => {
+                const bullet =
+                  item.number !== undefined
+                    ? `${item.number}.`
+                    : "•";
+                return (
+                  <View key={itemIndex} style={styles.listItem}>
+                    <Text style={styles.listBullet}>{bullet}</Text>
+                    <View style={styles.listItemContent}>
+                      <InlineText
+                        runs={item.runs}
+                        style={[styles.paragraph, style]}
+                        selectable={selectable}
+                        styles={styles}
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          );
+        }
+
+        return (
+          <Text
+            key={index}
+            style={[styles.paragraph, index > 0 && styles.paragraphGap, style]}
+            selectable={selectable}
+          >
+            <InlineText
+              runs={block.runs}
+              style={style}
+              selectable={selectable}
+              styles={styles}
+            />
+          </Text>
+        );
+      })}
+    </View>
+  );
+}
+
+function createStyles(colors: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
+    container: {
+      gap: 2,
+    },
+    inlineBase: {
+      fontFamily: fonts.medium,
+      color: colors.textPrimary,
+      fontSize: 15,
+      lineHeight: 22,
+    },
+    paragraph: {
+      fontFamily: fonts.medium,
+      color: colors.textPrimary,
+      fontSize: 15,
+      lineHeight: 22,
+    },
+    paragraphGap: {
+      marginTop: spacing.xs,
+    },
+    bold: {
+      fontFamily: fonts.bold,
+      fontWeight: "700",
+    },
+    italic: {
+      fontStyle: "italic",
+    },
+    inlineCode: {
+      fontFamily: "monospace",
+      backgroundColor: colors.cardSurfaceAmber,
+      borderRadius: 6,
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      color: colors.textPrimary,
+      fontSize: 13,
+    },
+    h1: {
+      fontFamily: fonts.extraBold,
+      color: colors.textPrimary,
+      fontSize: 22,
+      fontWeight: "800",
+      letterSpacing: -0.6,
+      marginTop: spacing.sm,
+      marginBottom: spacing.xs,
+    },
+    h2: {
+      fontFamily: fonts.bold,
+      color: colors.textPrimary,
+      fontSize: 18,
+      fontWeight: "700",
+      letterSpacing: -0.4,
+      marginTop: spacing.xs,
+      marginBottom: spacing.xs,
+    },
+    h3: {
+      fontFamily: fonts.semiBold,
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+      marginTop: spacing.xs,
+      marginBottom: 2,
+    },
+    quoteCard: {
+      flexDirection: "row",
+      backgroundColor: isDark ? "rgba(251, 191, 36, 0.12)" : "rgba(246, 223, 177, 0.28)",
+      borderRadius: radius.md,
+      overflow: "hidden",
+      marginVertical: spacing.xs,
+    },
+    quoteBar: {
+      width: 4,
+      backgroundColor: colors.accentCoral,
+    },
+    quoteBody: {
+      flex: 1,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    quoteText: {
+      fontFamily: fonts.medium,
+      fontStyle: "italic",
+      color: colors.textSecondary,
+      fontSize: 14,
+      lineHeight: 21,
+    },
+    list: {
+      marginVertical: spacing.xs,
+      gap: spacing.xs,
+    },
+    listItem: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: spacing.sm,
+    },
+    listBullet: {
+      fontFamily: fonts.bold,
+      color: colors.accentCoral,
+      fontSize: 15,
+      fontWeight: "700",
+      lineHeight: 22,
+      width: 16,
+    },
+    listItemContent: {
+      flex: 1,
+    },
+    codeBlock: {
+      backgroundColor: colors.codeSurface,
+      borderRadius: radius.md,
+      overflow: "hidden",
+      marginVertical: spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+    },
+    codeHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: colors.codeSurfaceHeader,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 7,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderSubtle,
+    },
+    codeLanguage: {
+      fontFamily: fonts.bold,
+      color: colors.starHighlight,
+      fontSize: 11,
+      fontWeight: "700",
+      letterSpacing: 0.6,
+    },
+    copyButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: radius.xs,
+      backgroundColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.06)",
+    },
+    copyButtonPressed: {
+      opacity: 0.7,
+    },
+    copyButtonText: {
+      fontFamily: fonts.semiBold,
+      color: colors.codeMuted,
+      fontSize: 11,
+      fontWeight: "600",
+    },
+    copiedText: {
+      color: colors.accentGreen,
+    },
+    codeScroll: {
+      padding: spacing.md,
+    },
+    codeText: {
+      fontFamily: "monospace",
+      color: colors.codeText,
+      fontSize: 13,
+      lineHeight: 20,
+    },
+  });
+}

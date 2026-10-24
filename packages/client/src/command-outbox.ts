@@ -2,7 +2,13 @@ import type { ClientCommand, CommandResult } from "@mots/protocol";
 
 export type RetriableCommand = Extract<
   ClientCommand,
-  { readonly type: "conversation.create" | "conversation.fork" | "prompt.submit" }
+  {
+    readonly type:
+      | "conversation.create"
+      | "conversation.fork"
+      | "prompt.submit"
+      | "conversation.setModel";
+  }
 >;
 
 type Completion = (accepted: boolean) => void;
