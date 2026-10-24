@@ -12,7 +12,24 @@ import { openrouterProvider } from "@earendil-works/pi-ai/providers/openrouter";
 export const VERCEL_GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh/v1";
 
 /** The unauthenticated catalog endpoint. */
-const VERCEL_GATEWAY_MODELS_URL = "https://ai-gateway.vercel.sh/v1/models";
+export const VERCEL_GATEWAY_MODELS_URL = "https://ai-gateway.vercel.sh/v1/models";
+
+/**
+ * A live catalog request aborts after this. Long enough for a healthy host, short enough that a
+ * hung one cannot hold Durable Object startup inside `blockConcurrencyWhile`.
+ */
+export const CATALOG_TIMEOUT_MS = 4_000;
+
+/** Optional fetch and timeout. Tests pass these; production leaves them unset. */
+export type CatalogFetch = (
+  url: string,
+  init: { readonly headers: { readonly accept: string }; readonly signal: AbortSignal },
+) => Promise<Response>;
+
+export type CatalogLoadOptions = {
+  readonly fetch?: CatalogFetch;
+  readonly timeoutMs?: number;
+};
 
 /**
  * Kilo Gateway (https://kilo.ai) provider configuration.
@@ -281,22 +298,53 @@ export const vercelGatewayProvider = (
 let cachedModels: readonly Model<"openai-completions">[] | undefined;
 let cachedFetch: Promise<readonly Model<"openai-completions">[]> | undefined;
 
+/** A custom fetch or timeout belongs to one test and must not stick in the isolate cache. */
+const usesIsolateCache = (options?: CatalogLoadOptions): boolean =>
+  options?.fetch === undefined && options?.timeoutMs === undefined;
+
+const readCatalog = async (
+  url: string,
+  failure: string,
+  options?: CatalogLoadOptions,
+): Promise<unknown> => {
+  const timeoutMs = options?.timeoutMs ?? CATALOG_TIMEOUT_MS;
+  const init = {
+    headers: { accept: "application/json" as const },
+    signal: AbortSignal.timeout(timeoutMs),
+  };
+  const response = options?.fetch ? await options.fetch(url, init) : await fetch(url, init);
+  if (!response.ok) throw new Error(`${failure}: ${response.status}`);
+  return response.json();
+};
+
+const loadGatewayModels = async (
+  options?: CatalogLoadOptions,
+): Promise<readonly Model<"openai-completions">[]> => {
+  const body = (await readCatalog(
+    VERCEL_GATEWAY_MODELS_URL,
+    "Vercel AI Gateway catalog request failed",
+    options,
+  )) as { readonly data?: readonly GatewayModel[] };
+  return (body.data ?? [])
+    .map((model) => toPiModel(model))
+    .filter((model): model is Model<"openai-completions"> => model !== undefined);
+};
+
 /** Fetch the live gateway catalog, cached for the lifetime of the isolate. */
-export const gatewayModels = async (): Promise<readonly Model<"openai-completions">[]> => {
+export const gatewayModels = async (
+  options?: CatalogLoadOptions,
+): Promise<readonly Model<"openai-completions">[]> => {
+  if (!usesIsolateCache(options)) return loadGatewayModels(options);
   if (cachedModels !== undefined) return cachedModels;
-  cachedFetch ??= (async () => {
-    const response = await fetch(VERCEL_GATEWAY_MODELS_URL, { headers: { accept: "application/json" } });
-    if (!response.ok) throw new Error(`Vercel AI Gateway catalog request failed: ${response.status}`);
-    const body = (await response.json()) as { readonly data?: readonly GatewayModel[] };
-    const models = (body.data ?? [])
-      .map((model) => toPiModel(model))
-      .filter((model): model is Model<"openai-completions"> => model !== undefined);
-    cachedModels = models;
-    return models;
-  })().catch((error: unknown) => {
-    cachedFetch = undefined;
-    throw error;
-  });
+  cachedFetch ??= loadGatewayModels()
+    .then((models) => {
+      cachedModels = models;
+      return models;
+    })
+    .catch((error: unknown) => {
+      cachedFetch = undefined;
+      throw error;
+    });
   return cachedFetch;
 };
 
@@ -413,127 +461,166 @@ export const kiloGatewayProvider = (
   streamSimple: (model, context, options) => openAICompletionsApi().streamSimple(model, context, options),
 });
 
+/** Used when the Kilo catalog times out, fails, or comes back empty. */
+const KILO_FALLBACK_MODELS: readonly Model<"openai-completions">[] = [
+  {
+    id: "reflection/beam-free",
+    name: "Reflection Beam (Free)",
+    api: "openai-completions",
+    provider: "kilo",
+    baseUrl: KILO_GATEWAY_BASE_URL,
+    input: ["text", "image"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    reasoning: true,
+    contextWindow: 128_000,
+    maxTokens: 8_192,
+    type: "chat",
+    compat: {
+      maxTokensField: "max_tokens",
+      supportsStore: false,
+      supportsDeveloperRole: false,
+      supportsReasoningEffort: true,
+      thinkingFormat: "openrouter",
+    },
+  },
+  {
+    id: "kilo-auto/free",
+    name: "Kilo Auto Free",
+    api: "openai-completions",
+    provider: "kilo",
+    baseUrl: KILO_GATEWAY_BASE_URL,
+    input: ["text", "image"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    reasoning: true,
+    contextWindow: 128_000,
+    maxTokens: 8_192,
+    type: "chat",
+    compat: {
+      maxTokensField: "max_tokens",
+      supportsStore: false,
+      supportsDeveloperRole: false,
+      supportsReasoningEffort: true,
+      thinkingFormat: "openrouter",
+    },
+  },
+];
+
+type KiloCatalogEntry = {
+  readonly id: string;
+  readonly name?: string;
+  readonly context_length?: number;
+  readonly top_provider?: { readonly max_completion_tokens?: number };
+  readonly max_completion_tokens?: number;
+  readonly pricing?: {
+    readonly prompt?: string;
+    readonly completion?: string;
+    readonly input_cache_read?: string;
+    readonly input_cache_write?: string;
+  };
+  readonly architecture?: { readonly input_modalities?: readonly string[] };
+  readonly supported_parameters?: readonly string[];
+};
+
+const loadKiloModels = async (
+  options?: CatalogLoadOptions,
+): Promise<readonly Model<"openai-completions">[]> => {
+  try {
+    const body = (await readCatalog(
+      KILO_GATEWAY_MODELS_URL,
+      "Kilo Gateway catalog request failed",
+      options,
+    )) as { readonly data?: readonly KiloCatalogEntry[] };
+    const models = (body.data ?? [])
+      .map((model) => {
+        const adapted: GatewayModel = {
+          id: model.id,
+          name: model.name,
+          context_window: model.context_length,
+          max_tokens: model.top_provider?.max_completion_tokens ?? model.max_completion_tokens,
+          pricing: {
+            input: model.pricing?.prompt,
+            output: model.pricing?.completion,
+            input_cache_read: model.pricing?.input_cache_read,
+            input_cache_write: model.pricing?.input_cache_write,
+          },
+          modalities: { input: model.architecture?.input_modalities },
+          supported_parameters: model.supported_parameters,
+        };
+        return toKiloPiModel(adapted);
+      })
+      .filter((model): model is Model<"openai-completions"> => model !== undefined);
+    if (models.length > 0) return models;
+  } catch {
+    // Timeout, HTTP error, or a payload we cannot read.
+  }
+  return KILO_FALLBACK_MODELS;
+};
+
 let cachedKiloModels: readonly Model<"openai-completions">[] | undefined;
 let cachedKiloFetch: Promise<readonly Model<"openai-completions">[]> | undefined;
 
-export const kiloModels = async (): Promise<readonly Model<"openai-completions">[]> => {
+export const kiloModels = async (
+  options?: CatalogLoadOptions,
+): Promise<readonly Model<"openai-completions">[]> => {
+  if (!usesIsolateCache(options)) return loadKiloModels(options);
   if (cachedKiloModels !== undefined) return cachedKiloModels;
-  cachedKiloFetch ??= (async () => {
-    try {
-      const response = await fetch(KILO_GATEWAY_MODELS_URL, { headers: { accept: "application/json" } });
-      if (!response.ok) throw new Error(`Kilo Gateway catalog request failed: ${response.status}`);
-      const body = (await response.json()) as { readonly data?: readonly any[] };
-      const models = (body.data ?? [])
-        .map((model) => {
-          const adapted: GatewayModel = {
-            id: model.id,
-            name: model.name,
-            context_window: model.context_length,
-            max_tokens: model.top_provider?.max_completion_tokens ?? model.max_completion_tokens,
-            pricing: {
-              input: model.pricing?.prompt,
-              output: model.pricing?.completion,
-              input_cache_read: model.pricing?.input_cache_read,
-              input_cache_write: model.pricing?.input_cache_write,
-            },
-            modalities: { input: model.architecture?.input_modalities },
-            supported_parameters: model.supported_parameters,
-          };
-          return toKiloPiModel(adapted);
-        })
-        .filter((model): model is Model<"openai-completions"> => model !== undefined);
-      if (models.length > 0) {
-        cachedKiloModels = models;
-        return models;
-      }
-    } catch {
-      // fallback
-    }
-    const fallback: Model<"openai-completions">[] = [
-      {
-        id: "reflection/beam-free",
-        name: "Reflection Beam (Free)",
-        api: "openai-completions",
-        provider: "kilo",
-        baseUrl: KILO_GATEWAY_BASE_URL,
-        input: ["text", "image"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        reasoning: true,
-        contextWindow: 128_000,
-        maxTokens: 8_192,
-        type: "chat",
-        compat: {
-          maxTokensField: "max_tokens",
-          supportsStore: false,
-          supportsDeveloperRole: false,
-          supportsReasoningEffort: true,
-          thinkingFormat: "openrouter",
-        },
-      },
-      {
-        id: "kilo-auto/free",
-        name: "Kilo Auto Free",
-        api: "openai-completions",
-        provider: "kilo",
-        baseUrl: KILO_GATEWAY_BASE_URL,
-        input: ["text", "image"],
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-        reasoning: true,
-        contextWindow: 128_000,
-        maxTokens: 8_192,
-        type: "chat",
-        compat: {
-          maxTokensField: "max_tokens",
-          supportsStore: false,
-          supportsDeveloperRole: false,
-          supportsReasoningEffort: true,
-          thinkingFormat: "openrouter",
-        },
-      },
-    ];
-    cachedKiloModels = fallback;
-    return fallback;
-  })().catch((error: unknown) => {
-    cachedKiloFetch = undefined;
-    throw error;
-  });
+  cachedKiloFetch ??= loadKiloModels()
+    .then((models) => {
+      cachedKiloModels = models;
+      return models;
+    })
+    .catch((error: unknown) => {
+      cachedKiloFetch = undefined;
+      throw error;
+    });
   return cachedKiloFetch;
 };
 
 /**
- * Build the model catalog used by the Agent. The provider is selected by `MOTS_PROVIDER` and the model
- * by `MOTS_MODEL`, so switching away from a provider that ran out of quota needs no code change.
+ * Register the models this session can call. Kilo and Vercel publish live catalogs; those requests
+ * run only for `provider` and abort after `CATALOG_TIMEOUT_MS`. OpenRouter and NVIDIA ship a
+ * bundled catalog, so registering them does not touch the network.
  */
 export const createMotsModels = async (
   env: MotsEnvironment,
-  _provider?: MotsProviderId,
+  provider: MotsProviderId,
+  options?: CatalogLoadOptions,
 ): Promise<MutableModels> => {
   const models = createModels({ authContext: providerAuthContext(env) });
 
-  // Register Kilo Gateway (default)
-  try {
-    models.setProvider(kiloGatewayProvider(await kiloModels()));
-  } catch {
-    // fallback or offline
+  switch (provider) {
+    case "kilo":
+      try {
+        models.setProvider(kiloGatewayProvider(await kiloModels(options)));
+      } catch {
+        // kiloModels already falls back; this guards setProvider itself.
+      }
+      break;
+    case "vercel-ai-gateway":
+      try {
+        models.setProvider(vercelGatewayProvider(await gatewayModels(options)));
+      } catch {
+        // A timed-out or failed catalog leaves Vercel unregistered. Startup does not wait longer.
+      }
+      break;
+    case "openrouter":
+    case "nvidia":
+      break;
+    default: {
+      const unreachable: never = provider;
+      throw new Error(`Unsupported provider: ${String(unreachable)}`);
+    }
   }
 
-  // Register OpenRouter
+  // Bundled catalogs. No network, so they do not delay startup for any provider.
   try {
     models.setProvider(openrouterProvider());
   } catch {
     // ignore
   }
 
-  // Register NVIDIA NIM
   try {
     models.setProvider(nvidiaProvider());
-  } catch {
-    // ignore
-  }
-
-  // Register Vercel AI Gateway
-  try {
-    models.setProvider(vercelGatewayProvider(await gatewayModels()));
   } catch {
     // ignore
   }
