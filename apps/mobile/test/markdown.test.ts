@@ -41,6 +41,20 @@ describe("inline markdown", () => {
       { text: "2 * 3 = 6", bold: false, italic: false, code: false },
     ]);
   });
+
+  test("marks an http link and keeps the label", () => {
+    expect(parseInline("vedi [la guida](https://example.com/a) ora")).toEqual([
+      { text: "vedi ", bold: false, italic: false, code: false },
+      { text: "la guida", bold: false, italic: false, code: false, href: "https://example.com/a" },
+      { text: " ora", bold: false, italic: false, code: false },
+    ]);
+  });
+
+  test("does not treat a javascript url as a link", () => {
+    expect(parseInline("[x](javascript:alert(1))")).toEqual([
+      { text: "[x](javascript:alert(1))", bold: false, italic: false, code: false },
+    ]);
+  });
 });
 
 describe("block markdown", () => {

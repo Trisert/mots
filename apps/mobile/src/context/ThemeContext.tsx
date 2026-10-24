@@ -24,18 +24,18 @@ export interface ThemeContextValue {
 }
 
 const defaultContext: ThemeContextValue = {
-  theme: "light",
-  mode: "system",
+  theme: "dark",
+  mode: "dark",
   setMode: () => {},
-  colors: lightColors,
-  isDark: false,
+  colors: darkColors,
+  isDark: true,
 };
 
 const ThemeContext = createContext<ThemeContextValue>(defaultContext);
 
 export function ThemeProvider({ children }: { readonly children: React.ReactNode }) {
   const systemScheme = useColorScheme();
-  const [mode, setModeState] = useState<ThemeMode>("system");
+  const [mode, setModeState] = useState<ThemeMode>("dark");
 
   useEffect(() => {
     let alive = true;

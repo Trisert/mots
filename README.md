@@ -264,20 +264,20 @@ Per seguire l'avanzamento: questa sezione, `git log --oneline` e i comandi di ve
 
 ## Mobile client adoption
 
-The mobile UI is unchanged in this change. `packages/client` does not need a new socket parameter. The UX work should adopt the gate as follows.
+The mobile app adopts this gate. `packages/client` does not take a new socket parameter. The contract is:
 
 1. `POST /api/sessions` must send `Authorization: Bearer <MOTS_CREATE_TOKEN>`. Keep reading `sessionId` from the JSON body. That string is now the full join code (`{uuid}_{hmac}`, 80 characters, alphabet `[A-Za-z0-9_-]`). Store it unchanged. Do not strip the signature, lowercase it, or keep only the uuid.
 2. The WebSocket URL stays `/api/sessions/${sessionId}`. `MotsClient` already builds that path. No query parameter and no second header on the socket.
 3. Share and join the full `sessionId`. `parseJoinTarget` already accepts it. Joining does not send the create token.
 4. A bare uuid saved by a current install is rejected with `401`. Send that person through onboarding again. Do not add a legacy bypass.
-5. `conversation.setModel` can now fail with `command.result` `ok: false` and `error.code === "model_not_allowed"`. The protocol shape is unchanged. The reducer already stores `state.error`. The chat screen should show that refusal. It currently updates the model pill before the server accepts.
+5. `conversation.setModel` can now fail with `command.result` `ok: false` and `error.code === "model_not_allowed"`. The protocol shape is unchanged. The reducer stores `event.error.message` on `state.error`, and the chat banner shows the Italian refusal. The header pill stays on `snapshot.agent.model` until the server reports that model.
 6. A schedule over the cap, or a new recurrence under the minimum cadence, fails inside the tool. No client frame changes.
 7. Native apps send no `Origin`, so CORS does not affect them. A web preview must use an origin listed in `MOTS_CORS_ORIGINS` once that variable is set. Until it is set, every origin is allowed.
 8. `429` bodies are `{ error: "rate_limited", message }` and include a `Retry-After` header in seconds. `401` is `{ error: "unauthorized", message }`. `503` means a server secret is missing (`session_secret_unconfigured` or `create_token_unconfigured`).
-9. `EXPO_PUBLIC_MOTS_CREATE_TOKEN` would be compiled into the app bundle. It is not a confidential secret. It only stops callers who do not have the app.
-10. The visible session label that slices the first characters is not a join code. The share text must keep the entire `sessionId`.
+9. `EXPO_PUBLIC_MOTS_CREATE_TOKEN`, when set, is compiled into the app bundle. It is not a confidential secret. It only stops callers who do not have the app. When it is unset, `createSession` omits `Authorization` so a local Worker that does not check a token still works.
+10. The share sheet and the session menu show the entire `sessionId`. A sliced label is not a join code.
 
-`apps/mobile/src/api.ts` `createSession` is the function that must add the bearer. `apps/mobile/src/storage.ts` already accepts the new code shape.
+`apps/mobile/src/api.ts` `createSession` sends the bearer. A plain `GET` of the socket path distinguishes `426` (open the socket), `401` (offer a new space or a join), and `503` / `429` / `403` (the server is not ready). Anything else, including a network failure, still tries the socket so local dev without the gate keeps working. `apps/mobile/src/storage.ts` already accepts the new code shape.
 
 ## Licenza
 

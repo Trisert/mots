@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -33,20 +34,38 @@ function InlineText({
 }) {
   return (
     <Text style={[styles.inlineBase, style]} selectable={selectable}>
-      {runs.map((run, index) => (
-        <Text
-          key={index}
-          style={[
-            run.bold && styles.bold,
-            run.italic && styles.italic,
-            run.code && styles.inlineCode,
-          ]}
-        >
-          {run.text}
-        </Text>
-      ))}
+      {runs.map((run, index) =>
+        run.href !== undefined ? (
+          <Text
+            key={index}
+            accessibilityRole="link"
+            accessibilityLabel={run.text}
+            accessibilityHint="Apre il link nel browser"
+            style={[styles.link, run.bold && styles.bold, run.italic && styles.italic]}
+            onPress={() => openLink(run.href ?? "")}
+          >
+            {run.text}
+          </Text>
+        ) : (
+          <Text
+            key={index}
+            style={[
+              run.bold && styles.bold,
+              run.italic && styles.italic,
+              run.code && styles.inlineCode,
+            ]}
+          >
+            {run.text}
+          </Text>
+        ),
+      )}
     </Text>
   );
+}
+
+function openLink(href: string): void {
+  if (!/^https?:\/\//i.test(href)) return;
+  void Linking.openURL(href).catch(() => undefined);
 }
 
 function CodeBlockView({
@@ -239,9 +258,13 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     italic: {
       fontStyle: "italic",
     },
+    link: {
+      color: colors.link,
+      textDecorationLine: "underline",
+    },
     inlineCode: {
       fontFamily: "monospace",
-      backgroundColor: colors.cardSurfaceAmber,
+      backgroundColor: colors.surfaceSoft,
       borderRadius: 6,
       paddingHorizontal: 6,
       paddingVertical: 1,
@@ -276,14 +299,14 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     },
     quoteCard: {
       flexDirection: "row",
-      backgroundColor: isDark ? "rgba(251, 191, 36, 0.12)" : "rgba(246, 223, 177, 0.28)",
+      backgroundColor: colors.surfaceSoft,
       borderRadius: radius.md,
       overflow: "hidden",
       marginVertical: spacing.xs,
     },
     quoteBar: {
       width: 4,
-      backgroundColor: colors.accentCoral,
+      backgroundColor: colors.accent,
     },
     quoteBody: {
       flex: 1,
@@ -308,7 +331,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     },
     listBullet: {
       fontFamily: fonts.bold,
-      color: colors.accentCoral,
+      color: colors.accent,
       fontSize: 15,
       fontWeight: "700",
       lineHeight: 22,
@@ -337,7 +360,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     },
     codeLanguage: {
       fontFamily: fonts.bold,
-      color: colors.starHighlight,
+      color: colors.textSecondary,
       fontSize: 11,
       fontWeight: "700",
       letterSpacing: 0.6,

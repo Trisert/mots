@@ -1,10 +1,7 @@
 import { Platform } from "react-native";
+import { normalizeBaseUrl } from "./url";
 
-export function normalizeBaseUrl(value: string): string {
-  const trimmed = value.trim().replace(/\/+$/, "");
-  if (trimmed.length === 0) return trimmed;
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
-}
+export { normalizeBaseUrl };
 
 const fallback = Platform.OS === "android" ? "http://10.0.2.2:8787" : "http://localhost:8787";
 

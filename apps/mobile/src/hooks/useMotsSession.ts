@@ -1,13 +1,19 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { MotsClient } from "@mots/client";
 
 export type MotsSessionOptions = {
   readonly baseUrl: string;
   readonly sessionId: string;
   readonly username: string;
+  /** When false, the socket stays down. Used while a join code is still being checked. */
+  readonly enabled?: boolean;
 };
 
 export function useMotsSession(options: MotsSessionOptions) {
+  // A terminal close sets a private flag on MotsClient and later connect() calls do nothing.
+  // A new client is the reset available without changing the client package.
+  const [epoch, setEpoch] = useState(0);
+  const retry = useCallback(() => setEpoch((current) => current + 1), []);
   const client = useMemo(
     () =>
       new MotsClient({
@@ -15,7 +21,7 @@ export function useMotsSession(options: MotsSessionOptions) {
         sessionId: options.sessionId,
         username: options.username,
       }),
-    [options.baseUrl, options.sessionId, options.username],
+    [epoch, options.baseUrl, options.enabled, options.sessionId, options.username],
   );
 
   const subscribe = useMemo(
@@ -26,9 +32,10 @@ export function useMotsSession(options: MotsSessionOptions) {
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   useEffect(() => {
+    if (options.enabled === false) return;
     client.connect();
     return () => client.dispose();
-  }, [client]);
+  }, [client, options.enabled]);
 
-  return { client, state };
+  return { client, state, retry };
 }
