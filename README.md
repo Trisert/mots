@@ -129,15 +129,35 @@ L'anteprima usa `http://localhost:8787` come server; l'URL resta modificabile da
 
 ```powershell
 cd apps/server
-bunx wrangler secret put MOTS_SESSION_SECRET
-bunx wrangler secret put MOTS_CREATE_TOKEN
-bunx wrangler secret put KILO_API_KEY
-bunx wrangler deploy
+bunx wrangler secret put MOTS_SESSION_SECRET --env=""
+bunx wrangler secret put MOTS_CREATE_TOKEN --env=""
+bunx wrangler secret put KILO_API_KEY --env=""
+bunx wrangler deploy --env=""
 ```
 
-Il provider predefinito è `kilo`, con modello `reflection/beam-free`. Per OpenRouter, Vercel o NVIDIA metti al posto di `KILO_API_KEY` la variabile `OPENROUTER_API_KEY`, `AI_GATEWAY_API_KEY` o `NVIDIA_API_KEY`, e imposta `MOTS_PROVIDER` con `bunx wrangler secret put MOTS_PROVIDER`. Se `MOTS_PROVIDER` manca, il codice usa `kilo`. Un valore sconosciuto fa fallire l'avvio della sessione. `MOTS_MODEL` è opzionale. Non fare il deploy finché l'app mobile non invia il bearer di creazione: un client vecchio riceve `401`.
+`--env=""` è il Worker di primo livello, `mots`. Senza quel flag Wrangler avvisa, perché nel file c'è anche `staging`, e il comando resterebbe sul Worker `mots`.
 
-Poi nell'app usa l'URL pubblico del Worker come server.
+Il provider predefinito è `kilo`, con modello `reflection/beam-free`. Per OpenRouter, Vercel o NVIDIA metti al posto di `KILO_API_KEY` la variabile `OPENROUTER_API_KEY`, `AI_GATEWAY_API_KEY` o `NVIDIA_API_KEY`, e imposta `MOTS_PROVIDER` con `bunx wrangler secret put MOTS_PROVIDER --env=""`. Se `MOTS_PROVIDER` manca, il codice usa `kilo`. Un valore sconosciuto fa fallire l'avvio della sessione. `MOTS_MODEL` è opzionale. Non fare il deploy finché l'app mobile non invia il bearer di creazione: un client vecchio riceve `401`.
+
+Poi nell'app usa l'URL pubblico del Worker come server. L'URL predefinito dell'app resta quello locale.
+
+### Staging
+
+`apps/server/wrangler.jsonc` definisce l'ambiente `staging`. Il Worker si chiama `mots-staging` ed è distinto da `mots`. La CI esegue `wrangler deploy --dry-run --env staging` (`bun run check:server:staging`) accanto al dry-run del Worker predefinito. Quel passo non pubblica nulla.
+
+I secret dello staging si impostano con `--env staging`, dal directory `apps/server`. Non finiscono nel git.
+
+```powershell
+cd apps/server
+bunx wrangler secret put MOTS_SESSION_SECRET --env staging
+bunx wrangler secret put MOTS_CREATE_TOKEN --env staging
+bunx wrangler secret put MOTS_CORS_ORIGINS --env staging
+bunx wrangler secret put KILO_API_KEY --env staging
+```
+
+Genera `MOTS_SESSION_SECRET` e `MOTS_CREATE_TOKEN` con `openssl rand -base64 32` (minimo 16 caratteri). `MOTS_CORS_ORIGINS` è l'elenco di origini browser separate da virgola. Per OpenRouter, Vercel o NVIDIA sostituisci `KILO_API_KEY` con `OPENROUTER_API_KEY`, `AI_GATEWAY_API_KEY` o `NVIDIA_API_KEY`, e se serve imposta `MOTS_PROVIDER` con `bunx wrangler secret put MOTS_PROVIDER --env staging`. Non fare il deploy finché l'app mobile non invia il bearer di creazione: un client vecchio riceve `401`.
+
+Il deploy manuale, quando quei secret ci sono e l'app invia il bearer, è `bunx wrangler deploy --env staging`. L'app non punta da sola a staging né a produzione: il default resta `http://localhost:8787` (Android emulator: `http://10.0.2.2:8787`). Per provare `mots-staging`, incolla il suo URL nel campo Server.
 
 ## Configurazione
 
@@ -213,9 +233,10 @@ I tool dell'agente (`remember`, `forget`, `schedule`, `search_history`) richiedo
 | `bun run typecheck` | Typecheck di tutti i package. |
 | `bun run test` | 134 test: protocollo, client, agent, gate del Worker e funzioni pure del mobile. |
 | `bun run check` | Typecheck + dry-run del Worker. |
-| `bun run check:server` | Solo `wrangler deploy --dry-run`. |
+| `bun run check:server` | Solo `wrangler deploy --dry-run --env=""`. Resta sul Worker `mots`. |
+| `bun run check:server:staging` | Dry-run di `wrangler deploy --env staging`. Non pubblica. |
 | `bun run build:mobile` | Export Android con Metro. |
-| `bun run --cwd apps/server deploy` | Deploy del Worker. |
+| `bun run --cwd apps/server deploy` | Deploy del Worker `mots` (`wrangler deploy --env=""`). Non è lo staging. |
 
 ## API
 

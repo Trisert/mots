@@ -23,5 +23,20 @@
     "traces": {
       "enabled": true
     }
+  },
+  // Bindings are not inherited. Repeat them so `wrangler deploy --env staging`
+  // keeps the same Session object as the top-level Worker.
+  "env": {
+    "staging": {
+      "name": "mots-staging",
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "SESSIONS",
+            "class_name": "Session"
+          }
+        ]
+      }
+    }
   }
 }
