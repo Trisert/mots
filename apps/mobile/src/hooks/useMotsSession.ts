@@ -5,6 +5,8 @@ export type MotsSessionOptions = {
   readonly baseUrl: string;
   readonly sessionId: string;
   readonly username: string;
+  /** When false, the socket stays down. Used while a join code is still being checked. */
+  readonly enabled?: boolean;
 };
 
 export function useMotsSession(options: MotsSessionOptions) {
@@ -19,7 +21,7 @@ export function useMotsSession(options: MotsSessionOptions) {
         sessionId: options.sessionId,
         username: options.username,
       }),
-    [epoch, options.baseUrl, options.sessionId, options.username],
+    [epoch, options.baseUrl, options.enabled, options.sessionId, options.username],
   );
 
   const subscribe = useMemo(
@@ -30,9 +32,10 @@ export function useMotsSession(options: MotsSessionOptions) {
   const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   useEffect(() => {
+    if (options.enabled === false) return;
     client.connect();
     return () => client.dispose();
-  }, [client]);
+  }, [client, options.enabled]);
 
   return { client, state, retry };
 }

@@ -52,6 +52,7 @@ function MainApp() {
 
   const [identity, setIdentity] = useState<Identity | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  const [openJoin, setOpenJoin] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -118,6 +119,13 @@ function MainApp() {
 
   const handleLeave = async () => {
     await clearIdentity();
+    setOpenJoin(false);
+    setIdentity(undefined);
+  };
+
+  const handleRestart = async (mode: "create" | "join") => {
+    await clearIdentity();
+    setOpenJoin(mode === "join");
     setIdentity(undefined);
   };
 
@@ -127,9 +135,20 @@ function MainApp() {
 
   const content =
     identity !== undefined ? (
-      <ChatScreen identity={identity} onLeave={handleLeave} onIdentityChange={handleReady} />
+      <ChatScreen
+        identity={identity}
+        onLeave={handleLeave}
+        onIdentityChange={handleReady}
+        onRestart={(mode) => void handleRestart(mode)}
+      />
     ) : (
-      <OnboardingScreen onReady={handleReady} />
+      <OnboardingScreen
+        initialJoin={openJoin}
+        onReady={async (next) => {
+          setOpenJoin(false);
+          await handleReady(next);
+        }}
+      />
     );
 
   return (

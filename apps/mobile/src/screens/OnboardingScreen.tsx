@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,11 +16,12 @@ import { ThemeSwitcher } from "../ui/ThemeSwitcher";
 
 type Props = {
   readonly onReady: (identity: Identity) => void | Promise<void>;
+  readonly initialJoin?: boolean;
 };
 
 type Busy = "create" | "join" | undefined;
 
-export function OnboardingScreen({ onReady }: Props) {
+export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -30,7 +31,11 @@ export function OnboardingScreen({ onReady }: Props) {
   const [apiUrl, setApiUrl] = useState(DEFAULT_API_URL);
   const [busy, setBusy] = useState<Busy>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(initialJoin);
+
+  useEffect(() => {
+    if (initialJoin) setModalOpen(true);
+  }, [initialJoin]);
 
   const name = username.trim().length > 0 ? username.trim() : "Utente";
 

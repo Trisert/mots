@@ -59,6 +59,12 @@ describe("presentError", () => {
   test("passes server text through", () => {
     expect(presentError("Try again later")).toBe("Try again later");
   });
+
+  test("translates a model the server refused", () => {
+    expect(presentError("That model is not available.")).toBe(
+      "Quel modello non è disponibile su questo server.",
+    );
+  });
 });
 
 describe("presentConnection", () => {

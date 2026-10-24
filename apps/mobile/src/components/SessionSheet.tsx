@@ -164,6 +164,9 @@ export function SessionSheet({
             <Text selectable accessibilityLabel={`Codice sessione ${sessionId}`} style={styles.code}>
               {sessionId}
             </Text>
+            <Text style={styles.body}>
+              Condividi il codice per intero. La parte dopo il trattino basso è la firma.
+            </Text>
             <View style={styles.row}>
               <View style={styles.rowItem}>
                 <Button

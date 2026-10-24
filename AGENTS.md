@@ -39,9 +39,10 @@ Live chat needs a provider key in `apps/server/.dev.vars` (gitignored). Copy `ap
 | `MOTS_MIN_RECURRENCE_SECONDS` | Optional. Default 900. Values below 60 are ignored. One-shots stay at 1 second. |
 | `KILO_API_KEY` | Kilo. If unset, local dev may read `~/.pi/agent/auth.json` or send the literal key `free`. |
 | `OPENROUTER_API_KEY` | OpenRouter |
-| `AI_GATEWAY_API_KEY` | Vercel AI Gateway. The mobile sheet text says `AI_GATEWAY_TOKEN`; that name is wrong. |
+| `AI_GATEWAY_API_KEY` | Vercel AI Gateway. The mobile sheet uses this name and `ai-gateway.vercel.sh/v1`. |
 | `NVIDIA_API_KEY` | NVIDIA |
 | `EXPO_PUBLIC_MOTS_API_URL` | Optional build-time server URL baked into the app. Not a secret. |
+| `EXPO_PUBLIC_MOTS_CREATE_TOKEN` | Optional app-wide gate, not a per-user secret. Inlined into the bundle. Sent as `Authorization: Bearer` on `POST /api/sessions` when set. Omitted when unset, so a local Worker without the check still creates a session. |
 
 Wrangler local dev reads `apps/server/.dev.vars`. A Cursor environment secret is not visible inside the Worker until it is copied into that file. Never commit `.dev.vars`, `~/.pi/agent/auth.json`, or a Cloudflare API token.
 
@@ -102,11 +103,11 @@ Do not "fix" a 503 by editing Worker code. Fix the runtime first.
 ## Gotchas
 
 - The code defaults to `kilo` / `reflection/beam-free` (`packages/agent/src/provider.ts`, `DEFAULT_MODELS`). An unknown `MOTS_PROVIDER` fails session startup.
-- Onboarding shows the server URL and never edits it. `setApiUrl` in `apps/mobile/src/screens/OnboardingScreen.tsx` is unused. Android defaults to `http://10.0.2.2:8787`, everything else to `http://localhost:8787`, unless `EXPO_PUBLIC_MOTS_API_URL` is set at bundle time.
-- `ChatScreen` does not render `state.error`. A failed socket still looks like "connecting".
-- The model pill is local React state. It does not read the model the Durable Object actually configured.
-- The socket path still matches `[A-Za-z0-9_-]{1,128}`, but `getByName` runs only after `verifySessionCapability`. The Durable Object name is the uuid, never the full join code. `POST /api/sessions` does not create a Durable Object. Do not log session ids, prompts, or API keys.
-- Do not re-open a legacy uuid bypass. Existing installs that stored a bare uuid must create or join again. The mobile adoption steps are in the README section "Mobile client adoption". Leave `apps/mobile` to the UX work unless the task says otherwise.
+- Onboarding edits the server URL and saves it with the identity. Android still defaults to `http://10.0.2.2:8787`, everything else to `http://localhost:8787`, unless `EXPO_PUBLIC_MOTS_API_URL` is set at bundle time.
+- `ChatScreen` renders `state.error`. `failed` and `connecting` use different copy. Riprova after a terminal close builds a new `MotsClient`, because `connect()` ignores calls once the client has given up.
+- The model pill reads `snapshot.agent.model`. It does not change until the server reports the new model. A `model_not_allowed` refusal stays in `state.error`.
+- The socket path still matches `[A-Za-z0-9_-]{1,128}`, but `getByName` runs only after `verifySessionCapability`. The Durable Object name is the uuid, never the full join code. `POST /api/sessions` does not create a Durable Object. The app stores and shares the full join code. Do not log session ids, prompts, or API keys.
+- Do not re-open a legacy uuid bypass. A stored bare uuid probes as `401` and the chat offers a new space or a join. The mobile adoption steps are in the README section "Mobile client adoption".
 - Rate limits in `apps/server/src/rate-limit.ts` are per Worker isolate. They use `CF-Connecting-IP` only. Do not add a second Durable Object class for them without a migration plan.
 - `readStoredKiloToken()` in `packages/agent/src/provider.ts` reads `~/.pi/agent/auth.json` when `KILO_API_KEY` is unset. On a laptop that uses the developer's personal token. Do not copy that file into the repo or the cloud VM.
 - Recurring reminders do not reschedule themselves. After delivery, the model is asked to call `schedule` with `sourceScheduleId`. If it does not, the routine stops.

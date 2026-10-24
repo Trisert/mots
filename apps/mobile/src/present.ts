@@ -39,6 +39,7 @@ const KNOWN_ERRORS: Readonly<Record<string, string>> = {
   "A prompt must contain text": "Scrivi un messaggio prima di inviare.",
   "Server sent a binary protocol frame.": "Il server ha inviato un messaggio non valido.",
   "Server sent an invalid protocol frame.": "Il server ha inviato un messaggio non valido.",
+  "That model is not available.": "Quel modello non è disponibile su questo server.",
 };
 
 export function providerLabel(provider: string): string {

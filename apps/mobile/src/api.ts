@@ -1,15 +1,43 @@
+import {
+  parseSessionHttpBody,
+  presentSessionHttpFailure,
+  readCreateToken,
+  sessionCreateHeaders,
+} from "./session-gate";
 import { normalizeBaseUrl, parseJoinTarget } from "./url";
 
 export { parseJoinTarget };
 export type { JoinTarget } from "./url";
 
-export async function createSession(baseUrl: string): Promise<string> {
-  const response = await fetch(`${normalizeBaseUrl(baseUrl)}/api/sessions`, {
-    method: "POST",
-    headers: { Accept: "application/json" },
-  });
+const PROBE_TIMEOUT_MS = 4_000;
+
+export type SessionAccess = "open" | "unauthorized" | "unavailable" | "unknown";
+
+export type SessionProbe = {
+  readonly access: SessionAccess;
+  readonly message?: string;
+};
+
+export async function createSession(
+  baseUrl: string,
+  token: string | undefined = readCreateToken({
+    EXPO_PUBLIC_MOTS_CREATE_TOKEN: process.env.EXPO_PUBLIC_MOTS_CREATE_TOKEN,
+  }),
+): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch(`${normalizeBaseUrl(baseUrl)}/api/sessions`, {
+      method: "POST",
+      headers: sessionCreateHeaders(token),
+    });
+  } catch {
+    throw new Error("Non riesco a raggiungere il server.");
+  }
   if (!response.ok) {
-    throw new Error(`Il server ha risposto con ${response.status}`);
+    const body = parseSessionHttpBody(await response.json().catch(() => undefined));
+    throw new Error(
+      presentSessionHttpFailure(response.status, body, "create", response.headers.get("Retry-After")),
+    );
   }
   const body: unknown = await response.json();
   if (
@@ -20,4 +48,37 @@ export async function createSession(baseUrl: string): Promise<string> {
     throw new Error("Il server ha restituito una sessione non valida");
   }
   return (body as { sessionId: string }).sessionId;
+}
+
+/** A plain GET returns 426 for a code the server will open, and 401 for a bad one. */
+export async function probeSession(baseUrl: string, sessionId: string): Promise<SessionProbe> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  try {
+    const response = await fetch(
+      `${normalizeBaseUrl(baseUrl)}/api/sessions/${encodeURIComponent(sessionId)}`,
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      },
+    );
+    if (response.status === 426 || response.status === 101) return { access: "open" };
+    const body = parseSessionHttpBody(await response.json().catch(() => undefined));
+    const message = presentSessionHttpFailure(
+      response.status,
+      body,
+      "open",
+      response.headers.get("Retry-After"),
+    );
+    if (response.status === 401) return { access: "unauthorized", message };
+    if (response.status === 429 || response.status === 503 || response.status === 403) {
+      return { access: "unavailable", message };
+    }
+    return { access: "unknown" };
+  } catch {
+    return { access: "unknown" };
+  } finally {
+    clearTimeout(timer);
+  }
 }

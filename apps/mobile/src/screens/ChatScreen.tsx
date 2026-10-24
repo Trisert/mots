@@ -23,6 +23,7 @@ import { MenuIcon, PlusIcon } from "../components/Icon";
 import { MarkdownText } from "../components/MarkdownText";
 import { MessageBubble } from "../components/MessageBubble";
 import { SessionSheet } from "../components/SessionSheet";
+import { probeSession, type SessionAccess } from "../api";
 import { useMotsSession } from "../hooks/useMotsSession";
 import { presentConnection, presentError, presentModel } from "../present";
 import { motion, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
@@ -52,28 +53,65 @@ const SUGGESTIONS = [
   },
 ];
 
+type AccessView = SessionAccess | "checking";
+
 type Props = {
   readonly identity: Identity;
   readonly onLeave: () => void;
   readonly onIdentityChange: (identity: Identity) => void | Promise<void>;
+  readonly onRestart: (mode: "create" | "join") => void;
 };
 
-export function ChatScreen({ identity, onLeave, onIdentityChange }: Props) {
+export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: Props) {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const isWide = windowWidth >= 768;
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const keyboardVisible = useKeyboardState((keyboard) => keyboard.isVisible);
+  const [access, setAccess] = useState<AccessView>("checking");
+  const [accessMessage, setAccessMessage] = useState<string | undefined>(undefined);
+  const [probeEpoch, setProbeEpoch] = useState(0);
+  const sessionOpen = access === "open" || access === "unknown";
 
   const { client, state, retry } = useMotsSession({
     baseUrl: identity.apiUrl,
     sessionId: identity.sessionId,
     username: identity.username,
+    enabled: sessionOpen,
   });
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setAccess("checking");
+    setAccessMessage(undefined);
+    void probeSession(identity.apiUrl, identity.sessionId).then((result) => {
+      if (!alive) return;
+      setAccess(result.access);
+      setAccessMessage(result.message);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [identity.apiUrl, identity.sessionId, probeEpoch]);
+
+  useEffect(() => {
+    if (state.status !== "failed") return;
+    let alive = true;
+    void probeSession(identity.apiUrl, identity.sessionId).then((result) => {
+      if (!alive) return;
+      if (result.access === "unauthorized" || result.access === "unavailable") {
+        setAccess(result.access);
+        setAccessMessage(result.message);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [identity.apiUrl, identity.sessionId, state.status]);
 
   const listRef = useRef<FlatList<TranscriptEntry>>(null);
   const stickToBottom = useRef(true);
@@ -239,7 +277,35 @@ export function ChatScreen({ identity, onLeave, onIdentityChange }: Props) {
     </View>
   );
 
-  const empty = !connected ? (
+  const blocked = access === "unauthorized" || access === "unavailable";
+
+  const empty = blocked ? (
+    <View testID="session-gate" style={styles.connection}>
+      <Text accessibilityRole="header" style={styles.connectionTitle}>
+        {access === "unauthorized" ? "Codice non valido" : "Server non pronto"}
+      </Text>
+      <Text style={styles.connectionBody}>
+        {accessMessage ??
+          "Questo codice non apre la sessione. Creane una nuova, oppure entra con il codice intero."}
+      </Text>
+      <Button label="Crea un nuovo spazio" onPress={() => onRestart("create")} />
+      <Button
+        label="Entra con un codice"
+        variant="secondary"
+        onPress={() => onRestart("join")}
+      />
+      {access === "unavailable" ? (
+        <Button label="Riprova" variant="ghost" onPress={() => setProbeEpoch((current) => current + 1)} />
+      ) : null}
+    </View>
+  ) : access === "checking" ? (
+    <View testID="connection-state" style={styles.connection}>
+      <ActivityIndicator color={colors.textSecondary} />
+      <Text accessibilityRole="header" style={styles.connectionTitle}>
+        Controllo il codice
+      </Text>
+    </View>
+  ) : !connected ? (
     <View testID="connection-state" style={styles.connection}>
       {connection.busy ? <ActivityIndicator color={colors.textSecondary} /> : null}
       <Text accessibilityRole="header" style={styles.connectionTitle}>
@@ -275,11 +341,13 @@ export function ChatScreen({ identity, onLeave, onIdentityChange }: Props) {
     </View>
   );
 
-  const composerHint = !connected
-    ? "L'invio resta fermo finché non torna la connessione."
-    : activeConversationId === undefined
-      ? "Aspetto la chat dal server."
-      : undefined;
+  const composerHint = blocked
+    ? accessMessage
+    : !connected
+      ? "L'invio resta fermo finché non torna la connessione."
+      : activeConversationId === undefined
+        ? "Aspetto la chat dal server."
+        : undefined;
 
   return (
     <View testID="chat-screen" style={[styles.outer, isWide && styles.outerWide]}>
