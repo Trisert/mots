@@ -231,6 +231,63 @@ describe("MotsClient", () => {
     }
   });
 
+  test("registers and clears an Expo push token", () => {
+    const { client, socket } = connect();
+    try {
+      const token = "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]";
+      expect(client.registerPushToken(token)).toBe(true);
+      const registered = JSON.parse(socket.sent.at(-1) ?? "") as {
+        readonly type: string;
+        readonly requestId: string;
+        readonly token: string;
+      };
+      expect(registered.type).toBe("pushToken.register");
+      expect(registered.token).toBe(token);
+      expect(registered.requestId.length).toBeGreaterThan(0);
+
+      expect(client.clearPushToken()).toBe(true);
+      const cleared = JSON.parse(socket.sent.at(-1) ?? "") as {
+        readonly type: string;
+        readonly requestId: string;
+      };
+      expect(cleared.type).toBe("pushToken.clear");
+      expect(cleared.requestId.length).toBeGreaterThan(0);
+      expect(client.getSnapshot().status).toBe("connected");
+      expect(client.getSnapshot().error).toBeUndefined();
+    } finally {
+      client.dispose();
+    }
+  });
+
+  test("does not send a push token the server would reject", () => {
+    const { client, socket } = connect();
+    try {
+      const before = socket.sent.length;
+      expect(client.registerPushToken("not-a-token")).toBe(false);
+      expect(client.registerPushToken("ExpoPushToken[abc def]")).toBe(false);
+      expect(socket.sent.length).toBe(before);
+      expect(client.getSnapshot().status).toBe("connected");
+      expect(client.getSnapshot().error).toBeUndefined();
+    } finally {
+      client.dispose();
+    }
+  });
+
+  test("stays quiet when a push token cannot be sent", () => {
+    const client = new MotsClient({
+      baseUrl: "https://mots.example",
+      sessionId: "session-1",
+      username: "Luca",
+      socketFactory: () => {
+        throw new Error("no socket");
+      },
+    });
+    expect(client.registerPushToken("ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]")).toBe(false);
+    expect(client.clearPushToken()).toBe(false);
+    expect(client.getSnapshot().error).toBeUndefined();
+    expect(client.getSnapshot().status).toBe("connecting");
+  });
+
   test("surfaces command failures as state errors", async () => {
     const { client, socket } = connect();
     try {
