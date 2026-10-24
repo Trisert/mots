@@ -1,0 +1,4 @@
+{
+  "name": "Mots",
+  "install": "set -euo pipefail\nnode_ok=0\nif command -v node >/dev/null 2>&1; then\n  node_major=\"$(node -p 'Number(process.versions.node.split(\".\")[0])')\"\n  if [ \"${node_major}\" -ge 22 ]; then\n    node_ok=1\n  fi\nfi\nif [ \"${node_ok}\" -ne 1 ]; then\n  curl -fsSL \"https://nodejs.org/dist/v22.23.4/node-v22.23.4-linux-x64.tar.xz\" | sudo tar -xJ -C /usr/local --strip-components=1 --no-same-owner\nfi\nif [ ! -x \"${HOME}/.bun/bin/bun\" ]; then\n  curl -fsSL https://bun.sh/install | bash -s \"bun-v1.4.4\"\nfi\nsudo ln -sf \"${HOME}/.bun/bin/bun\" /usr/local/bin/bun\nbun install --frozen-lockfile\n"
+}
