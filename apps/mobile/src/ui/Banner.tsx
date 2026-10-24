@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { presentCalmError } from "../present";
-import { hit, spacing, type as typeScale } from "../theme";
+import { hit, radius, spacing, type as typeScale } from "../theme";
 
 type Props = {
   readonly message: string;
@@ -20,7 +20,11 @@ export function Banner({ message, actionLabel = "Riprova", onAction, onDismiss }
   const actionText = onAction !== undefined ? actionLabel : onDismiss !== undefined ? "Chiudi" : undefined;
 
   return (
-    <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.banner}>
+    <View
+      accessibilityRole="alert"
+      accessibilityLiveRegion="polite"
+      style={[styles.banner, { backgroundColor: colors.surfaceSoft }]}
+    >
       <Text style={[styles.message, { color: colors.textPrimary }]}>{calm.line}</Text>
       <View style={styles.actions}>
         {action !== undefined && actionText !== undefined ? (
@@ -56,7 +60,9 @@ export function Banner({ message, actionLabel = "Riprova", onAction, onDismiss }
 const styles = StyleSheet.create({
   banner: {
     gap: spacing.xs,
-    paddingVertical: spacing.sm,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
   message: {
     ...typeScale.body,

@@ -146,14 +146,16 @@ export const spacing = {
   xxxl: 48,
 } as const;
 
+/** One radius scale. full is the pill and circle. Older names alias these steps. */
 export const radius = {
-  xs: 8,
-  sm: 10,
-  md: 14,
-  lg: 20,
-  xl: 28,
+  sm: 12,
+  md: 18,
+  lg: 24,
+  full: 9999,
+  xs: 12,
+  xl: 24,
   card: 24,
-  cardLarge: 28,
+  cardLarge: 24,
   pill: 9999,
 } as const;
 

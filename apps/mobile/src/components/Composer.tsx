@@ -1,7 +1,8 @@
 import { useMemo } from "react";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useTheme } from "../context/ThemeContext";
-import { fonts, hit, inset, spacing, type as typeScale, type ThemeColors } from "../theme";
+import { ArrowUpIcon } from "./Icon";
+import { fonts, hit, inset, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 
 type Props = {
   readonly value: string;
@@ -17,62 +18,74 @@ export function Composer({ value, onChange, onSend, disabled, sending }: Props) 
   const canSend = value.trim().length > 0 && !disabled && !sending;
 
   return (
-    <View style={styles.row}>
-      <TextInput
-        accessibilityLabel="Messaggio"
-        value={value}
-        onChangeText={onChange}
-        placeholder="Messaggio"
-        placeholderTextColor={colors.textFaint}
-        style={styles.input}
-        maxLength={100_000}
-        selectionColor={colors.textPrimary}
-        onKeyPress={(event) => {
-          if (Platform.OS !== "web") return;
-          const native = event.nativeEvent;
-          const shift = "shiftKey" in native && native.shiftKey === true;
-          if (native.key !== "Enter" || shift) return;
-          if ("preventDefault" in event && typeof event.preventDefault === "function") {
-            event.preventDefault();
-          }
-          if (canSend) onSend();
-        }}
-      />
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Invia messaggio"
-        accessibilityState={{ disabled: !canSend, busy: sending }}
-        onPress={onSend}
-        disabled={!canSend}
-        style={({ pressed }) => [
-          styles.send,
-          { backgroundColor: canSend ? colors.accent : "transparent" },
-          pressed && canSend && styles.pressed,
-        ]}
-      >
-        {sending ? (
-          <ActivityIndicator color={colors.accentInk} />
-        ) : (
-          <Text style={[styles.sendLabel, { color: canSend ? colors.accentInk : colors.textFaint }]}>
-            Invia
-          </Text>
-        )}
-      </Pressable>
+    <View style={styles.wrap}>
+      <View style={styles.pill}>
+        <TextInput
+          accessibilityLabel="Messaggio"
+          value={value}
+          onChangeText={onChange}
+          placeholder="Messaggio"
+          placeholderTextColor={colors.textFaint}
+          style={styles.input}
+          maxLength={100_000}
+          selectionColor={colors.textPrimary}
+          onKeyPress={(event) => {
+            if (Platform.OS !== "web") return;
+            const native = event.nativeEvent;
+            const shift = "shiftKey" in native && native.shiftKey === true;
+            if (native.key !== "Enter" || shift) return;
+            if ("preventDefault" in event && typeof event.preventDefault === "function") {
+              event.preventDefault();
+            }
+            if (canSend) onSend();
+          }}
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Invia messaggio"
+          accessibilityState={{ disabled: !canSend, busy: sending }}
+          onPress={onSend}
+          disabled={!canSend}
+          hitSlop={4}
+          style={({ pressed }) => [
+            styles.send,
+            {
+              backgroundColor: canSend ? colors.accent : "transparent",
+              borderColor: canSend ? colors.accent : colors.borderSubtle,
+            },
+            pressed && canSend && styles.pressed,
+          ]}
+        >
+          {sending ? (
+            <ActivityIndicator color={colors.accentInk} />
+          ) : (
+            <ArrowUpIcon size={18} color={canSend ? colors.accentInk : colors.textFaint} />
+          )}
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    row: {
+    wrap: {
+      paddingHorizontal: inset,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.md,
+      backgroundColor: colors.bgMain,
+    },
+    pill: {
       flexDirection: "row",
       alignItems: "center",
-      gap: spacing.md,
-      paddingHorizontal: inset,
-      paddingVertical: spacing.md,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: colors.borderSubtle,
-      backgroundColor: colors.bgMain,
+      gap: spacing.sm,
+      minHeight: 56,
+      borderRadius: radius.full,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.borderSubtle,
+      backgroundColor: colors.surfaceSoft,
+      paddingLeft: spacing.lg,
+      paddingRight: 6,
     },
     input: {
       flex: 1,
@@ -84,14 +97,12 @@ function createStyles(colors: ThemeColors) {
       color: colors.textPrimary,
     },
     send: {
-      minHeight: hit,
-      minWidth: 72,
-      paddingHorizontal: spacing.md,
+      width: hit,
+      height: hit,
+      borderRadius: radius.full,
+      borderWidth: StyleSheet.hairlineWidth,
       alignItems: "center",
       justifyContent: "center",
-    },
-    sendLabel: {
-      ...typeScale.body,
     },
     pressed: {
       opacity: 0.8,

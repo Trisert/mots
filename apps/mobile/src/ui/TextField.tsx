@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from "react-native";
 import { useTheme } from "../context/ThemeContext";
-import { fonts, spacing, type as typeScale } from "../theme";
+import { fonts, radius, spacing, type as typeScale } from "../theme";
 
 type Props = {
   readonly label: string;
@@ -54,7 +54,8 @@ export function TextField({
           styles.input,
           {
             color: colors.textPrimary,
-            borderBottomColor: focused ? colors.textPrimary : colors.borderSubtle,
+            backgroundColor: colors.surfaceSoft,
+            borderColor: focused ? colors.textPrimary : colors.borderSubtle,
           },
         ]}
       />
@@ -78,8 +79,9 @@ const styles = StyleSheet.create({
   },
   input: {
     minHeight: 48,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 0,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     fontFamily: fonts.regular,
     fontSize: 16,

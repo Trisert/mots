@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme, type ThemeMode } from "../context/ThemeContext";
-import { hit, spacing, type as typeScale } from "../theme";
+import { hit, radius, spacing, type as typeScale } from "../theme";
 
 const OPTIONS: readonly { readonly id: ThemeMode; readonly label: string }[] = [
   { id: "dark", label: "Scuro" },
@@ -21,7 +21,7 @@ export function ThemeSwitcher() {
             accessibilityLabel={`Tema ${option.label}`}
             accessibilityState={{ selected }}
             onPress={() => setMode(option.id)}
-            style={styles.row}
+            style={[styles.row, selected && { backgroundColor: colors.surfaceSoft }]}
           >
             <Text
               style={[
@@ -43,6 +43,9 @@ const styles = StyleSheet.create({
     minHeight: hit,
     justifyContent: "center",
     paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    marginHorizontal: -spacing.sm,
+    borderRadius: radius.md,
   },
   label: {
     ...typeScale.body,

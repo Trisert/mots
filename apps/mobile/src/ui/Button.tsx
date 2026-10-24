@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
 import { useTheme } from "../context/ThemeContext";
-import { fonts, hit, type ThemeColors } from "../theme";
+import { fonts, hit, radius, type ThemeColors } from "../theme";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -90,7 +90,7 @@ function palettes(colors: ThemeColors): Record<
 const styles = StyleSheet.create({
   base: {
     minHeight: hit,
-    borderRadius: 2,
+    borderRadius: radius.full,
     borderWidth: 0,
     paddingHorizontal: 18,
     alignItems: "center",

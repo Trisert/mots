@@ -197,7 +197,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       alignSelf: "flex-end",
       maxWidth: "84%",
       backgroundColor: colors.userBubble,
-      borderRadius: 4,
+      borderRadius: radius.lg,
       paddingHorizontal: 14,
       paddingVertical: 10,
     },
@@ -270,7 +270,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     iconActionButton: {
       width: 44,
       height: 44,
-      borderRadius: 22,
+      borderRadius: radius.full,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: "transparent",

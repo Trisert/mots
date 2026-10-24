@@ -265,7 +265,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     inlineCode: {
       fontFamily: "monospace",
       backgroundColor: colors.surfaceSoft,
-      borderRadius: 6,
+      borderRadius: radius.sm,
       paddingHorizontal: 6,
       paddingVertical: 1,
       color: colors.textPrimary,

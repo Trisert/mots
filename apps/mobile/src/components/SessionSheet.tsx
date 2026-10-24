@@ -7,7 +7,7 @@ import { normalizeBaseUrl } from "../config";
 import { useTheme } from "../context/ThemeContext";
 import { presentModel, providerLabel, shortModelName, type PresentedModel } from "../present";
 import { PROVIDER_MODELS, PROVIDERS } from "../models";
-import { hit, inset, spacing, type as typeScale, type ThemeColors } from "../theme";
+import { hit, inset, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TextField } from "../ui/TextField";
 import { ThemeSwitcher } from "../ui/ThemeSwitcher";
 
@@ -176,7 +176,7 @@ export function SessionSheet({
                 accessibilityLabel={name}
                 accessibilityState={{ selected: active }}
                 onPress={() => onSelect(conversation.id)}
-                style={styles.row}
+                style={[styles.row, active && styles.rowSelected]}
               >
                 <Text style={[styles.rowLabel, active && styles.rowActive]}>{name}</Text>
               </Pressable>
@@ -204,7 +204,7 @@ export function SessionSheet({
                     accessibilityLabel={provider.name}
                     accessibilityState={{ selected }}
                     onPress={() => setSelectedProviderId(provider.id)}
-                    style={styles.row}
+                    style={[styles.row, selected && styles.rowSelected]}
                   >
                     <Text style={[styles.rowLabel, selected && styles.rowActive]}>{provider.name}</Text>
                   </Pressable>
@@ -219,7 +219,7 @@ export function SessionSheet({
                     accessibilityLabel={model.name}
                     accessibilityState={{ selected: live }}
                     onPress={() => chooseModel(model.id)}
-                    style={styles.row}
+                    style={[styles.row, live && styles.rowSelected]}
                   >
                     <Text style={[styles.rowLabel, live && styles.rowActive]}>{model.name}</Text>
                   </Pressable>
@@ -280,7 +280,10 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.bgMain,
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.borderSubtle,
-      paddingTop: spacing.md,
+      borderTopLeftRadius: radius.lg,
+      borderTopRightRadius: radius.lg,
+      overflow: "hidden",
+      paddingTop: spacing.lg,
       paddingHorizontal: inset,
     },
     header: {
@@ -300,6 +303,9 @@ function createStyles(colors: ThemeColors) {
     row: {
       minHeight: hit,
       justifyContent: "center",
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.sm,
+      marginHorizontal: -spacing.sm,
     },
     rowLabel: {
       ...typeScale.body,
@@ -307,6 +313,9 @@ function createStyles(colors: ThemeColors) {
     },
     rowActive: {
       color: colors.textPrimary,
+    },
+    rowSelected: {
+      backgroundColor: colors.surfaceSoft,
     },
     note: {
       ...typeScale.small,
