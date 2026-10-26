@@ -96,10 +96,10 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
       ]}
       keyboardShouldPersistTaps="handled"
     >
-      <View style={styles.column}>
+      <View role="main" style={styles.column}>
         <View style={styles.intro}>
           <BrandMark size={52} />
-          <Text accessibilityRole="header" maxFontSizeMultiplier={1.6} style={styles.title}>
+          <Text role="heading" aria-level={1} maxFontSizeMultiplier={1.6} style={styles.title}>
             Mots
           </Text>
           <Text style={styles.lead}>

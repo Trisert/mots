@@ -466,7 +466,11 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
               keyboardDismissMode="interactive"
             />
           </View>
-          <View style={{ paddingBottom: keyboardVisible ? spacing.xs : Math.max(insets.bottom, spacing.sm) }}>
+          <View
+            role="form"
+            aria-label="Scrivi a Mots"
+            style={{ paddingBottom: keyboardVisible ? spacing.xs : Math.max(insets.bottom, spacing.sm) }}
+          >
             {showErrorBanner && state.error !== undefined ? (
               <View style={styles.bannerWrap}>
                 <Banner message={presentError(state.error)} onDismiss={() => client.clearError()} />
