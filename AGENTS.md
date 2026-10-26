@@ -24,7 +24,7 @@ Requirements that are already encoded in `.cursor/environment.json`:
 - Bun 1.4.4, linked at `/usr/local/bin/bun` so login shells find it. The installer also drops a copy in `~/.bun/bin`; do not rely on `~/.bashrc`.
 - `bun install --frozen-lockfile` from the repo root. There is a `bun.lock`. Do not switch the repo to npm or pnpm, and do not refresh the lockfile unless the task is a dependency change.
 
-Live chat needs a provider key in `apps/server/.dev.vars` (gitignored). Copy `apps/server/.dev.vars.example`. `bun run check` and `bun run test` do not need a key.
+Live chat needs `apps/server/.dev.vars` (gitignored). `bun run setup` creates it from `apps/server/.dev.vars.example` with fresh secrets; add a provider key by hand if the default Kilo free tier is not enough. `bun run check` and `bun run test` do not need a key.
 
 | Variable | Required for |
 | --- | --- |
@@ -54,10 +54,12 @@ Run from the repo root unless noted.
 | --- | --- |
 | `bun install --frozen-lockfile` | Install workspace dependencies. |
 | `bun run typecheck` | `tsc` in every workspace. |
-| `bun run test` | Bun tests for protocol, client, agent, the Worker gate, and mobile pure functions. The suite is 217 tests. |
+| `bun run test` | Bun tests for protocol, client, agent, the Worker gate, and mobile pure functions. The suite is 257 tests. |
 | `bun run check:server` | `wrangler deploy --dry-run --env=""` for the top-level Worker `mots`. |
 | `bun run check:server:staging` | `wrangler deploy --dry-run --env staging` for `mots-staging`. Does not publish. |
 | `bun run check` | Typecheck, then the top-level Worker dry-run. This is the gate for a PR. |
+| `bun run setup` | Creates `apps/server/.dev.vars` from the example, fills empty or short `MOTS_SESSION_SECRET` / `MOTS_CREATE_TOKEN` with random values (keeps working ones), and writes the create token to `apps/mobile/.env.local`. Never prints secrets. |
+| `bun run dev` | `setup`, then Wrangler under Node on `0.0.0.0:8787`, then Expo with `EXPO_PUBLIC_MOTS_API_URL` set to the LAN address. `--web` starts the web preview. Ctrl+C stops both. |
 | `bun run dev:server` | `wrangler dev` on port 8787. See the Wrangler gotcha below. |
 | `bun run dev:server:lan` | Same, bound to `0.0.0.0`. |
 | `bun run dev:mobile` | Expo. |

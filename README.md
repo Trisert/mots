@@ -2,7 +2,7 @@
 
 Mots è un compagno AI mobile-first: ricorda le cose importanti, organizza promemoria, cerca nelle conversazioni passate e resta nella tua tasca. L'obiettivo è un'architettura platform-agnostic con un'app mobile come primo client, costruita sopra [Pi Durable](https://github.com/earendil-works/pi/tree/main/packages/durable) e Cloudflare Durable Objects.
 
-> **Stato: MVP in sviluppo attivo.** Monorepo funzionante. Typecheck di tutti i workspace, suite `bun run test` (217 test), dry-run del Worker e bundle Android verificati. Il Worker rifiuta sessioni anonime. Account utente, copertura E2E con LLM reale e deploy pubblico restano i prossimi passi.
+> **Stato: MVP in sviluppo attivo.** Monorepo funzionante. Typecheck di tutti i workspace, suite `bun run test` (257 test), dry-run del Worker e bundle Android verificati. Il Worker rifiuta sessioni anonime. Account utente, copertura E2E con LLM reale e deploy pubblico restano i prossimi passi.
 
 ## Cosa c'è già
 
@@ -70,8 +70,31 @@ Il repository usa Bun come package manager e non richiede npm. Gli build nativi 
 
 ## Avvio rapido
 
+Due comandi, dalla cartella del repository:
+
 ```powershell
 bun install
+bun run dev
+```
+
+`bun run dev` prepara l'ambiente e avvia tutto in un solo terminale:
+
+1. Crea `apps/server/.dev.vars` dall'esempio, se manca, e genera `MOTS_SESSION_SECRET` e `MOTS_CREATE_TOKEN` se sono vuoti o troppo corti. I valori che funzionano già restano com'erano, quindi i codici di ingresso non si invalidano.
+2. Copia lo stesso token in `apps/mobile/.env.local`, che Expo legge da solo. Non serve `set` né `$env:`.
+3. Avvia il server con Node su `0.0.0.0:8787` e aspetta che `/api/health` risponda.
+4. Avvia Expo con il server già impostato sull'indirizzo di rete locale del computer, e stampa gli indirizzi da aprire sul telefono.
+
+Con Expo avviato, inquadra il QR code con Expo Go oppure premi `w` per il browser. `bun run dev --web` apre subito l'anteprima web. Dal telefono, sulla stessa Wi‑Fi, puoi anche aprire nel browser l'indirizzo `http://<IP del computer>:8081` stampato all'avvio: l'app web usa da sola il server sullo stesso host. Ctrl+C ferma sia Expo sia il server.
+
+Se il telefono non si collega, consenti Node.js nel firewall per le reti private. Se la rete isola i dispositivi, come le reti pubbliche o eduroam, usa un emulatore oppure un tunnel HTTPS.
+
+`bun run setup` esegue solo la preparazione, senza avviare niente. I file `.dev.vars` e `.env.local` sono ignorati da git e non vanno mai committati.
+
+### Configurazione manuale
+
+Se preferisci preparare l'ambiente a mano:
+
+```powershell
 Copy-Item apps/server/.dev.vars.example apps/server/.dev.vars
 ```
 
@@ -101,6 +124,12 @@ AI_GATEWAY_API_KEY=...
 ```
 
 I dettagli dei provider sono in [Provider LLM](#provider-llm).
+
+Scrivi lo stesso valore di `MOTS_CREATE_TOKEN` in `apps/mobile/.env.local`, altrimenti il server rifiuta la creazione dello spazio con `401`:
+
+```dotenv
+EXPO_PUBLIC_MOTS_CREATE_TOKEN=...
+```
 
 Avvia server e app in due terminali:
 
@@ -226,12 +255,14 @@ I tool dell'agente (`remember`, `forget`, `schedule`, `search_history`) richiedo
 | Comando | Cosa fa |
 | --- | --- |
 | `bun install` | Installa tutti i workspace. |
+| `bun run setup` | Crea `.dev.vars` con i segreti e copia il token in `apps/mobile/.env.local`. |
+| `bun run dev` | `setup`, poi server su Node e Expo insieme, con l'indirizzo LAN già impostato. `--web` apre il browser. |
 | `bun run dev:server` | Avvia Wrangler in locale sulla porta 8787. |
 | `bun run dev:server:lan` | Avvia Wrangler su `0.0.0.0:8787` per il telefono. |
 | `bun run dev:mobile` | Avvia Expo. |
 | `bun run dev:web` | Avvia l'anteprima web di Expo. |
 | `bun run typecheck` | Typecheck di tutti i package. |
-| `bun run test` | 217 test: protocollo, client, agent, gate del Worker e funzioni pure del mobile. |
+| `bun run test` | 257 test: protocollo, client, agent, gate del Worker e funzioni pure del mobile. |
 | `bun run check` | Typecheck + dry-run del Worker. |
 | `bun run check:server` | Solo `wrangler deploy --dry-run --env=""`. Resta sul Worker `mots`. |
 | `bun run check:server:staging` | Dry-run di `wrangler deploy --env staging`. Non pubblica. |
@@ -267,7 +298,7 @@ La persona dell'agente, l'orologio e la memoria vengono iniettati come sezioni d
 - [x] Agente con memoria, promemoria e ricerca. Provider predefinito: Kilo. Alternative da ambiente: OpenRouter, Vercel AI Gateway, NVIDIA.
 - [x] App mobile con onboarding, chat, sessioni e fork.
 - [x] Typecheck, dry-run Worker, bundle Android.
-- [x] Suite automatica (`bun run test`, 217 test): protocollo, client, agent, gate del Worker e funzioni pure del mobile.
+- [x] Suite automatica (`bun run test`, 257 test): protocollo, client, agent, gate del Worker e funzioni pure del mobile.
 - [x] Verifica end-to-end locale: health, creazione sessione, WebSocket e nuova conversazione.
 - [x] Gate di sessione: codice firmato, token di creazione, rate limit per isolate, CORS da ambiente, allowlist di `conversation.setModel`, tetto sul numero di routine e sulla cadenza. Non sono account utente.
 - [ ] Notifiche push per i promemoria.
