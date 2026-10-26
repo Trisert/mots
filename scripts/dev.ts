@@ -8,11 +8,13 @@
  *
  * Usage: bun run dev        (Expo: QR code for Expo Go, press w for the browser)
  *        bun run dev --web  (opens the web preview directly)
+ *        EXPO_PUBLIC_MOTS_API_URL=https://<your-worker> bun run dev
+ *                           (a deployed server: no local Worker starts, the phone talks to it)
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { networkInterfaces } from "node:os";
 import { join } from "node:path";
-import { lanAddress } from "./dev-env.ts";
+import { devServerPlan, lanAddress } from "./dev-env.ts";
 import { setup } from "./setup.ts";
 
 const root = join(import.meta.dir, "..");
@@ -44,9 +46,14 @@ if (node.error !== undefined || !(major >= 22)) {
   fail("Serve Node.js 22 o successivo nel PATH (https://nodejs.org). Il server non parte con Bun.");
 }
 
+const lan = lanAddress(networkInterfaces());
+const plan = devServerPlan({ remoteUrl: process.env.EXPO_PUBLIC_MOTS_API_URL, lan, port: PORT });
+
 let server: ChildProcess | undefined;
 let stopping = false;
-if ((await health()) === 200) {
+if (!plan.localWorker) {
+  console.log(`Uso il server ${plan.apiUrl}: nessun Worker locale.`);
+} else if ((await health()) === 200) {
   console.log(`Uso il server già avviato su http://localhost:${PORT}.`);
 } else {
   const wrangler = join(root, "apps/server/node_modules/wrangler/bin/wrangler.js");
@@ -78,21 +85,19 @@ if ((await health()) === 200) {
   }
 }
 
-const lan = lanAddress(networkInterfaces());
 const env: NodeJS.ProcessEnv = { ...process.env };
-if (lan !== undefined) {
-  // Both the QR code and the app's default server point at the same LAN address.
-  env.EXPO_PUBLIC_MOTS_API_URL = `http://${lan}:${PORT}`;
-  env.REACT_NATIVE_PACKAGER_HOSTNAME = lan;
-}
+// The app's default server: the LAN address, or the deployed server the caller named.
+if (plan.apiUrl !== undefined) env.EXPO_PUBLIC_MOTS_API_URL = plan.apiUrl;
+// The QR code must point at this computer's LAN address, not at a name the phone cannot resolve.
+if (lan !== undefined) env.REACT_NATIVE_PACKAGER_HOSTNAME = lan;
 
 console.log("");
-console.log(`Server pronto: http://localhost:${PORT}`);
+console.log(plan.localWorker ? `Server pronto: http://localhost:${PORT}` : `Server remoto: ${plan.apiUrl}`);
 if (lan !== undefined) {
-  console.log(`Dal telefono (stessa Wi-Fi): app su http://${lan}:8081, server su http://${lan}:${PORT}`);
+  console.log(`Dal telefono (stessa Wi-Fi): app su http://${lan}:8081, server su ${plan.apiUrl}`);
   console.log("Se il telefono non si collega, consenti Node.js nel firewall per le reti private.");
 } else {
-  console.log("Nessun indirizzo di rete locale trovato: il telefono non potrà raggiungere il server.");
+  console.log("Nessun indirizzo di rete locale trovato: il telefono non potrà collegarsi a Expo sulla stessa Wi-Fi.");
 }
 console.log("");
 

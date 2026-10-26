@@ -1,8 +1,9 @@
-# iOS preview
+# Preview build
 
-`eas.json` defines one EAS Build profile, `preview`. It produces an internal iOS build (an ad hoc `.ipa` for registered devices) and an Android `.apk`. Run EAS from this directory, after the credentials below exist:
+`eas.json` defines one EAS Build profile, `preview`. It produces an internal iOS build (an ad hoc `.ipa` for registered devices) and an Android `.apk`. Run EAS from this directory, after the credentials below exist. The Android build needs only an Expo account:
 
 ```bash
+npx eas-cli@latest build --platform android --profile preview
 npx eas-cli@latest build --platform ios --profile preview
 ```
 
@@ -49,4 +50,11 @@ Prefer EAS-hosted credentials. `credentials.json` is only for a local copy. If a
 
 A phone cannot reach `http://localhost:8787`. Set `EXPO_PUBLIC_MOTS_API_URL` on the preview build to the Worker URL. When that Worker requires `MOTS_CREATE_TOKEN`, set `EXPO_PUBLIC_MOTS_CREATE_TOKEN` as well. Expo inlines both into the binary. The create token is the app-wide gate, and anyone with the app can read it.
 
-Use EAS environment variables for the preview environment. Leave the values out of `eas.json` and out of git.
+Use EAS environment variables for the preview environment. Leave the values out of `eas.json` and out of git. The `preview` profile sets `"environment": "preview"`, so EAS loads only the variables created for that environment. Create them once from this directory:
+
+```bash
+npx eas-cli@latest env:create --environment preview --name EXPO_PUBLIC_MOTS_API_URL --value https://mots.<tuo-sottodominio>.workers.dev --visibility plaintext
+npx eas-cli@latest env:create --environment preview --name EXPO_PUBLIC_MOTS_CREATE_TOKEN --value <the MOTS_CREATE_TOKEN set on the Worker> --visibility plaintext
+```
+
+`EXPO_PUBLIC_*` values are compiled into the JavaScript, so they are stored as plain text. Use the same token the Worker checks. A different one makes the app fail with `401` when it creates a space.
