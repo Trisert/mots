@@ -21,10 +21,11 @@ type Props = {
   readonly hint?: string;
 };
 
-/** One line of text plus its vertical padding. */
-const INPUT_MIN_HEIGHT = 40;
 const ACTION_SIZE = 34;
+/** One line of text, as tall as the buttons beside it. */
+const INPUT_MIN_HEIGHT = ACTION_SIZE;
 const TARGET_INSET = (hit - ACTION_SIZE) / 2;
+const FIELD_PADDING = 5;
 
 const QUICK_ACTIONS = [
   {
@@ -82,6 +83,17 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
       ) : null}
 
       <View style={[styles.field, focused && styles.fieldFocused]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Azioni rapide"
+          accessibilityState={{ expanded: toolsOpen }}
+          onPress={() => setToolsOpen((open) => !open)}
+          style={({ pressed }) => [styles.target, pressed && styles.pressed]}
+        >
+          <View style={[styles.circle, styles.circleBorder, toolsOpen && styles.circleOpen]}>
+            <PlusIcon size={18} color={colors.textPrimary} />
+          </View>
+        </Pressable>
         <TextInput
           accessibilityLabel="Messaggio"
           value={value}
@@ -111,44 +123,31 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
             if (canSend) onSend();
           }}
         />
-        <View style={styles.actions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Azioni rapide"
-            accessibilityState={{ expanded: toolsOpen }}
-            onPress={() => setToolsOpen((open) => !open)}
-            style={({ pressed }) => [styles.target, pressed && styles.pressed]}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Invia messaggio"
+          accessibilityState={{ disabled: !canSend, busy: sending }}
+          onPress={onSend}
+          disabled={!canSend}
+          style={({ pressed }) => [styles.target, pressed && canSend && styles.pressed]}
+        >
+          <View
+            style={[
+              styles.circle,
+              { backgroundColor: canSend ? colors.invertBg : colors.surfaceSoft },
+            ]}
           >
-            <View style={[styles.circle, styles.circleBorder, toolsOpen && styles.circleOpen]}>
-              <PlusIcon size={18} color={colors.textPrimary} />
-            </View>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Invia messaggio"
-            accessibilityState={{ disabled: !canSend, busy: sending }}
-            onPress={onSend}
-            disabled={!canSend}
-            style={({ pressed }) => [styles.target, pressed && canSend && styles.pressed]}
-          >
-            <View
-              style={[
-                styles.circle,
-                { backgroundColor: canSend ? colors.invertBg : colors.surfaceSoft },
-              ]}
-            >
-              {sending ? (
-                <ActivityIndicator color={colors.invertFg} />
-              ) : (
-                <ArrowUpIcon
-                  size={17}
-                  color={canSend ? colors.invertFg : colors.textFaint}
-                  strokeWidth={2.2}
-                />
-              )}
-            </View>
-          </Pressable>
-        </View>
+            {sending ? (
+              <ActivityIndicator color={colors.invertFg} />
+            ) : (
+              <ArrowUpIcon
+                size={17}
+                color={canSend ? colors.invertFg : colors.textFaint}
+                strokeWidth={2.2}
+              />
+            )}
+          </View>
+        </Pressable>
       </View>
     </View>
   );
@@ -189,19 +188,23 @@ function createStyles(colors: ThemeColors) {
       ...typeScale.label,
       color: colors.textPrimary,
     },
+    // One row: actions on the sides, text in between. The buttons stay at the bottom while the
+    // text grows to more lines.
     field: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      gap: spacing.sm,
       borderRadius: radius.composer,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.fieldBorder,
       backgroundColor: colors.field,
-      paddingTop: spacing.xs,
-      paddingHorizontal: spacing.sm,
-      paddingBottom: spacing.sm,
+      padding: FIELD_PADDING,
     },
     fieldFocused: {
       borderColor: colors.textSecondary,
     },
     input: {
+      flex: 1,
       minHeight: INPUT_MIN_HEIGHT,
       maxHeight: 160,
       paddingHorizontal: spacing.sm,
@@ -210,11 +213,6 @@ function createStyles(colors: ThemeColors) {
       fontSize: 16,
       lineHeight: 22,
       color: colors.textPrimary,
-    },
-    actions: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
     },
     // 44px touch target on every platform (hitSlop is ignored on web). The
     // negative margin pulls it back so the visible 34px circle stays where it was.
