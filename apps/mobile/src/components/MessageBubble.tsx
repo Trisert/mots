@@ -6,11 +6,17 @@ import { useTheme } from "../context/ThemeContext";
 import { fonts, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TOOL_LABELS, toolSummary } from "../tools";
 import {
+  AlertIcon,
+  BookmarkIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  ClockIcon,
   CopyIcon,
   ForkIcon,
+  SearchIcon,
+  ToolIcon,
+  TrashIcon,
 } from "./Icon";
 import { MarkdownText } from "./MarkdownText";
 
@@ -29,10 +35,22 @@ function extractThinkingAndText(raw: string): { thinking?: string; text: string 
   return { text: clean };
 }
 
-/** Build Log markers: [+] adds, [~] reads or changes, [!] broke. Typed, never drawn. */
-function toolMarker(name: string, isError: boolean): string {
-  if (isError) return "[!]";
-  return name === "remember" || name === "schedule" ? "[+]" : "[~]";
+/** The icon of a tool row: what the tool did, or an alert when it failed. */
+function ToolMarker({ name, isError, color }: { name: string; isError: boolean; color: string }) {
+  const props = { size: 15, color };
+  if (isError) return <AlertIcon {...props} strokeWidth={1.8} />;
+  switch (name) {
+    case "remember":
+      return <BookmarkIcon {...props} />;
+    case "forget":
+      return <TrashIcon {...props} />;
+    case "schedule":
+      return <ClockIcon {...props} />;
+    case "search_history":
+      return <SearchIcon {...props} strokeWidth={1.8} />;
+    default:
+      return <ToolIcon {...props} />;
+  }
 }
 
 type Props = {
@@ -72,13 +90,18 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
 
     return (
       <View style={styles.toolRow}>
-        <Text
+        <View
+          aria-hidden
           accessibilityElementsHidden
-          importantForAccessibility="no"
-          style={[styles.toolMark, isError && styles.toolMarkError]}
+          importantForAccessibility="no-hide-descendants"
+          style={styles.toolMark}
         >
-          {toolMarker(name, isError)}
-        </Text>
+          <ToolMarker
+            name={name}
+            isError={isError}
+            color={isError ? colors.textPrimary : colors.textSecondary}
+          />
+        </View>
         <View style={styles.toolTitleBlock}>
           <Text style={styles.toolName} numberOfLines={2}>
             {TOOL_LABELS[name] ?? name}
@@ -371,17 +394,8 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       paddingHorizontal: 2,
     },
     toolMark: {
-      fontFamily: fonts.mono,
-      fontSize: 12,
-      lineHeight: 20,
-      color: colors.textSecondary,
-      paddingHorizontal: 2,
-    },
-    toolMarkError: {
-      backgroundColor: colors.invertBg,
-      color: colors.invertFg,
-      borderRadius: radius.xs,
-      overflow: "hidden",
+      height: 20,
+      justifyContent: "center",
     },
     toolTitleBlock: {
       flex: 1,
