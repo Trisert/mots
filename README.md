@@ -287,6 +287,7 @@ Il protocollo applicativo vive in `packages/protocol`: comandi client (`conversa
 | `forget` | Rimuove le memorie che corrispondono a una frase. |
 | `schedule` | Programma un'istruzione nel futuro, con ricorrenza e timezone. |
 | `search_history` | Cerca nelle conversazioni passate tramite subagent. |
+| `fetch_page` | Legge il testo di una pagina web pubblica (solo http/https, niente indirizzi privati, massimo 512 KB letti). |
 
 La persona dell'agente, l'orologio e la memoria vengono iniettati come sezioni del contesto. I messaggi utente possono includere `[Nome]` come attribuzione del parlante.
 

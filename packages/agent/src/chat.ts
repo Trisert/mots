@@ -14,6 +14,7 @@ import {
   type MotsProviderId,
 } from "./provider.ts";
 import { useExpoAccessToken } from "./push-token.ts";
+import { fetchPageTool } from "./web.ts";
 import { DeliverScheduledInstruction } from "./schedule.ts";
 import { scheduleLimitsFromEnv } from "./schedule-limits.ts";
 import { conversationSearchExtension, searchHistoryTool } from "./search.ts";
@@ -41,7 +42,7 @@ export async function createMotsHarnessOptions(
   const motsExtension = defineExtension({
     name: "mots",
     tasks: [DeliverScheduledInstruction],
-    tools: [rememberTool, forgetTool, scheduleTool, searchHistoryTool],
+    tools: [rememberTool, forgetTool, scheduleTool, searchHistoryTool, fetchPageTool],
     sections: [
       section(
         "preamble",
@@ -51,7 +52,7 @@ export async function createMotsHarnessOptions(
           "Be concise by default and go deeper when the user asks. " +
           "You have durable memory, autonomous routines (scheduled cronjobs where you execute tasks and report back), and search across past conversations: " +
           "use remember for lasting facts and preferences, forget when asked to remove one, " +
-          "schedule for autonomous routines, scheduled cronjobs, and tasks that should happen later, and search_history for earlier discussions. " +
+          "schedule for autonomous routines, scheduled cronjobs, and tasks that should happen later, search_history for earlier discussions, and fetch_page to read a public web link the user shares. " +
           "When setting up a routine or scheduled task, specify clear instructions for what you must execute. " +
           "When a scheduled routine fires, carry it out autonomously using your reasoning and tools, then report the results. " +
           "Never claim to have remembered, forgotten, or scheduled something unless the matching tool ran. " +
@@ -71,7 +72,7 @@ export async function createMotsHarnessOptions(
   const defaultAgent = {
     model: { provider, modelId },
     thinkingLevel: "off" as const,
-    tools: [rememberTool, forgetTool, scheduleTool, searchHistoryTool],
+    tools: [rememberTool, forgetTool, scheduleTool, searchHistoryTool, fetchPageTool],
   };
 
   return {
