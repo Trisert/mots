@@ -67,6 +67,9 @@ function MainApp() {
   useEffect(() => {
     let alive = true;
     if (Platform.OS === "web" && typeof document !== "undefined") {
+      // The UI copy is Italian; the served shell declares lang="en" (WCAG 3.1.1).
+      document.documentElement.lang = "it";
+
       const fontLinkId = "mots-google-fonts";
       if (!document.getElementById(fontLinkId)) {
         const link = document.createElement("link");

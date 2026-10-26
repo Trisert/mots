@@ -61,8 +61,19 @@ export function TextField({
         ]}
       />
       {error !== undefined ? (
-        <Text accessibilityRole="alert" style={[styles.hint, { color: colors.textPrimary }]}>
-          <Text style={[styles.mark, { backgroundColor: colors.invertBg, color: colors.invertFg }]}>[!]</Text>
+        <Text
+          accessibilityRole="alert"
+          accessibilityLabel={`Errore: ${error}`}
+          style={[styles.hint, { color: colors.textPrimary }]}
+        >
+          <Text
+            aria-hidden
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            style={[styles.mark, { backgroundColor: colors.invertBg, color: colors.invertFg }]}
+          >
+            [!]
+          </Text>
           {` ${error}`}
         </Text>
       ) : hint !== undefined ? (

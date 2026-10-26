@@ -28,6 +28,7 @@ export function Banner({ message, tone = "danger", actionLabel, onAction, onDism
       <View style={styles.body}>
         {tone === "danger" ? (
           <Text
+            aria-hidden
             accessibilityElementsHidden
             importantForAccessibility="no"
             style={[styles.mark, { backgroundColor: colors.invertBg, color: colors.invertFg }]}
@@ -35,7 +36,12 @@ export function Banner({ message, tone = "danger", actionLabel, onAction, onDism
             [!]
           </Text>
         ) : null}
-        <Text style={[styles.message, { color: foreground }]}>{message}</Text>
+        <Text
+          accessibilityLabel={tone === "danger" ? `Errore: ${message}` : undefined}
+          style={[styles.message, { color: foreground }]}
+        >
+          {message}
+        </Text>
       </View>
       <View style={styles.actions}>
         {actionLabel !== undefined && onAction !== undefined ? (
