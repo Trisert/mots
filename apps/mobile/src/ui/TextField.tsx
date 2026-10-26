@@ -56,7 +56,7 @@ export function TextField({
           {
             color: colors.textPrimary,
             backgroundColor: colors.field,
-            borderColor: error !== undefined ? colors.rule : focused ? colors.borderMedium : colors.fieldBorder,
+            borderColor: error !== undefined ? colors.rule : focused ? colors.textSecondary : colors.fieldBorder,
             borderWidth: error !== undefined ? 1.5 : StyleSheet.hairlineWidth,
           },
         ]}

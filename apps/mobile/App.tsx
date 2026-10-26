@@ -95,6 +95,10 @@ function MainApp() {
             outline: 2px solid var(--mots-focus, currentColor);
             outline-offset: 2px;
           }
+          /* Text fields match :focus-visible on every click; their own border shows focus instead. */
+          input:focus, input:focus-visible, textarea:focus, textarea:focus-visible {
+            outline: none;
+          }
         `;
         document.head.appendChild(style);
       }

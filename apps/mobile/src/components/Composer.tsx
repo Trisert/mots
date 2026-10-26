@@ -199,7 +199,7 @@ function createStyles(colors: ThemeColors) {
       paddingBottom: spacing.sm,
     },
     fieldFocused: {
-      borderColor: colors.borderMedium,
+      borderColor: colors.textSecondary,
     },
     input: {
       minHeight: INPUT_MIN_HEIGHT,
