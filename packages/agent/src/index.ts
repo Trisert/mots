@@ -48,6 +48,7 @@ export {
 } from "./memory.ts";
 export { conversationSearchExtension, searchHistoryTool } from "./search.ts";
 export { createScheduleTool, SCHEDULE_TOOL_NAME } from "./tools.ts";
+export { fetchPageTool, FETCH_PAGE_TOOL_NAME, fetchPageText, parseWebUrl } from "./web.ts";
 export type {
   ScheduleCadence,
   ScheduledInstruction,

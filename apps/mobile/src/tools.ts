@@ -6,6 +6,7 @@ export const TOOL_LABELS: Record<string, string> = {
   forget: "cancellazione",
   schedule: "routine autonoma",
   search_history: "ricerca",
+  fetch_page: "pagina",
 };
 
 type Details = Readonly<Record<string, unknown>>;
@@ -49,6 +50,8 @@ export function toolSummary(name: string, details: unknown): string | undefined 
     }
     case "search_history":
       return "Ricerca completata";
+    case "fetch_page":
+      return typeof info.url === "string" ? "Pagina letta" : undefined;
     default:
       return undefined;
   }
