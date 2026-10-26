@@ -43,8 +43,8 @@ MOTS_CREATE_TOKEN=
 # nvidia (https://build.nvidia.com)
 # NVIDIA_API_KEY=
 
-# Optional web search for the web_search tool (https://tavily.com).
-# Without it the agent is not offered web_search; fetch_page still works.
+# Optional. Authenticates the web_search tool (https://tavily.com) for higher limits.
+# Without it web_search uses Tavily's keyless mode, which has lower rate limits.
 # TAVILY_API_KEY=
 
 # Optional Expo access token for reminder pushes (https://expo.dev).

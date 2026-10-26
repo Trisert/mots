@@ -40,7 +40,7 @@ export async function createMotsHarnessOptions(
 ): Promise<HarnessOptions> {
   useExpoAccessToken(options.env?.EXPO_ACCESS_TOKEN);
   const scheduleTool = createScheduleTool(ensureWakeupAt, scheduleLimitsFromEnv(options.env));
-  // Without TAVILY_API_KEY the tool is absent, and the preamble does not mention it.
+  // Without TAVILY_API_KEY the search uses Tavily's keyless mode, which has lower limits.
   const webSearch = createWebSearchTool(options.env?.[WEB_SEARCH_API_KEY_ENV]);
   const agentTools = [
     rememberTool,
@@ -48,7 +48,7 @@ export async function createMotsHarnessOptions(
     scheduleTool,
     searchHistoryTool,
     fetchPageTool,
-    ...(webSearch === undefined ? [] : [webSearch]),
+    webSearch,
   ];
   const motsExtension = defineExtension({
     name: "mots",
@@ -64,7 +64,7 @@ export async function createMotsHarnessOptions(
           "You have durable memory, autonomous routines (scheduled cronjobs where you execute tasks and report back), and search across past conversations: " +
           "use remember for lasting facts and preferences, forget when asked to remove one, " +
           "schedule for autonomous routines, scheduled cronjobs, and tasks that should happen later, search_history for earlier discussions, " +
-          (webSearch === undefined ? "" : "web_search for current public information, ") +
+          "web_search for current public information, " +
           "and fetch_page to read a public web link the user shares. " +
           "When setting up a routine or scheduled task, specify clear instructions for what you must execute. " +
           "When a scheduled routine fires, carry it out autonomously using your reasoning and tools, then report the results. " +

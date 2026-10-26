@@ -32,26 +32,22 @@ function recording(response: Response): { fetch: FetchLike; calls: { url: string
 }
 
 describe("createWebSearchTool", () => {
-  test("is not offered without a key", () => {
-    expect(createWebSearchTool(undefined)).toBeUndefined();
-    expect(createWebSearchTool("")).toBeUndefined();
-    expect(createWebSearchTool("   ")).toBeUndefined();
-  });
-
-  test("is read-only and safe to replay when a key is set", () => {
-    const tool = createWebSearchTool(KEY);
-    expect(tool?.name).toBe(WEB_SEARCH_TOOL_NAME);
-    expect(tool?.replay).toBe("safe");
+  test("is offered with or without a key, and is read-only", () => {
+    for (const key of [KEY, undefined, "", "   "]) {
+      const tool = createWebSearchTool(key);
+      expect(tool.name).toBe(WEB_SEARCH_TOOL_NAME);
+      expect(tool.replay).toBe("safe");
+    }
   });
 
   test("rejects an empty or oversized query before any request is made", async () => {
     const fake = recording(json({ results: [] }));
     const tool = createWebSearchTool(KEY, fake.fetch);
-    await expect(tool?.execute({ query: "   " }, {} as never, context)).rejects.toThrow(
+    await expect(tool.execute({ query: "   " }, {} as never, context)).rejects.toThrow(
       `between 1 and ${MAX_SEARCH_QUERY_CHARACTERS}`,
     );
     await expect(
-      tool?.execute({ query: "q".repeat(MAX_SEARCH_QUERY_CHARACTERS + 1) }, {} as never, context),
+      tool.execute({ query: "q".repeat(MAX_SEARCH_QUERY_CHARACTERS + 1) }, {} as never, context),
     ).rejects.toThrow(`between 1 and ${MAX_SEARCH_QUERY_CHARACTERS}`);
     expect(fake.calls).toEqual([]);
   });
@@ -69,7 +65,7 @@ describe("createWebSearchTool", () => {
       }),
     );
     const tool = createWebSearchTool(KEY, fake.fetch);
-    const result = await tool?.execute({ query: "  durable objects " }, {} as never, context);
+    const result = await tool.execute({ query: "  durable objects " }, {} as never, context);
     const text = JSON.stringify(result);
     expect(text).toContain("1. Durable Objects");
     expect(text).toContain("https://developers.cloudflare.com/durable-objects/");
@@ -80,7 +76,7 @@ describe("createWebSearchTool", () => {
 
   test("says so when nothing matches", async () => {
     const tool = createWebSearchTool(KEY, recording(json({ results: [] })).fetch);
-    const result = await tool?.execute({ query: "nulla" }, {} as never, context);
+    const result = await tool.execute({ query: "nulla" }, {} as never, context);
     expect(JSON.stringify(result)).toContain('No web results for \\"nulla\\".');
   });
 });
@@ -99,6 +95,14 @@ describe("searchWeb", () => {
       search_depth: "basic",
       include_answer: false,
     });
+  });
+
+  test("uses Tavily's keyless mode without a key", async () => {
+    const fake = recording(json({ results: [] }));
+    await searchWeb(undefined, "meteo", fake.fetch);
+    const headers = fake.calls[0]?.init?.headers as Record<string, string>;
+    expect(headers["x-tavily-access-mode"]).toBe("keyless");
+    expect(headers.authorization).toBeUndefined();
   });
 
   test("keeps only addresses that fetch_page would read, and clips long snippets", async () => {

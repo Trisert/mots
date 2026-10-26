@@ -63,11 +63,12 @@ function parseQuery(input: string): string {
 }
 
 /**
- * Asks Tavily for a short list of results. The key travels only in the Authorization header and is never
- * part of an error message, so a failed search cannot leak it into the transcript.
+ * Asks Tavily for a short list of results. With a key the request is authenticated; without one it uses Tavily's
+ * keyless mode, which has lower rate limits. The key travels only in the Authorization header and is never part of
+ * an error message, so a failed search cannot leak it into the transcript.
  */
 export async function searchWeb(
-  apiKey: string,
+  apiKey: string | undefined,
   query: string,
   fetchImpl: FetchLike = fetch,
   signal: AbortSignal = AbortSignal.timeout(SEARCH_TIMEOUT_MS),
@@ -78,7 +79,9 @@ export async function searchWeb(
     headers: {
       accept: "application/json",
       "content-type": "application/json",
-      authorization: `Bearer ${apiKey}`,
+      ...(apiKey === undefined
+        ? { "x-tavily-access-mode": "keyless" }
+        : { authorization: `Bearer ${apiKey}` }),
     },
     body: JSON.stringify({
       query,
@@ -111,15 +114,14 @@ export function webSearchOutput(query: string, results: readonly WebSearchResult
 }
 
 /**
- * The web search tool, or undefined when no key is configured. The agent is then not offered the tool at all,
- * so a deployment without the key behaves as it did before this tool existed.
+ * The web search tool. A key in TAVILY_API_KEY uses the authenticated quota; without one, Tavily's keyless mode
+ * answers, so the agent can search out of the box.
  */
 export function createWebSearchTool(
   apiKey: string | undefined,
   fetchImpl: FetchLike = fetch,
-): ToolRegistration | undefined {
-  const key = apiKey?.trim() ?? "";
-  if (key.length === 0) return undefined;
+): ToolRegistration {
+  const key = apiKey?.trim() || undefined;
   return {
     name: WEB_SEARCH_TOOL_NAME,
     description:
