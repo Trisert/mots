@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   formatScheduledInstruction,
   InvalidClientCommand,
+  isTimezone,
   MAX_PUSH_TOKEN_CHARACTERS,
   parseClientCommand,
   parseScheduledInstruction,
@@ -345,5 +346,28 @@ describe("server events", () => {
       ok: false,
       error: { code: "command_failed", message: "Push token was not stored" },
     });
+  });
+});
+
+describe("session timezone", () => {
+  test("accepts an IANA timezone", () => {
+    expect(
+      parseClientCommand(
+        JSON.stringify({ type: "session.setTimezone", requestId: "req-tz-1", timezone: "Europe/Rome" }),
+      ),
+    ).toEqual({ type: "session.setTimezone", requestId: "req-tz-1", timezone: "Europe/Rome" });
+    expect(isTimezone("UTC")).toBe(true);
+    expect(isTimezone("America/Argentina/Buenos_Aires")).toBe(true);
+    expect(isTimezone("Etc/GMT+1")).toBe(true);
+  });
+
+  test("rejects values that are not timezones", () => {
+    for (const timezone of ["", "Mars/Olympus", "Europe/Rome\n", "../etc", "+01:00", 42, "A".repeat(101)]) {
+      expect(() =>
+        parseClientCommand(
+          JSON.stringify({ type: "session.setTimezone", requestId: "req-tz-2", timezone }),
+        ),
+      ).toThrow(InvalidClientCommand);
+    }
   });
 });

@@ -34,6 +34,8 @@ export interface MotsClientOptions {
   readonly sessionId: string;
   readonly username: string;
   readonly initialConversationId?: number;
+  /** IANA timezone of the device. Sent after every snapshot so reminders use local time. */
+  readonly timezone?: string;
   readonly socketFactory?: SocketFactory;
 }
 
@@ -278,6 +280,16 @@ export class MotsClient {
             conversationId: chosen,
           });
         }
+      }
+      if (this.#options.timezone !== undefined) {
+        this.#send(
+          {
+            type: "session.setTimezone",
+            requestId: newRequestId(),
+            timezone: this.#options.timezone,
+          },
+          false,
+        );
       }
       this.#outbox.replay((command) => this.#send(command));
     }

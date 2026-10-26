@@ -19,6 +19,7 @@ export const MAX_PROMPT_CHARACTERS = 100_000;
 export const MAX_REQUEST_ID_CHARACTERS = 256;
 // Expo push tokens (`ExponentPushToken[...]`, `ExpoPushToken[...]`, or a legacy UUID).
 export const MAX_PUSH_TOKEN_CHARACTERS = 256;
+export const MAX_TIMEZONE_CHARACTERS = 100;
 // JSON may escape each prompt code unit as six characters.
 export const MAX_CLIENT_FRAME_CHARACTERS =
   MAX_PROMPT_CHARACTERS * 6 + MAX_REQUEST_ID_CHARACTERS + 1024;
@@ -156,6 +157,12 @@ export type ClientCommand =
   | {
       readonly type: "pushToken.clear";
       readonly requestId: string;
+    }
+  | {
+      readonly type: "session.setTimezone";
+      readonly requestId: string;
+      /** IANA timezone of the device, e.g. `Europe/Rome`. */
+      readonly timezone: string;
     };
 export type ClientCommandType = Exclude<ClientCommand["type"], "presence.typing">;
 
@@ -259,6 +266,27 @@ const requirePushToken = (value: unknown): string => {
   return value;
 };
 
+const TIMEZONE_PATTERN = /^[A-Za-z][A-Za-z0-9_+\-]*(?:\/[A-Za-z0-9_+\-]+)*$/;
+
+/** True when `value` names an IANA timezone this runtime's `Intl` accepts. */
+export const isTimezone = (value: string): boolean => {
+  if (value.length === 0 || value.length > MAX_TIMEZONE_CHARACTERS) return false;
+  if (!TIMEZONE_PATTERN.test(value)) return false;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const requireTimezone = (value: unknown): string => {
+  if (typeof value !== "string" || !isTimezone(value)) {
+    throw new InvalidClientCommand("timezone must be an IANA timezone such as Europe/Rome");
+  }
+  return value;
+};
+
 const commandTypes = new Set<ClientCommandType>([
   "conversation.open",
   "conversation.create",
@@ -267,6 +295,7 @@ const commandTypes = new Set<ClientCommandType>([
   "conversation.setModel",
   "pushToken.register",
   "pushToken.clear",
+  "session.setTimezone",
 ]);
 
 const requireCommandType = (value: unknown): ClientCommandType => {
@@ -451,6 +480,8 @@ export function parseClientCommand(message: string): ClientCommand {
       return { type: value.type, requestId, token: requirePushToken(value.token) };
     case "pushToken.clear":
       return { type: value.type, requestId };
+    case "session.setTimezone":
+      return { type: value.type, requestId, timezone: requireTimezone(value.timezone) };
     default:
       throw new InvalidClientCommand(`Unknown command type: ${value.type}`);
   }

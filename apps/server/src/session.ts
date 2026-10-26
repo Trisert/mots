@@ -19,6 +19,7 @@ import {
 import { openDurableObjectSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/cloudflare";
 import {
   applyPushTokenCommand,
+  applyTimezone,
   createMotsHarnessOptions,
   createStubModels,
   isAllowedAgentModel,
@@ -27,6 +28,7 @@ import {
   PushTokenDoc,
   resolveMotsProvider,
   scheduledDeadline,
+  TimezoneDoc,
 } from "@mots/agent";
 import {
   COMMAND_ERROR,
@@ -524,6 +526,18 @@ export class Session extends DurableObject<Env> {
       case "pushToken.clear": {
         await this.#harness.commit(async (tx) => {
           applyPushTokenCommand(await tx.doc(PushTokenDoc), command);
+        }, BACKGROUND_CONTEXT);
+        this.#send(socket, {
+          type: "command.result",
+          command: command.type,
+          requestId: command.requestId,
+          ok: true,
+        });
+        return;
+      }
+      case "session.setTimezone": {
+        await this.#harness.commit(async (tx) => {
+          applyTimezone(await tx.doc(TimezoneDoc), command.timezone);
         }, BACKGROUND_CONTEXT);
         this.#send(socket, {
           type: "command.result",

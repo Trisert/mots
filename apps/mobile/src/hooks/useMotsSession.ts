@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { MotsClient } from "@mots/client";
 
+/** The device's IANA timezone, or undefined when the runtime does not report one. */
+const deviceTimezone = (): string | undefined => {
+  try {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return typeof timezone === "string" && timezone.length > 0 ? timezone : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export type MotsSessionOptions = {
   readonly baseUrl: string;
   readonly sessionId: string;
@@ -20,6 +30,7 @@ export function useMotsSession(options: MotsSessionOptions) {
         baseUrl: options.baseUrl,
         sessionId: options.sessionId,
         username: options.username,
+        timezone: deviceTimezone(),
       }),
     [epoch, options.baseUrl, options.enabled, options.sessionId, options.username],
   );
