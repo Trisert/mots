@@ -24,7 +24,7 @@ Requirements that are already encoded in `.cursor/environment.json`:
 - Bun 1.4.4, linked at `/usr/local/bin/bun` so login shells find it. The installer also drops a copy in `~/.bun/bin`; do not rely on `~/.bashrc`.
 - `bun install --frozen-lockfile` from the repo root. There is a `bun.lock`. Do not switch the repo to npm or pnpm, and do not refresh the lockfile unless the task is a dependency change.
 
-Live chat needs a provider key in `apps/server/.dev.vars` (gitignored). Copy `apps/server/.dev.vars.example`. `bun run check` and `bun run test` do not need a key.
+Live chat needs `apps/server/.dev.vars` (gitignored). `bun run setup` creates it from `apps/server/.dev.vars.example` with fresh secrets; add a provider key by hand if the default Kilo free tier is not enough. `bun run check` and `bun run test` do not need a key.
 
 | Variable | Required for |
 | --- | --- |
@@ -54,10 +54,12 @@ Run from the repo root unless noted.
 | --- | --- |
 | `bun install --frozen-lockfile` | Install workspace dependencies. |
 | `bun run typecheck` | `tsc` in every workspace. |
-| `bun run test` | Bun tests for protocol, client, agent, the Worker gate, and mobile pure functions. The suite is 217 tests. |
+| `bun run test` | Bun tests for protocol, client, agent, the Worker gate, and mobile pure functions. The suite is 274 tests. |
 | `bun run check:server` | `wrangler deploy --dry-run --env=""` for the top-level Worker `mots`. |
 | `bun run check:server:staging` | `wrangler deploy --dry-run --env staging` for `mots-staging`. Does not publish. |
 | `bun run check` | Typecheck, then the top-level Worker dry-run. This is the gate for a PR. |
+| `bun run setup` | Creates `apps/server/.dev.vars` from the example, fills empty or short `MOTS_SESSION_SECRET` / `MOTS_CREATE_TOKEN` with random values (keeps working ones), and writes the create token to `apps/mobile/.env.local`. Never prints secrets. |
+| `bun run dev` | `setup`, then Wrangler under Node on `0.0.0.0:8787`, then Expo with `EXPO_PUBLIC_MOTS_API_URL` set to the LAN address. `--web` starts the web preview. Ctrl+C stops both. |
 | `bun run dev:server` | `wrangler dev` on port 8787. See the Wrangler gotcha below. |
 | `bun run dev:server:lan` | Same, bound to `0.0.0.0`. |
 | `bun run dev:mobile` | Expo. |
@@ -98,6 +100,7 @@ Do not "fix" a 503 by editing Worker code. Fix the runtime first.
 - Protocol parsers throw `InvalidClientCommand` for bad client frames and `Error` for bad server frames. Keep validation at the boundary in `packages/protocol`. Do not trust a frame just because TypeScript says it is a `ClientCommand`.
 - Durable Object storage and the Pi harness are the source of truth. The mobile app is a projection. Idempotency for create and fork is the receipt doc keyed by `requestId` in `apps/server/src/session.ts`. Preserve that when you change commands.
 - Tool handlers that are marked `replay: "safe"` must stay safe to run twice. Schedule creation is guarded by the `app.schedule-intent` doc. Do not create a second task on replay.
+- The app's look comes from the Mots design system (https://claude.ai/artifact/HWoqJFg45sk4wqpKVKuMSW): tokens in `apps/mobile/src/palette.ts` and `theme.ts`, Figtree plus JetBrains Mono, pastels as fills with `inkOnPastel` text only, and the speech-bubble `Mascot` (`apps/mobile/src/components/Mascot.tsx`), which holds still under reduced motion. Change a value there and in the design system together.
 - User-facing copy in the app is Italian. The agent preamble is English. Do not translate the product as a drive-by.
 - `documentRetentionMs: 0` in the harness settings drops idle Pi documents from memory. It does not delete SQLite data. Leave it unless you are changing DO memory behavior on purpose.
 
@@ -106,7 +109,8 @@ Do not "fix" a 503 by editing Worker code. Fix the runtime first.
 - The code defaults to `kilo` / `reflection/beam-free` (`packages/agent/src/provider.ts`, `DEFAULT_MODELS`). An unknown `MOTS_PROVIDER` fails session startup.
 - Onboarding edits the server URL and saves it with the identity. Android still defaults to `http://10.0.2.2:8787`, everything else to `http://localhost:8787`, unless `EXPO_PUBLIC_MOTS_API_URL` is set at bundle time.
 - `ChatScreen` renders `state.error`. `failed` and `connecting` use different copy. Riprova after a terminal close builds a new `MotsClient`, because `connect()` ignores calls once the client has given up.
-- The model pill reads `snapshot.agent.model`. It does not change until the server reports the new model. A `model_not_allowed` refusal stays in `state.error`.
+- The model picker (`apps/mobile/src/components/ModelPicker.tsx`) loads `GET /api/sessions/:code/models`. The list and the `conversation.setModel` check share one policy, `modelPolicy` in `packages/agent/src/model-catalog.ts`: the selected provider, Kilo (free models only without `KILO_API_KEY`), and every provider whose key is set. Batch and `~…-latest` ids are hidden. There is no model list in the app; do not add one back.
+- The header title opens the picker and reads `snapshot.agent.model`. It does not change until the server reports the new model. A `model_not_allowed` refusal shows inside the picker.
 - The socket path still matches `[A-Za-z0-9_-]{1,128}`, but `getByName` runs only after `verifySessionCapability`. The Durable Object name is the uuid, never the full join code. `POST /api/sessions` does not create a Durable Object. The app stores and shares the full join code. Do not log session ids, prompts, or API keys.
 - Do not re-open a legacy uuid bypass. A stored bare uuid probes as `401` and the chat offers a new space or a join. The mobile adoption steps are in the README section "Mobile client adoption".
 - Rate limits in `apps/server/src/rate-limit.ts` are per Worker isolate. They use `CF-Connecting-IP` only. Do not add a second Durable Object class for them without a migration plan.

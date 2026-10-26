@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { ArrowUpIcon, BookmarkIcon, ClockIcon, PlusIcon, SearchIcon } from "./Icon";
-import { fonts, hit, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
+import { fonts, hit, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
 
 type Props = {
   readonly value: string;
@@ -21,10 +21,11 @@ type Props = {
   readonly hint?: string;
 };
 
-/** One line of text plus its vertical padding. */
-const INPUT_MIN_HEIGHT = 40;
-const ACTION_SIZE = 34;
+const ACTION_SIZE = 40;
+/** One line of text, as tall as the buttons beside it. */
+const INPUT_MIN_HEIGHT = ACTION_SIZE;
 const TARGET_INSET = (hit - ACTION_SIZE) / 2;
+const FIELD_PADDING = 6;
 
 const QUICK_ACTIONS = [
   {
@@ -82,6 +83,17 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
       ) : null}
 
       <View style={[styles.field, focused && styles.fieldFocused]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Azioni rapide"
+          accessibilityState={{ expanded: toolsOpen }}
+          onPress={() => setToolsOpen((open) => !open)}
+          style={({ pressed }) => [styles.target, pressed && styles.pressed]}
+        >
+          <View style={[styles.circle, styles.circleBorder, toolsOpen && styles.circleOpen]}>
+            <PlusIcon size={18} color={toolsOpen ? colors.inkOnPastel : colors.textPrimary} />
+          </View>
+        </Pressable>
         <TextInput
           accessibilityLabel="Messaggio"
           value={value}
@@ -111,44 +123,31 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
             if (canSend) onSend();
           }}
         />
-        <View style={styles.actions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Azioni rapide"
-            accessibilityState={{ expanded: toolsOpen }}
-            onPress={() => setToolsOpen((open) => !open)}
-            style={({ pressed }) => [styles.target, pressed && styles.pressed]}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Invia messaggio"
+          accessibilityState={{ disabled: !canSend, busy: sending }}
+          onPress={onSend}
+          disabled={!canSend}
+          style={({ pressed }) => [styles.target, pressed && canSend && styles.pressed]}
+        >
+          <View
+            style={[
+              styles.circle,
+              { backgroundColor: canSend ? colors.action : colors.sunk },
+            ]}
           >
-            <View style={[styles.circle, styles.circleBorder, toolsOpen && styles.circleOpen]}>
-              <PlusIcon size={18} color={colors.textPrimary} />
-            </View>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Invia messaggio"
-            accessibilityState={{ disabled: !canSend, busy: sending }}
-            onPress={onSend}
-            disabled={!canSend}
-            style={({ pressed }) => [styles.target, pressed && canSend && styles.pressed]}
-          >
-            <View
-              style={[
-                styles.circle,
-                { backgroundColor: canSend ? colors.invertBg : colors.surfaceSoft },
-              ]}
-            >
-              {sending ? (
-                <ActivityIndicator color={colors.invertFg} />
-              ) : (
-                <ArrowUpIcon
-                  size={17}
-                  color={canSend ? colors.invertFg : colors.textFaint}
-                  strokeWidth={2.2}
-                />
-              )}
-            </View>
-          </Pressable>
-        </View>
+            {sending ? (
+              <ActivityIndicator color={colors.invertFg} />
+            ) : (
+              <ArrowUpIcon
+                size={17}
+                color={canSend ? colors.onAction : colors.textSecondary}
+                strokeWidth={2.2}
+              />
+            )}
+          </View>
+        </Pressable>
       </View>
     </View>
   );
@@ -179,29 +178,33 @@ function createStyles(colors: ThemeColors) {
       flexDirection: "row",
       alignItems: "center",
       gap: spacing.sm,
-      paddingHorizontal: spacing.md,
+      paddingHorizontal: spacing.lg,
       borderRadius: radius.pill,
-      backgroundColor: colors.field,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.fieldBorder,
+      backgroundColor: colors.card,
+      ...shadows.card,
     },
     toolLabel: {
       ...typeScale.label,
       color: colors.textPrimary,
     },
+    // One row: actions on the sides, text in between. The buttons stay at the bottom while the
+    // text grows to more lines.
     field: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      gap: spacing.sm,
       borderRadius: radius.composer,
-      borderWidth: StyleSheet.hairlineWidth,
+      borderWidth: 1,
       borderColor: colors.fieldBorder,
-      backgroundColor: colors.field,
-      paddingTop: spacing.xs,
-      paddingHorizontal: spacing.sm,
-      paddingBottom: spacing.sm,
+      backgroundColor: colors.card,
+      padding: FIELD_PADDING,
+      ...shadows.card,
     },
     fieldFocused: {
-      borderColor: colors.borderMedium,
+      borderColor: colors.focus,
     },
     input: {
+      flex: 1,
       minHeight: INPUT_MIN_HEIGHT,
       maxHeight: 160,
       paddingHorizontal: spacing.sm,
@@ -210,11 +213,6 @@ function createStyles(colors: ThemeColors) {
       fontSize: 16,
       lineHeight: 22,
       color: colors.textPrimary,
-    },
-    actions: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
     },
     // 44px touch target on every platform (hitSlop is ignored on web). The
     // negative margin pulls it back so the visible 34px circle stays where it was.
@@ -233,11 +231,10 @@ function createStyles(colors: ThemeColors) {
       justifyContent: "center",
     },
     circleBorder: {
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.fieldBorder,
+      backgroundColor: colors.sunk,
     },
     circleOpen: {
-      backgroundColor: colors.surfaceSoft,
+      backgroundColor: colors.sky,
     },
     pressed: {
       opacity: 0.7,

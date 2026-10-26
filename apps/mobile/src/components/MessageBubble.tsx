@@ -3,16 +3,23 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import type { TranscriptEntry } from "@mots/client";
 import { useTheme } from "../context/ThemeContext";
-import { fonts, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
+import { fonts, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TOOL_LABELS, toolSummary } from "../tools";
 import {
+  AlertIcon,
+  BookmarkIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  ClockIcon,
   CopyIcon,
   ForkIcon,
+  SearchIcon,
+  ToolIcon,
+  TrashIcon,
 } from "./Icon";
 import { MarkdownText } from "./MarkdownText";
+import { MascotAvatar } from "./Mascot";
 
 function extractThinkingAndText(raw: string): { thinking?: string; text: string } {
   // Strip user submission ID prefixes if present
@@ -29,10 +36,22 @@ function extractThinkingAndText(raw: string): { thinking?: string; text: string 
   return { text: clean };
 }
 
-/** Build Log markers: [+] adds, [~] reads or changes, [!] broke. Typed, never drawn. */
-function toolMarker(name: string, isError: boolean): string {
-  if (isError) return "[!]";
-  return name === "remember" || name === "schedule" ? "[+]" : "[~]";
+/** The icon of a tool row: what the tool did, or an alert when it failed. */
+function ToolMarker({ name, isError, color }: { name: string; isError: boolean; color: string }) {
+  const props = { size: 15, color };
+  if (isError) return <AlertIcon {...props} strokeWidth={1.8} />;
+  switch (name) {
+    case "remember":
+      return <BookmarkIcon {...props} />;
+    case "forget":
+      return <TrashIcon {...props} />;
+    case "schedule":
+      return <ClockIcon {...props} />;
+    case "search_history":
+      return <SearchIcon {...props} strokeWidth={1.8} />;
+    default:
+      return <ToolIcon {...props} />;
+  }
 }
 
 type Props = {
@@ -71,14 +90,19 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
     const isError = entry.toolResult?.isError === true;
 
     return (
-      <View style={styles.toolRow}>
-        <Text
+      <View style={[styles.toolRow, isError && styles.toolRowError]}>
+        <View
+          aria-hidden
           accessibilityElementsHidden
-          importantForAccessibility="no"
-          style={[styles.toolMark, isError && styles.toolMarkError]}
+          importantForAccessibility="no-hide-descendants"
+          style={styles.toolMark}
         >
-          {toolMarker(name, isError)}
-        </Text>
+          <ToolMarker
+            name={name}
+            isError={isError}
+            color={isError ? colors.danger : colors.textPrimary}
+          />
+        </View>
         <View style={styles.toolTitleBlock}>
           <Text style={styles.toolName} numberOfLines={2}>
             {TOOL_LABELS[name] ?? name}
@@ -111,6 +135,11 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
 
   return (
     <View style={[styles.row, isUser ? styles.rowUser : styles.rowAssistant]}>
+      {!isUser ? (
+        <View style={styles.avatar}>
+          <MascotAvatar size={28} />
+        </View>
+      ) : null}
       <View
         style={[
           styles.bubble,
@@ -245,23 +274,31 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     },
     rowAssistant: {
       justifyContent: "flex-start",
+      gap: spacing.sm,
+    },
+    avatar: {
+      paddingTop: 4,
     },
     bubble: {
       maxWidth: "100%",
     },
     bubbleAssistant: {
-      width: "100%",
+      flex: 1,
+      minWidth: 0,
       backgroundColor: "transparent",
       paddingHorizontal: 2,
       paddingVertical: 6,
     },
+    // White bubble with a tail corner toward the sender.
     bubbleUser: {
       alignSelf: "flex-end",
       maxWidth: "84%",
       backgroundColor: colors.userBubble,
       borderRadius: radius.bubble,
+      borderBottomRightRadius: radius.xs,
       paddingHorizontal: 16,
       paddingVertical: 10,
+      ...(isDark ? null : shadows.card),
     },
     bubbleScheduled: {
       paddingHorizontal: 2,
@@ -316,20 +353,17 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     },
     toolChip: {
       borderRadius: radius.pill,
-      borderWidth: 1,
-      borderColor: colors.rule,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 2,
+      backgroundColor: colors.sunk,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
     },
     toolChipText: {
-      ...typeScale.mono,
-      fontSize: 11,
+      ...typeScale.caption,
       color: colors.textPrimary,
     },
     reasoningCard: {
       borderRadius: radius.card,
-      borderWidth: 1,
-      borderColor: colors.reasoningBorder,
+      backgroundColor: colors.reasoningSurface,
       overflow: "hidden",
       marginBottom: spacing.sm,
     },
@@ -354,47 +388,48 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     reasoningContent: {
       paddingHorizontal: spacing.md,
       paddingBottom: spacing.md,
-      borderTopWidth: 1,
-      borderTopColor: colors.reasoningBorder,
-      paddingTop: spacing.sm,
+      paddingTop: 0,
     },
     reasoningText: {
       ...typeScale.mono,
       color: colors.reasoningText,
       lineHeight: 18,
     },
+    // A pastel pill: what the tool did, in a few words.
     toolRow: {
+      alignSelf: "flex-start",
+      maxWidth: "100%",
       flexDirection: "row",
       alignItems: "flex-start",
       gap: spacing.sm,
       marginTop: spacing.sm,
-      paddingHorizontal: 2,
+      marginLeft: 28 + spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 6,
+      borderRadius: radius.pill,
+      backgroundColor: colors.mintSoft,
+    },
+    toolRowError: {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.line,
     },
     toolMark: {
-      fontFamily: fonts.mono,
-      fontSize: 12,
-      lineHeight: 20,
-      color: colors.textSecondary,
-      paddingHorizontal: 2,
-    },
-    toolMarkError: {
-      backgroundColor: colors.invertBg,
-      color: colors.invertFg,
-      borderRadius: radius.xs,
-      overflow: "hidden",
+      height: 20,
+      justifyContent: "center",
     },
     toolTitleBlock: {
-      flex: 1,
+      flexShrink: 1,
     },
     toolName: {
       fontFamily: fonts.medium,
-      color: colors.textSecondary,
+      color: colors.textPrimary,
       fontSize: 13,
       lineHeight: 20,
     },
     toolSummary: {
       fontFamily: fonts.regular,
-      color: colors.textSecondary,
+      color: colors.textPrimary,
     },
     diagnostics: {
       marginTop: spacing.sm,

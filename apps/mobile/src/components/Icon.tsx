@@ -332,6 +332,53 @@ export function DocumentIcon({
   );
 }
 
+/** Circled exclamation mark: an error or a failed step */
+export function AlertIcon({ size = 16, color, strokeWidth = 2 }: IconProps) {
+  const { colors } = useTheme();
+  const iconColor = color ?? colors.textPrimary;
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="9" stroke={iconColor} strokeWidth={strokeWidth} />
+      <Path d="M12 7.5V13" stroke={iconColor} strokeWidth={strokeWidth} strokeLinecap="round" />
+      <Circle cx="12" cy="16.5" r="1.2" fill={iconColor} />
+    </Svg>
+  );
+}
+
+/** Bin with lid: something was removed */
+export function TrashIcon({ size = 16, color, strokeWidth = 1.8 }: IconProps) {
+  const { colors } = useTheme();
+  const iconColor = color ?? colors.textSecondary;
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M4 7H20M10 11V17M14 11V17M6 7L7 19C7 20.1 7.9 21 9 21H15C16.1 21 17 20.1 17 19L18 7M9 7V4H15V7"
+        stroke={iconColor}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+/** Wrench: any other tool the agent ran */
+export function ToolIcon({ size = 16, color, strokeWidth = 1.8 }: IconProps) {
+  const { colors } = useTheme();
+  const iconColor = color ?? colors.textSecondary;
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
+        stroke={iconColor}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 /** Grok Bot style circular avatar with colored background and emblem */
 export function BotAvatarIcon({
   size = 36,

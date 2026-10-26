@@ -1,3 +1,4 @@
+import { parseModelCatalog, type ModelCatalogResponse } from "@mots/protocol";
 import {
   parseSessionHttpBody,
   presentSessionHttpFailure,
@@ -80,5 +81,36 @@ export async function probeSession(baseUrl: string, sessionId: string): Promise<
     return { access: "unknown" };
   } finally {
     clearTimeout(timer);
+  }
+}
+
+const CATALOG_TIMEOUT_MS = 10_000;
+
+/** The models this session can switch to, as the server offers them. Throws an Italian message. */
+export async function fetchModelCatalog(baseUrl: string, sessionId: string): Promise<ModelCatalogResponse> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CATALOG_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(
+      `${normalizeBaseUrl(baseUrl)}/api/sessions/${encodeURIComponent(sessionId)}/models`,
+      { method: "GET", headers: { Accept: "application/json" }, signal: controller.signal },
+    );
+  } catch {
+    throw new Error("Non riesco a raggiungere il server.");
+  } finally {
+    clearTimeout(timer);
+  }
+  if (response.status === 404) {
+    throw new Error("Questo server non elenca ancora i modelli. Aggiornalo.");
+  }
+  if (!response.ok) {
+    const body = parseSessionHttpBody(await response.json().catch(() => undefined));
+    throw new Error(presentSessionHttpFailure(response.status, body, "open", response.headers.get("Retry-After")));
+  }
+  try {
+    return parseModelCatalog(await response.json());
+  } catch {
+    throw new Error("Il server ha inviato un elenco di modelli non valido.");
   }
 }

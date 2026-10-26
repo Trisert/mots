@@ -6,6 +6,11 @@ import { verifySessionCapability } from "../src/session-auth.ts";
 
 const SECRET = "test-session-secret-0123456789";
 const CREATE = "test-create-token-0123456789";
+const CATALOG = {
+  providers: [{ id: "kilo", name: "Kilo" }],
+  models: [],
+  default: { provider: "kilo", modelId: "reflection/beam-free" },
+};
 
 function deps(overrides: Partial<RouterDeps> = {}): {
   deps: RouterDeps;
@@ -28,6 +33,7 @@ function deps(overrides: Partial<RouterDeps> = {}): {
         opened.push(sessionId);
         return stub;
       },
+      listModels: async () => CATALOG,
       ...overrides,
     },
   };
@@ -176,5 +182,30 @@ describe("session gate", () => {
     );
     expect(health.status).toBe(200);
     expect(health.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  });
+});
+
+describe("model catalog route", () => {
+  const models = (router: RouterDeps, code: string, method = "GET") =>
+    handleRequest(
+      new Request(`https://mots.example/api/sessions/${code}/models`, { method }),
+      router,
+    );
+
+  test("serves the catalog to a valid join code without opening the Durable Object", async () => {
+    const { deps: router, opened } = deps();
+    const { sessionId } = (await (await create(router)).json()) as { sessionId: string };
+    const response = await models(router, sessionId);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(CATALOG);
+    expect(opened).toEqual([]);
+  });
+
+  test("refuses a forged code and other methods", async () => {
+    const { deps: router } = deps();
+    const { sessionId } = (await (await create(router)).json()) as { sessionId: string };
+    const forged = `${sessionId.slice(0, -2)}${sessionId.endsWith("AA") ? "BB" : "AA"}`;
+    expect((await models(router, forged)).status).toBe(401);
+    expect((await models(router, sessionId, "POST")).status).toBe(405);
   });
 });

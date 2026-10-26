@@ -1,145 +1,134 @@
 /**
- * Mots colour palettes. No React Native import, so the contrast tests can
- * load these values under plain Bun. theme.ts re-exports everything here.
+ * Mots colour palettes, from the Mots design system
+ * (https://claude.ai/artifact/HWoqJFg45sk4wqpKVKuMSW). No React Native import, so the contrast
+ * tests can load these values under plain Bun. theme.ts re-exports everything here.
+ *
+ * The first block of each palette is the design system's own tokens. The rest are the names the
+ * components already use, mapped onto those tokens.
  */
 
-const ink = "#000000";
-const paper = "#FFFFFF";
-const bone = "#E7E5E4";
-const putty = "#C4C3B6";
-const graphite = "#595855";
-const vellum = "#DFDCD5";
-const chalk = "#EBEBEB";
-
-export const lightColors = {
-  bgMain: bone,
-  cardSurfacePrimary: bone,
-  cardSurfaceAmber: bone,
-  cardSurfaceMint: bone,
-  cardSurfacePink: bone,
-  accentCoral: ink,
-  accentGreen: ink,
-  starHighlight: ink,
-  textPrimary: ink,
-  textSecondary: graphite,
-  borderSubtle: vellum,
-  borderMedium: graphite,
-
-  codeSurface: ink,
-  codeSurfaceHeader: ink,
-  codeText: paper,
-  codeMuted: putty,
-  reasoningSurface: bone,
-  reasoningBorder: graphite,
-  reasoningText: ink,
-  cardBorderSubtle: graphite,
-  badgeMintBg: ink,
-  badgeMintText: paper,
-  badgeAmberBg: bone,
-  badgeAmberText: ink,
-  badgePinkBg: ink,
-  badgePinkText: paper,
-
-  avatarPurple: ink,
-  avatarBlue: ink,
-  avatarGreen: ink,
-  avatarOrange: ink,
-  avatarRed: ink,
-  avatarTeal: ink,
-
-  background: bone,
-  surface: bone,
-  surfaceRaised: chalk,
-  surfaceSoft: vellum,
-  border: graphite,
-  borderStrong: ink,
-  text: ink,
-  textMuted: graphite,
-  textFaint: graphite,
-  accent: ink,
-  accentSoft: vellum,
-  accentInk: paper,
-  userBubble: vellum,
-  userBubbleText: ink,
-  onAccentFaint: graphite,
-  danger: ink,
-  dangerSoft: vellum,
-  success: ink,
-  overlay: "rgba(0, 0, 0, 0.42)",
-  link: ink,
-  frame: chalk,
-  /** The one highlight: inverted fill and the text set on it. */
-  invertBg: ink,
-  invertFg: paper,
-  rule: ink,
-  /** Raised input surfaces such as the composer, and their quiet outline. */
-  field: chalk,
-  fieldBorder: "#7E7C77",
+const light = {
+  ground: "#ECF2F4",
+  card: "#FFFFFF",
+  sunk: "#F2F5F7",
+  line: "#DCE3E8",
+  ink: "#15171A",
+  inkMuted: "#5A6169",
+  action: "#15171A",
+  onAction: "#FFFFFF",
+  inverse: "#1C1E21",
+  onInverse: "#F4F6F7",
+  blush: "#F7B6DA",
+  mint: "#94EDC8",
+  sky: "#93DCEC",
+  blushSoft: "#FDE6F2",
+  mintSoft: "#DDFAEE",
+  skySoft: "#DEF4F9",
+  inkOnPastel: "#15171A",
+  danger: "#B42318",
+  focus: "#0E6F86",
+  /** Input outlines: 3:1 against the ground and the card (WCAG 1.4.11). */
+  fieldBorder: "#76818B",
 } as const;
 
-export const darkColors = {
-  bgMain: ink,
-  cardSurfacePrimary: ink,
-  cardSurfaceAmber: ink,
-  cardSurfaceMint: ink,
-  cardSurfacePink: ink,
-  accentCoral: paper,
-  accentGreen: paper,
-  starHighlight: paper,
-  textPrimary: paper,
-  textSecondary: putty,
-  borderSubtle: graphite,
-  borderMedium: graphite,
-
-  codeSurface: "#0F0F0E",
-  codeSurfaceHeader: ink,
-  codeText: paper,
-  codeMuted: putty,
-  reasoningSurface: ink,
-  reasoningBorder: graphite,
-  reasoningText: paper,
-  cardBorderSubtle: graphite,
-  badgeMintBg: paper,
-  badgeMintText: ink,
-  badgeAmberBg: ink,
-  badgeAmberText: paper,
-  badgePinkBg: paper,
-  badgePinkText: ink,
-
-  avatarPurple: paper,
-  avatarBlue: paper,
-  avatarGreen: paper,
-  avatarOrange: paper,
-  avatarRed: paper,
-  avatarTeal: paper,
-
-  background: ink,
-  surface: ink,
-  surfaceRaised: "#141413",
-  surfaceSoft: "#1C1C1A",
-  border: graphite,
-  borderStrong: paper,
-  text: paper,
-  textMuted: putty,
-  textFaint: putty,
-  accent: paper,
-  accentSoft: "#1C1C1A",
-  accentInk: ink,
-  userBubble: "#262624",
-  userBubbleText: paper,
-  onAccentFaint: putty,
-  danger: paper,
-  dangerSoft: "#1C1C1A",
-  success: paper,
-  overlay: "rgba(0, 0, 0, 0.7)",
-  link: paper,
-  frame: "#0F0F0E",
-  invertBg: paper,
-  invertFg: ink,
-  rule: paper,
-  field: "#141413",
-  fieldBorder: "#64635C",
+const dark = {
+  ground: "#0F1012",
+  card: "#1C1E21",
+  sunk: "#26292D",
+  line: "#34383D",
+  ink: "#F4F6F7",
+  inkMuted: "#A4ABB2",
+  action: "#FFFFFF",
+  onAction: "#15171A",
+  inverse: "#2C2F33",
+  onInverse: "#F4F6F7",
+  blush: "#F4A7D2",
+  mint: "#86E6BE",
+  sky: "#86D4E6",
+  blushSoft: "#3A2431",
+  mintSoft: "#1E3A2F",
+  skySoft: "#1B3540",
+  inkOnPastel: "#15171A",
+  danger: "#FF9B91",
+  focus: "#93DCEC",
+  fieldBorder: "#717981",
 } as const;
+
+type Tokens = { readonly [K in keyof typeof light]: string };
+
+function palette(t: Tokens, overlay: string) {
+  return {
+    ...t,
+
+    bgMain: t.ground,
+    background: t.ground,
+    frame: t.ground,
+    surface: t.card,
+    surfaceRaised: t.card,
+    surfaceSoft: t.sunk,
+    cardSurfacePrimary: t.card,
+    cardSurfaceAmber: t.blushSoft,
+    cardSurfaceMint: t.mintSoft,
+    cardSurfacePink: t.blushSoft,
+    field: t.card,
+
+    textPrimary: t.ink,
+    textSecondary: t.inkMuted,
+    textFaint: t.inkMuted,
+    text: t.ink,
+    textMuted: t.inkMuted,
+    link: t.ink,
+
+    borderSubtle: t.line,
+    borderMedium: t.inkMuted,
+    border: t.line,
+    borderStrong: t.ink,
+    cardBorderSubtle: t.line,
+    rule: t.ink,
+
+    accent: t.action,
+    accentInk: t.onAction,
+    accentSoft: t.skySoft,
+    accentCoral: t.ink,
+    accentGreen: t.ink,
+    starHighlight: t.ink,
+    onAccentFaint: t.inkMuted,
+    invertBg: t.action,
+    invertFg: t.onAction,
+
+    userBubble: t.card,
+    userBubbleText: t.ink,
+
+    codeSurface: t.inverse,
+    codeSurfaceHeader: t.inverse,
+    codeText: t.onInverse,
+    codeMuted: "#A4ABB2",
+    reasoningSurface: t.sunk,
+    reasoningBorder: t.line,
+    reasoningText: t.ink,
+
+    badgeMintBg: t.mint,
+    badgeMintText: t.inkOnPastel,
+    badgeAmberBg: t.blush,
+    badgeAmberText: t.inkOnPastel,
+    badgePinkBg: t.blush,
+    badgePinkText: t.inkOnPastel,
+
+    avatarPurple: t.sky,
+    avatarBlue: t.sky,
+    avatarGreen: t.mint,
+    avatarOrange: t.blush,
+    avatarRed: t.blush,
+    avatarTeal: t.mint,
+
+    dangerSoft: t.sunk,
+    success: t.ink,
+    overlay,
+  };
+}
+
+export const lightColors = palette(light, "rgba(21, 23, 26, 0.38)");
+export const darkColors = palette(dark, "rgba(0, 0, 0, 0.7)");
 
 export type ThemeColors = {
   [K in keyof typeof lightColors]: string;

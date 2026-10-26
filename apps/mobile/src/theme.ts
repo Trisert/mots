@@ -1,16 +1,12 @@
 import { Platform, type TextStyle } from "react-native";
 
 /**
- * Mots visual system, adapted from the NRights design system.
+ * Mots visual system, from the Mots design system
+ * (https://claude.ai/artifact/HWoqJFg45sk4wqpKVKuMSW).
  *
- * Monochrome, warm, flat. Light is the Gallery (ink on bone), dark is the
- * Dark Room (paper on ink). There is no accent colour: emphasis is inversion
- * (ink fill, paper text, or the reverse), weight, and size. No shadows, no
- * gradients; hairlines carry structure. Serif is for moments, the grotesk and
- * the mono are for systems.
- *
- * Legacy color names (accentCoral, cardSurfaceMint, …) stay so older
- * components keep compiling. They now resolve to the same few tones.
+ * Soft and rounded: a pale sky ground, white cards, three pastel fills (blush, mint, sky) that
+ * always carry dark text, one black (light) or white (dark) action fill, and the speech-bubble
+ * mascot. One family, Figtree; JetBrains Mono only for model ids and codes.
  */
 
 import { lightColors, type ThemeColors } from "./palette.ts";
@@ -32,15 +28,15 @@ export const spacing = {
 
 export const radius = {
   xs: 6,
-  sm: 9,
-  md: 9,
-  lg: 9,
-  xl: 9,
-  card: 9,
-  cardLarge: 9,
-  /** Soft shapes for the conversation itself: message bubbles and the composer. */
-  bubble: 18,
-  composer: 24,
+  sm: 12,
+  md: 20,
+  lg: 20,
+  xl: 32,
+  card: 20,
+  cardLarge: 32,
+  /** Message bubbles; the tail corner is `xs`. */
+  bubble: 22,
+  composer: 9999,
   pill: 9999,
 } as const;
 
@@ -53,20 +49,19 @@ export const motion = {
 } as const;
 
 const family = (web: string, native: string) => Platform.select({ web, default: native });
-const SANS = "Inter, 'Helvetica Neue', Arial, sans-serif";
-const SERIF = "'Instrument Serif', 'Playfair Display', Georgia, serif";
+const SANS = "Figtree, 'Helvetica Neue', Arial, sans-serif";
 const MONO = "'JetBrains Mono', ui-monospace, Menlo, monospace";
 
 export const fonts = {
-  regular: family(SANS, "Inter_400Regular"),
-  medium: family(SANS, "Inter_500Medium"),
-  semiBold: family(SANS, "Inter_600SemiBold"),
-  bold: family(SANS, "Inter_600SemiBold"),
-  extraBold: family(SANS, "Inter_600SemiBold"),
-  /** Moments: greetings, the wordmark, large values. Never labels or body copy. */
-  serif: family(SERIF, "InstrumentSerif_400Regular"),
-  serifItalic: family(SERIF, "InstrumentSerif_400Regular_Italic"),
-  /** Systems: times, model ids, tool names, codes, markers. */
+  regular: family(SANS, "Figtree_400Regular"),
+  medium: family(SANS, "Figtree_500Medium"),
+  semiBold: family(SANS, "Figtree_600SemiBold"),
+  bold: family(SANS, "Figtree_700Bold"),
+  extraBold: family(SANS, "Figtree_700Bold"),
+  /** Display text. The system has one family, so these are Figtree at display weight. */
+  serif: family(SANS, "Figtree_600SemiBold"),
+  serifItalic: family(SANS, "Figtree_600SemiBold"),
+  /** Model ids and codes only. */
   mono: family(MONO, "JetBrainsMono_400Regular"),
   monoMedium: family(MONO, "JetBrainsMono_500Medium"),
 } as const;
@@ -79,26 +74,28 @@ const weight = {
 } as const;
 
 export const type = {
+  /** The greeting. Once per screen. */
   display: {
-    fontFamily: fonts.serif,
-    fontSize: 48,
-    lineHeight: 46,
-    letterSpacing: -1.2,
-    fontWeight: weight.regular,
-  },
-  title: {
-    fontFamily: fonts.serif,
-    fontSize: 36,
-    lineHeight: 36,
-    letterSpacing: -0.8,
-    fontWeight: weight.regular,
-  },
-  heading: {
-    fontFamily: fonts.serif,
-    fontSize: 26,
-    lineHeight: 28,
+    fontFamily: fonts.semiBold,
+    fontSize: 34,
+    lineHeight: 38,
     letterSpacing: -0.5,
-    fontWeight: weight.regular,
+    fontWeight: weight.semiBold,
+  },
+  /** Onboarding questions and screen titles. */
+  title: {
+    fontFamily: fonts.semiBold,
+    fontSize: 28,
+    lineHeight: 32,
+    letterSpacing: -0.3,
+    fontWeight: weight.semiBold,
+  },
+  /** Section and card titles. */
+  heading: {
+    fontFamily: fonts.semiBold,
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: weight.semiBold,
   },
   body: {
     fontFamily: fonts.regular,
@@ -109,19 +106,19 @@ export const type = {
   bodyMedium: {
     fontFamily: fonts.medium,
     fontSize: 16,
-    lineHeight: 24,
+    lineHeight: 22,
     fontWeight: weight.medium,
   },
   small: {
     fontFamily: fonts.regular,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: weight.regular,
   },
   label: {
     fontFamily: fonts.medium,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: weight.medium,
   },
   caption: {
@@ -130,7 +127,7 @@ export const type = {
     lineHeight: 16,
     fontWeight: weight.medium,
   },
-  /** Kickers and room labels. Always uppercase. */
+  /** Section labels. Always uppercase. */
   kicker: {
     fontFamily: fonts.medium,
     fontSize: 11,
@@ -147,7 +144,7 @@ export const type = {
   },
 } as const satisfies Record<string, TextStyle>;
 
-const flat = {
+const none = {
   shadowColor: "#000000",
   shadowOffset: { width: 0, height: 0 },
   shadowOpacity: 0,
@@ -155,9 +152,17 @@ const flat = {
   elevation: 0,
 } as const;
 
-/** The system is flat. Kept so older call sites compile; every level is no shadow. */
+/** White cards lift off the light ground with one soft shadow; dark separates by value. */
+const soft = {
+  shadowColor: "#15171A",
+  shadowOffset: { width: 0, height: 6 },
+  shadowOpacity: 0.07,
+  shadowRadius: 16,
+  elevation: 2,
+} as const;
+
 export const shadows = {
-  subtle: flat,
-  card: flat,
-  floating: flat,
+  subtle: none,
+  card: soft,
+  floating: soft,
 } as const;

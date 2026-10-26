@@ -23,7 +23,9 @@ import {
   createMotsHarnessOptions,
   createStubModels,
   isAllowedAgentModel,
+  isOfferedModel,
   ModelNotAllowedError,
+  modelPolicy,
   type MotsEnvironment,
   PushTokenDoc,
   resolveMotsProvider,
@@ -167,7 +169,8 @@ const conversationSummary = (conversation: ConversationRecord): ConversationSumm
 
 export class Session extends DurableObject<Env> {
   #harness!: Harness;
-  #models!: { getModel(provider: string, id: string): unknown };
+  /** True when a person may switch a conversation to this model. */
+  #canSelectModel!: (provider: string, modelId: string) => boolean;
   #activity!: AttachedReplicatedState<TaskGraph>;
   readonly #eventStreams = new Map<WebSocket, AgentEventStream>();
   readonly #typingConnections = new Set<WebSocket>();
@@ -202,7 +205,14 @@ export class Session extends DurableObject<Env> {
         ? { ...harnessInput, models: createStubModels() }
         : harnessInput,
     );
-    this.#models = chatOptions.models;
+    const models = chatOptions.models;
+    const policy = modelPolicy(harnessInput.env, provider);
+    // The stub resolves any id, so it keeps the plain registry check. Everywhere else the picker's
+    // catalog and this check come from the same policy.
+    this.#canSelectModel =
+      this.env.MOTS_FAKE_LLM === "stub"
+        ? (provider, modelId) => isAllowedAgentModel(models, provider, modelId)
+        : (provider, modelId) => isOfferedModel(models, policy, provider, modelId);
     const harness = await Harness.open(
       storage,
       {
@@ -502,7 +512,7 @@ export class Session extends DurableObject<Env> {
         return;
       }
       case "conversation.setModel": {
-        if (!isAllowedAgentModel(this.#models, command.provider, command.modelId)) {
+        if (!this.#canSelectModel(command.provider, command.modelId)) {
           throw new ModelNotAllowedError();
         }
         await this.#harness.commit(async (tx) => {

@@ -5,9 +5,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ROOT_CONVERSATION_ID, type ConversationSummary } from "@mots/protocol";
 import { normalizeBaseUrl } from "../config";
 import { useTheme } from "../context/ThemeContext";
-import { presentModel, providerLabel, type PresentedModel } from "../present";
-import { PROVIDER_MODELS, PROVIDERS } from "../models";
-import { CheckIcon, ChevronDownIcon, ChevronUpIcon, CloseIcon, PlusIcon } from "./Icon";
+import { presentModel, type PresentedModel } from "../present";
+import { CheckIcon, ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CloseIcon, PlusIcon } from "./Icon";
 import { FOCUSABLE_SELECTOR, isEnabledElement, tabTrapIndex } from "../focus-trap";
 import { fonts, hit, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { Button } from "../ui/Button";
@@ -28,10 +27,11 @@ type Props = {
   readonly onShare: () => void;
   readonly onLeave: () => void;
   readonly onApiUrlChange: (apiUrl: string) => void;
-  readonly onModelSelect?: (provider: string, modelId: string) => Promise<boolean> | boolean;
+  /** Opens the model picker. */
+  readonly onOpenModels: () => void;
 };
 
-type Section = "model" | "share" | "server" | "theme";
+type Section = "share" | "server" | "theme";
 
 function conversationName(conversation: ConversationSummary, index: number): string {
   if (conversation.id === ROOT_CONVERSATION_ID) return "Chat principale";
@@ -41,7 +41,7 @@ function conversationName(conversation: ConversationSummary, index: number): str
 type SettingRowProps = {
   readonly label: string;
   readonly value?: string;
-  readonly open: boolean;
+  readonly open?: boolean;
   readonly onPress: () => void;
   readonly styles: ReturnType<typeof createStyles>;
   readonly color: string;
@@ -53,7 +53,7 @@ function SettingRow({ label, value, open, onPress, styles, color }: SettingRowPr
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={value === undefined ? label : `${label}: ${value}`}
-      accessibilityState={{ expanded: open }}
+      accessibilityState={open === undefined ? undefined : { expanded: open }}
       onPress={onPress}
       style={({ pressed }) => [styles.item, pressed && styles.rowPressed]}
     >
@@ -65,7 +65,13 @@ function SettingRow({ label, value, open, onPress, styles, color }: SettingRowPr
       ) : (
         <View style={styles.itemCopy} />
       )}
-      {open ? <ChevronUpIcon size={14} color={color} /> : <ChevronDownIcon size={14} color={color} />}
+      {open === undefined ? (
+        <ChevronRightIcon size={14} color={color} />
+      ) : open ? (
+        <ChevronUpIcon size={14} color={color} />
+      ) : (
+        <ChevronDownIcon size={14} color={color} />
+      )}
     </Pressable>
   );
 }
@@ -84,21 +90,18 @@ export function SessionSheet({
   onShare,
   onLeave,
   onApiUrlChange,
-  onModelSelect,
+  onOpenModels,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const activeModel: PresentedModel | undefined = presentModel(agent);
 
-  const [selectedProviderId, setSelectedProviderId] = useState(activeModel?.provider ?? "kilo");
-  const [pending, setPending] = useState<{ provider: string; modelId: string } | undefined>();
   const [copied, setCopied] = useState(false);
   const [draftUrl, setDraftUrl] = useState(apiUrl);
   const [urlError, setUrlError] = useState<string | undefined>();
   const [openSection, setOpenSection] = useState<Section | undefined>(undefined);
 
-  const liveProvider = activeModel?.provider;
   const wasVisible = useRef(false);
   useEffect(() => {
     if (!visible) {
@@ -108,17 +111,9 @@ export function SessionSheet({
     if (!wasVisible.current) {
       setDraftUrl(apiUrl);
       setUrlError(undefined);
-      if (liveProvider !== undefined) setSelectedProviderId(liveProvider);
     }
     wasVisible.current = true;
-  }, [apiUrl, liveProvider, visible]);
-
-  const liveModelId = activeModel?.modelId;
-  useEffect(() => {
-    if (pending !== undefined && liveProvider === pending.provider && liveModelId === pending.modelId) {
-      setPending(undefined);
-    }
-  }, [liveModelId, liveProvider, pending]);
+  }, [apiUrl, visible]);
 
   useEffect(() => {
     // Calling BackHandler on web throws and takes down the sheet.
@@ -176,11 +171,6 @@ export function SessionSheet({
 
   if (!visible) return null;
 
-  const models = PROVIDER_MODELS[selectedProviderId] ?? [];
-  const inUse = activeModel === undefined
-    ? "Il server non ha ancora indicato il modello."
-    : `In uso: ${providerLabel(activeModel.provider)} · ${activeModel.modelId}`;
-
   const copyCode = async () => {
     try {
       await Clipboard.setStringAsync(sessionId);
@@ -204,16 +194,7 @@ export function SessionSheet({
   const toggle = (section: Section) =>
     setOpenSection((current) => (current === section ? undefined : section));
 
-  const chooseModel = (modelId: string) => {
-    const request = { provider: selectedProviderId, modelId };
-    setPending(request);
-    void Promise.resolve(onModelSelect?.(request.provider, request.modelId)).then((ok) => {
-      if (ok === false) setPending(undefined);
-    });
-  };
-
   const displayName = username !== undefined && username.length > 0 ? username : "Utente";
-  const selectedProvider = PROVIDERS.find((provider) => provider.id === selectedProviderId) ?? PROVIDERS[0];
 
   return (
     <View style={styles.container} accessibilityViewIsModal>
@@ -308,72 +289,11 @@ export function SessionSheet({
 
             <SettingRow
               label="Modello"
-              value={activeModel?.modelId ?? "—"}
-              open={openSection === "model"}
-              onPress={() => toggle("model")}
+              value={activeModel?.shortName ?? "—"}
+              onPress={onOpenModels}
               styles={styles}
               color={colors.textSecondary}
             />
-            {openSection === "model" ? (
-              <View style={styles.settingBody}>
-                <Text style={styles.body}>{inUse}</Text>
-                {pending !== undefined ? (
-                  <Text style={styles.body}>Richiesto {pending.modelId}. Aspetto conferma dal server.</Text>
-                ) : null}
-                <View style={styles.providers}>
-                  {PROVIDERS.map((provider) => {
-                    const selected = provider.id === selectedProviderId;
-                    return (
-                      <Pressable
-                        key={provider.id}
-                        accessibilityRole="button"
-                        accessibilityLabel={provider.name}
-                        accessibilityState={{ selected }}
-                        onPress={() => setSelectedProviderId(provider.id)}
-                        style={[
-                          styles.provider,
-                          selected
-                            ? { backgroundColor: colors.invertBg, borderColor: colors.invertBg }
-                            : { borderColor: colors.fieldBorder },
-                        ]}
-                      >
-                        <Text
-                          style={[styles.providerLabel, { color: selected ? colors.invertFg : colors.textPrimary }]}
-                        >
-                          {provider.name}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                <Text style={styles.meta}>
-                  {selectedProvider?.details}
-                  {" · "}
-                  {selectedProvider?.endpoint}
-                </Text>
-                {models.map((model) => {
-                  const live = activeModel?.provider === selectedProviderId && activeModel.modelId === model.id;
-                  return (
-                    <Pressable
-                      key={model.id}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${model.name}. ${model.id}`}
-                      accessibilityState={{ selected: live }}
-                      onPress={() => chooseModel(model.id)}
-                      style={({ pressed }) => [styles.item, live && styles.itemActive, pressed && styles.rowPressed]}
-                    >
-                      {live ? <View style={styles.activeBar} /> : null}
-                      <View style={styles.itemCopy}>
-                        <Text style={[styles.itemTitle, live && styles.itemTitleActive]}>{model.name}</Text>
-                        <Text style={styles.itemMeta}>{model.tag}</Text>
-                      </View>
-                      {live ? <CheckIcon size={16} color={colors.textPrimary} /> : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
-
             <SettingRow
               label="Condivisione"
               value="Codice"
@@ -482,9 +402,9 @@ function createStyles(colors: ThemeColors) {
       bottom: 0,
       width: "86%",
       maxWidth: 360,
-      backgroundColor: colors.bgMain,
-      borderRightWidth: StyleSheet.hairlineWidth,
-      borderRightColor: colors.fieldBorder,
+      backgroundColor: colors.card,
+      borderTopRightRadius: radius.xl,
+      borderBottomRightRadius: radius.xl,
       paddingHorizontal: spacing.md,
     },
     header: {
@@ -495,10 +415,7 @@ function createStyles(colors: ThemeColors) {
       paddingLeft: spacing.sm,
     },
     title: {
-      fontFamily: fonts.serif,
-      fontSize: 28,
-      lineHeight: 32,
-      letterSpacing: -0.5,
+      ...typeScale.title,
       color: colors.textPrimary,
     },
     close: {
@@ -611,10 +528,10 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.md,
       paddingHorizontal: spacing.sm,
       paddingVertical: spacing.xs,
-      borderRadius: radius.sm,
+      borderRadius: radius.md,
     },
     itemActive: {
-      backgroundColor: colors.surfaceSoft,
+      backgroundColor: colors.skySoft,
     },
     activeBar: {
       position: "absolute",
@@ -652,7 +569,7 @@ function createStyles(colors: ThemeColors) {
       paddingTop: spacing.sm,
       paddingHorizontal: spacing.sm,
       borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: colors.fieldBorder,
+      borderTopColor: colors.line,
     },
     avatar: {
       width: 32,
@@ -660,13 +577,13 @@ function createStyles(colors: ThemeColors) {
       borderRadius: 16,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: colors.invertBg,
+      backgroundColor: colors.blush,
     },
     avatarLetter: {
-      fontFamily: fonts.serif,
-      fontSize: 18,
-      lineHeight: 22,
-      color: colors.invertFg,
+      fontFamily: fonts.semiBold,
+      fontSize: 16,
+      lineHeight: 20,
+      color: colors.inkOnPastel,
     },
     footerName: {
       ...typeScale.bodyMedium,

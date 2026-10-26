@@ -1,514 +1,201 @@
-import { useEffect, useId, useRef, useState } from "react";
-import {
-  Animated,
-  Easing,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import Svg, {
-  Circle,
-  Defs,
-  Ellipse,
-  G,
-  LinearGradient,
-  Path,
-  Rect,
-  Stop,
-} from "react-native-svg";
+import { useEffect, useMemo, useRef } from "react";
+import { Animated, Easing, Platform, StyleSheet, View } from "react-native";
+import Svg, { Circle, Ellipse, Path } from "react-native-svg";
 import { useTheme } from "../context/ThemeContext";
+import { useReduceMotion } from "../hooks/useReduceMotion";
 
-export type MascotState = "idle" | "thinking" | "speaking" | "routine" | "happy";
+/**
+ * Mots: a speech bubble with a face. Each mood has its own colour and loop
+ * (design system, Mascot): felice hops on blush, calmo breathes on mint, pensa
+ * tilts on sky while three dots rise. Under reduced motion it holds still.
+ */
+export type MascotMood = "felice" | "calmo" | "pensa";
 
 type Props = {
+  readonly mood?: MascotMood;
   readonly size?: number;
-  readonly state?: MascotState;
-  readonly interactive?: boolean;
-  readonly onPress?: () => void;
+  /** Announced to screen readers. Leave it out when the face is decoration. */
+  readonly label?: string;
+  /** The soft ground shadow under a large mascot. */
+  readonly shadow?: boolean;
 };
 
-export function Mascot({
-  size = 64,
-  state = "idle",
-  interactive = true,
-  onPress,
-}: Props) {
+const VIEW = 176;
+const BODY = "M72 28H104C134 28 152 46 152 76V92C152 122 134 140 104 140H72L46 160L50 135C34 127 24 112 24 92V76C24 46 42 28 72 28Z";
+const useNative = Platform.OS !== "web";
+
+/** Eye boxes in the 176 grid, so a blink squashes the eyes around their own centre. */
+const EYES = {
+  felice: { x: 60, y: 70, w: 56, h: 20, eyes: [[70, 80, 6, 8], [106, 80, 6, 8]] },
+  pensa: { x: 66, y: 65, w: 54, h: 18, eyes: [[76, 74, 6, 7], [110, 74, 6, 7]] },
+} as const;
+
+function loop(animation: Animated.CompositeAnimation): Animated.CompositeAnimation {
+  return Animated.loop(animation);
+}
+
+export function Mascot({ mood = "felice", size = 168, label, shadow = false }: Props) {
   const { colors } = useTheme();
-  // Floating / hovering vertical motion
-  const floatAnim = useRef(new Animated.Value(0)).current;
-  // Breathing scale pulse
-  const breathAnim = useRef(new Animated.Value(1)).current;
-  // Eye blink vertical compression
-  const blinkAnim = useRef(new Animated.Value(1)).current;
-  // Head tilt / glance
-  const tiltAnim = useRef(new Animated.Value(0)).current;
-  // Interactive bounce on press
-  const bounceAnim = useRef(new Animated.Value(1)).current;
-  // Star antenna bounce
-  const starAnim = useRef(new Animated.Value(0)).current;
+  const reduceMotion = useReduceMotion();
+  const body = useRef(new Animated.Value(0)).current;
+  const blink = useRef(new Animated.Value(0)).current;
+  const dots = useRef(new Animated.Value(0)).current;
 
-  const [tapped, setTapped] = useState(false);
-
-  // Floating hover loop
   useEffect(() => {
-    const floatLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, {
-          toValue: -5,
-          duration: state === "thinking" ? 900 : 1800,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(floatAnim, {
-          toValue: 4,
-          duration: state === "thinking" ? 900 : 1800,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-
-    const breathLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(breathAnim, {
-          toValue: 1.04,
-          duration: 1500,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(breathAnim, {
-          toValue: 0.98,
-          duration: 1500,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-
-    const starLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(starAnim, {
+    body.setValue(0);
+    blink.setValue(0);
+    dots.setValue(0);
+    if (reduceMotion) return;
+    const period = mood === "felice" ? 2400 : mood === "calmo" ? 4000 : 3000;
+    const running = [
+      loop(
+        Animated.timing(body, {
           toValue: 1,
-          duration: 1200,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          duration: period,
+          easing: mood === "felice" ? Easing.linear : Easing.inOut(Easing.sin),
+          useNativeDriver: useNative,
         }),
-        Animated.timing(starAnim, {
-          toValue: 0,
-          duration: 1200,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-
-    floatLoop.start();
-    breathLoop.start();
-    starLoop.start();
-
+      ),
+      loop(Animated.timing(blink, { toValue: 1, duration: 4000, easing: Easing.linear, useNativeDriver: useNative })),
+      loop(Animated.timing(dots, { toValue: 1, duration: 1200, easing: Easing.linear, useNativeDriver: useNative })),
+    ];
+    for (const animation of running) animation.start();
     return () => {
-      floatLoop.stop();
-      breathLoop.stop();
-      starLoop.stop();
+      for (const animation of running) animation.stop();
     };
-  }, [floatAnim, breathAnim, starAnim, state]);
+  }, [blink, body, dots, mood, reduceMotion]);
 
-  // Organic blinking timer
-  useEffect(() => {
-    let isMounted = true;
-    let blinkTimeout: ReturnType<typeof setTimeout>;
-    let doubleBlinkTimeout: ReturnType<typeof setTimeout>;
+  const scale = size / VIEW;
+  const fill = mood === "felice" ? colors.blush : mood === "calmo" ? colors.mint : colors.sky;
+  const ink = colors.inkOnPastel;
 
-    const scheduleNextBlink = () => {
-      if (!isMounted) return;
-      const delay = Math.random() * 3200 + 2400; // 2.4s to 5.6s
-      blinkTimeout = setTimeout(() => {
-        if (!isMounted) return;
-        // Quick blink down & up
-        Animated.sequence([
-          Animated.timing(blinkAnim, {
-            toValue: 0.08,
-            duration: 85,
-            useNativeDriver: true,
-          }),
-          Animated.timing(blinkAnim, {
-            toValue: 1,
-            duration: 110,
-            useNativeDriver: true,
-          }),
-        ]).start(() => {
-          if (!isMounted) return;
-          // 25% chance of a double blink!
-          if (Math.random() < 0.25) {
-            doubleBlinkTimeout = setTimeout(() => {
-              if (!isMounted) return;
-              Animated.sequence([
-                Animated.timing(blinkAnim, {
-                  toValue: 0.08,
-                  duration: 75,
-                  useNativeDriver: true,
-                }),
-                Animated.timing(blinkAnim, {
-                  toValue: 1,
-                  duration: 100,
-                  useNativeDriver: true,
-                }),
-              ]).start();
-            }, 120);
-          }
-          scheduleNextBlink();
-        });
-      }, delay);
-    };
+  const bodyTransform = useMemo(() => {
+    if (mood === "felice") {
+      // A hop and a small squash on landing; still from 55% to the end of the loop.
+      return [
+        { translateY: body.interpolate({ inputRange: [0, 0.25, 0.55, 0.62, 0.72, 1], outputRange: [0, -10 * scale, 0, 2 * scale, 0, 0] }) },
+        { scaleX: body.interpolate({ inputRange: [0, 0.25, 0.55, 0.62, 0.72, 1], outputRange: [1, 0.97, 1, 1.04, 1, 1] }) },
+        { scaleY: body.interpolate({ inputRange: [0, 0.25, 0.55, 0.62, 0.72, 1], outputRange: [1, 1.03, 1, 0.95, 1, 1] }) },
+      ];
+    }
+    if (mood === "calmo") {
+      return [{ scale: body.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.04, 1] }) }];
+    }
+    return [{ rotate: body.interpolate({ inputRange: [0, 0.5, 1], outputRange: ["0deg", "-5deg", "0deg"] }) }];
+  }, [body, mood, scale]);
 
-    scheduleNextBlink();
-    return () => {
-      isMounted = false;
-      clearTimeout(blinkTimeout);
-      clearTimeout(doubleBlinkTimeout);
-    };
-  }, [blinkAnim]);
+  const shadowScale = mood === "felice"
+    ? body.interpolate({ inputRange: [0, 0.25, 0.55, 1], outputRange: [1, 0.8, 1, 1] })
+    : 1;
+  const blinkScale = blink.interpolate({ inputRange: [0, 0.92, 0.95, 0.98, 1], outputRange: [1, 1, 0.1, 1, 1] });
+  const eyes = mood === "calmo" ? undefined : EYES[mood];
 
-  // Occasional slight head tilt / curious glance
-  useEffect(() => {
-    const tiltInterval = setInterval(() => {
-      const targetTilt = (Math.random() - 0.5) * 8; // -4deg to +4deg
-      Animated.timing(tiltAnim, {
-        toValue: targetTilt,
-        duration: 600,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }).start();
-    }, 4500);
-
-    return () => clearInterval(tiltInterval);
-  }, [tiltAnim]);
-
-  const handlePress = () => {
-    if (!interactive) return;
-    setTapped(true);
-    Animated.sequence([
-      Animated.timing(bounceAnim, {
-        toValue: 0.88,
-        duration: 90,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-      Animated.spring(bounceAnim, {
-        toValue: 1.15,
-        friction: 3,
-        tension: 180,
-        useNativeDriver: true,
-      }),
-      Animated.spring(bounceAnim, {
-        toValue: 1,
-        friction: 5,
-        tension: 120,
-        useNativeDriver: true,
-      }),
-    ]).start(() => setTapped(false));
-
-    onPress?.();
-  };
-
-  const id = useId().replace(/[^a-zA-Z0-9]/g, "");
-  const bodyGradId = `bodyGrad_${id}`;
-  const visorGradId = `visorGrad_${id}`;
-  const bellyGradId = `bellyGrad_${id}`;
-
-  const scale = size / 64;
-  const isThinking = state === "thinking";
-  const isHappy = state === "happy" || tapped;
-  const isRoutine = state === "routine";
-
-  const starTranslateY = starAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -3 * scale],
-  });
-
-  const starRotate = starAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "15deg"],
-  });
+  const a11y = label === undefined
+    ? ({ accessible: false, importantForAccessibility: "no-hide-descendants", "aria-hidden": true } as const)
+    : ({ accessible: true, accessibilityRole: "image", accessibilityLabel: label } as const);
 
   return (
-    <Pressable
-      disabled={!interactive}
-      onPress={handlePress}
-      accessibilityRole="button"
-      accessibilityLabel="Mascot Mots"
-      style={styles.container}
-    >
-      <Animated.View
-        style={[
-          styles.mascotWrap,
-          {
-            width: size,
-            height: size,
-            transform: [
-              { translateY: floatAnim },
-              { scale: Animated.multiply(breathAnim, bounceAnim) },
-              {
-                rotate: tiltAnim.interpolate({
-                  inputRange: [-10, 10],
-                  outputRange: ["-10deg", "10deg"],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
-        {/* Star Antenna on Top */}
+    <View {...a11y} style={{ width: size, height: size }}>
+      {shadow ? (
         <Animated.View
           style={[
-            styles.starAntenna,
+            styles.shadow,
             {
-              top: -6 * scale,
-              transform: [{ translateY: starTranslateY }, { rotate: starRotate }],
+              left: (44 / VIEW) * size,
+              width: (88 / VIEW) * size,
+              top: (161 / VIEW) * size,
+              height: (10 / VIEW) * size,
+              backgroundColor: ink,
+              transform: [{ scaleX: shadowScale }],
             },
           ]}
-        >
-          <View
-            style={[
-              styles.sparklePoint,
-              {
-                width: 10 * scale,
-                height: 10 * scale,
-                backgroundColor: isThinking ? colors.accentCoral : colors.starHighlight,
-              },
-            ]}
-          />
-        </Animated.View>
-
-        {/* Main Vector Mascot Body */}
-        <Svg width={size} height={size} viewBox="0 0 64 64" fill="none">
-          <Defs>
-            <LinearGradient id={bodyGradId} x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-              <Stop offset="0%" stopColor="#8A6DF9" />
-              <Stop offset="50%" stopColor="#7A5AF8" />
-              <Stop offset="100%" stopColor="#623BF0" />
-            </LinearGradient>
-            <LinearGradient id={visorGradId} x1="10" y1="18" x2="54" y2="44" gradientUnits="userSpaceOnUse">
-              <Stop offset="0%" stopColor="#1B1C22" />
-              <Stop offset="100%" stopColor="#121316" />
-            </LinearGradient>
-            <LinearGradient id={bellyGradId} x1="32" y1="46" x2="32" y2="60" gradientUnits="userSpaceOnUse">
-              <Stop offset="0%" stopColor="rgba(255,255,255,0.22)" />
-              <Stop offset="100%" stopColor="rgba(255,255,255,0.06)" />
-            </LinearGradient>
-          </Defs>
-
-          {/* Left Ear / Antenna */}
-          <Circle cx="8" cy="27" r="4.5" fill="#623BF0" />
-          <Circle cx="8" cy="27" r="2.5" fill="#FAF8F5" />
-
-          {/* Right Ear / Antenna */}
-          <Circle cx="56" cy="27" r="4.5" fill="#623BF0" />
-          <Circle cx="56" cy="27" r="2.5" fill="#FAF8F5" />
-
-          {/* Outer Body Capsule */}
-          <Rect
-            x="9"
-            y="7"
-            width="46"
-            height="50"
-            rx="23"
-            fill={`url(#${bodyGradId})`}
-          />
-
-          {/* Glossy Top Highlight */}
-          <Path
-            d="M 18 12 Q 32 9 46 12"
-            stroke="rgba(255, 255, 255, 0.45)"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
-
-          {/* Belly Patch */}
-          <Path
-            d="M 20 46 C 20 53, 44 53, 44 46 Z"
-            fill={`url(#${bellyGradId})`}
-          />
-
-          {/* Dark Glass Visor */}
-          <Rect
-            x="13"
-            y="17"
-            width="38"
-            height="26"
-            rx="13"
-            fill={`url(#${visorGradId})`}
-          />
+        />
+      ) : null}
+      <Animated.View style={[StyleSheet.absoluteFill, { transform: bodyTransform }]}>
+        <Svg width={size} height={size} viewBox={`0 0 ${VIEW} ${VIEW}`}>
+          <Path d={BODY} fill={fill} />
+          {mood === "felice" ? (
+            <Path d="M74 102C82 113 96 113 104 102" stroke={ink} strokeWidth={3.2} strokeLinecap="round" fill="none" />
+          ) : null}
+          {mood === "calmo" ? (
+            <>
+              <Path d="M60 82C64 88 74 88 78 82M98 82C102 88 112 88 116 82" stroke={ink} strokeWidth={3.2} strokeLinecap="round" fill="none" />
+              <Path d="M83 106C87 109 93 109 97 106" stroke={ink} strokeWidth={3.2} strokeLinecap="round" fill="none" />
+            </>
+          ) : null}
         </Svg>
-
-        {/* Dynamic Animated Face (Eyes & Smile) Layer */}
-        <Animated.View
-          style={[
-            styles.faceLayer,
-            {
-              transform: [{ scaleY: blinkAnim }],
-            },
-          ]}
-        >
-          {isThinking ? (
-            /* Thinking State: Star Eyes */
-            <View style={styles.thinkingEyesRow}>
-              <Text style={[styles.starEyeText, { fontSize: 13 * scale }]}>✦</Text>
-              <Text style={[styles.starEyeText, { fontSize: 13 * scale }]}>✦</Text>
-            </View>
-          ) : isRoutine ? (
-            /* Routine State: Focused Calm Eyes */
-            <View style={styles.routineEyesRow}>
-              <View style={[styles.routineEyeBar, { width: 8 * scale, height: 2.2 * scale }]} />
-              <View style={[styles.routineEyeBar, { width: 8 * scale, height: 2.2 * scale }]} />
-            </View>
-          ) : isHappy ? (
-            /* Happy / Tapped State: Cute Curved Inverted Arcs (^ ^) */
-            <View style={styles.happyEyesRow}>
-              <Text style={[styles.happyEyeText, { fontSize: 12 * scale }]}>^</Text>
-              <Text style={[styles.happyEyeText, { fontSize: 12 * scale }]}>^</Text>
-            </View>
-          ) : (
-            /* Default Idle Eyes: Expressive Glowing Pupils */
-            <View style={styles.idleEyesRow}>
-              <View style={[styles.idleEye, { width: 7 * scale, height: 9 * scale }]}>
-                <View style={[styles.pupilGlint, { width: 2.5 * scale, height: 2.5 * scale }]} />
-              </View>
-              <View style={[styles.idleEye, { width: 7 * scale, height: 9 * scale }]}>
-                <View style={[styles.pupilGlint, { width: 2.5 * scale, height: 2.5 * scale }]} />
-              </View>
-            </View>
-          )}
-
-          {/* Cheeks blush */}
-          <View style={styles.cheeksRow}>
-            <View
-              style={[
-                styles.blush,
-                { width: 5 * scale, height: 2.5 * scale, backgroundColor: colors.cardSurfacePink },
-              ]}
-            />
-            <View
-              style={[
-                styles.blush,
-                { width: 5 * scale, height: 2.5 * scale, backgroundColor: colors.cardSurfacePink },
-              ]}
-            />
-          </View>
-
-          {/* Sweet Mouth Smile */}
-          <View style={[styles.mouthSmile, { width: 6 * scale, height: 3 * scale }]} />
-        </Animated.View>
+        {eyes !== undefined ? (
+          <Animated.View
+            style={{
+              position: "absolute",
+              left: eyes.x * scale,
+              top: eyes.y * scale,
+              width: eyes.w * scale,
+              height: eyes.h * scale,
+              transform: [{ scaleY: blinkScale }],
+            }}
+          >
+            <Svg width={eyes.w * scale} height={eyes.h * scale} viewBox={`${eyes.x} ${eyes.y} ${eyes.w} ${eyes.h}`}>
+              {eyes.eyes.map(([cx, cy, rx, ry]) => (
+                <Ellipse key={cx} cx={cx} cy={cy} rx={rx} ry={ry} fill={ink} />
+              ))}
+            </Svg>
+          </Animated.View>
+        ) : null}
+        {mood === "pensa"
+          ? [74, 88, 102].map((cx, index) => {
+              const start = index * 0.125;
+              const rise = dots.interpolate({
+                inputRange: [0, start, start + 0.25, start + 0.5, 1],
+                outputRange: [0, 0, -5 * scale, 0, 0],
+              });
+              const opacity = dots.interpolate({
+                inputRange: [0, start, start + 0.25, start + 0.5, 1],
+                outputRange: [0.45, 0.45, 1, 0.45, 0.45],
+              });
+              const r = 4.5 * scale;
+              return (
+                <Animated.View
+                  key={cx}
+                  style={{
+                    position: "absolute",
+                    left: cx * scale - r,
+                    top: 106 * scale - r,
+                    width: r * 2,
+                    height: r * 2,
+                    borderRadius: r,
+                    backgroundColor: ink,
+                    opacity: reduceMotion ? 1 : opacity,
+                    transform: [{ translateY: rise }],
+                  }}
+                />
+              );
+            })
+          : null}
       </Animated.View>
-    </Pressable>
+    </View>
+  );
+}
+
+/** The bubble alone at avatar size: no loop, no shadow. */
+export function MascotAvatar({ size = 28 }: { readonly size?: number }) {
+  const { colors } = useTheme();
+  return (
+    <View accessible={false} importantForAccessibility="no-hide-descendants" aria-hidden style={{ width: size, height: size }}>
+      <Svg width={size} height={size} viewBox={`0 0 ${VIEW} ${VIEW}`}>
+        <Path d={BODY} fill={colors.sky} />
+        <Circle cx={76} cy={74} r={9} fill={colors.inkOnPastel} />
+        <Circle cx={110} cy={74} r={9} fill={colors.inkOnPastel} />
+        <Path d="M76 108C84 114 96 114 104 108" stroke={colors.inkOnPastel} strokeWidth={8} strokeLinecap="round" fill="none" />
+      </Svg>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    alignItems: "center",
-    justifyContent: "center",
-    ...Platform.select({
-      web: {
-        outlineStyle: "none",
-        outlineWidth: 0,
-        userSelect: "none",
-        cursor: "pointer",
-      } as any,
-    }),
-  },
-  mascotWrap: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  starAntenna: {
+  shadow: {
     position: "absolute",
-    zIndex: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sparklePoint: {
-    borderRadius: 2,
-    transform: [{ rotate: "45deg" }],
-  },
-  faceLayer: {
-    position: "absolute",
-    top: "33%",
-    width: "48%",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  idleEyesRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    paddingHorizontal: 3,
-  },
-  idleEye: {
-    borderRadius: 5,
-    backgroundColor: "#78C864", // Fresh mint glowing gaze
-    alignItems: "flex-end",
-    paddingTop: 1.5,
-    paddingRight: 1.5,
-  },
-  pupilGlint: {
     borderRadius: 999,
-    backgroundColor: "#FFFFFF",
-  },
-  happyEyesRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    paddingHorizontal: 2,
-  },
-  happyEyeText: {
-    color: "#78C864",
-    fontWeight: "900",
-    lineHeight: 14,
-  },
-  thinkingEyesRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    paddingHorizontal: 2,
-  },
-  starEyeText: {
-    color: "#F5DF98",
-    fontWeight: "700",
-    lineHeight: 15,
-  },
-  routineEyesRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    paddingHorizontal: 3,
-  },
-  routineEyeBar: {
-    borderRadius: 2,
-    backgroundColor: "#78C864",
-  },
-  cheeksRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-    marginTop: 2,
-    paddingHorizontal: 1,
-    opacity: 0.85,
-  },
-  blush: {
-    borderRadius: 999,
-  },
-  mouthSmile: {
-    borderBottomWidth: 1.5,
-    borderBottomColor: "rgba(255, 255, 255, 0.75)",
-    borderBottomLeftRadius: 6,
-    borderBottomRightRadius: 6,
-    marginTop: 1,
+    opacity: 0.1,
   },
 });

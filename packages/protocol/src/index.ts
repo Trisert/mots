@@ -13,6 +13,13 @@ export {
   SESSION_CAPABILITY_PATTERN,
   type SessionCapability,
 } from "./session-capability.ts";
+export {
+  MAX_CATALOG_MODELS,
+  parseModelCatalog,
+  type ModelCatalogEntry,
+  type ModelCatalogProvider,
+  type ModelCatalogResponse,
+} from "./model-catalog.ts";
 
 export const ROOT_CONVERSATION_ID = 1;
 export const MAX_PROMPT_CHARACTERS = 100_000;

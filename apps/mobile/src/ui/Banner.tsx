@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../context/ThemeContext";
-import { CloseIcon } from "../components/Icon";
-import { fonts, hit, radius, spacing, type as typeScale } from "../theme";
+import { AlertIcon, CloseIcon } from "../components/Icon";
+import { hit, radius, spacing, type as typeScale } from "../theme";
 
 type Props = {
   readonly message: string;
@@ -13,7 +13,7 @@ type Props = {
 
 export function Banner({ message, tone = "danger", actionLabel, onAction, onDismiss }: Props) {
   const { colors } = useTheme();
-  // Flat and colourless: a failure is marked by the inverted [!] of the Build Log, not by red.
+  // A card on the ground; the alert icon in the danger colour marks a failure, the words explain it.
   const foreground = colors.textPrimary;
 
   return (
@@ -22,19 +22,19 @@ export function Banner({ message, tone = "danger", actionLabel, onAction, onDism
       accessibilityLiveRegion="polite"
       style={[
         styles.banner,
-        { borderColor: colors.rule },
+        { borderColor: colors.line, backgroundColor: colors.card },
       ]}
     >
       <View style={styles.body}>
         {tone === "danger" ? (
-          <Text
+          <View
             aria-hidden
             accessibilityElementsHidden
-            importantForAccessibility="no"
-            style={[styles.mark, { backgroundColor: colors.invertBg, color: colors.invertFg }]}
+            importantForAccessibility="no-hide-descendants"
+            style={styles.mark}
           >
-            [!]
-          </Text>
+            <AlertIcon size={16} color={colors.danger} />
+          </View>
         ) : null}
         <Text
           accessibilityLabel={tone === "danger" ? `Errore: ${message}` : undefined}
@@ -84,12 +84,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   mark: {
-    ...typeScale.mono,
-    fontFamily: fonts.monoMedium,
-    borderRadius: radius.xs,
-    overflow: "hidden",
-    paddingHorizontal: 3,
-    paddingVertical: 1,
+    height: typeScale.small.lineHeight,
+    justifyContent: "center",
   },
   message: {
     ...typeScale.small,

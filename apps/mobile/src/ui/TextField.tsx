@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from "react-native";
+import { AlertIcon } from "../components/Icon";
 import { useTheme } from "../context/ThemeContext";
 import { fonts, radius, spacing, type as typeScale } from "../theme";
 
@@ -55,27 +56,29 @@ export function TextField({
           {
             color: colors.textPrimary,
             backgroundColor: colors.field,
-            borderColor: error !== undefined ? colors.rule : focused ? colors.borderMedium : colors.fieldBorder,
-            borderWidth: error !== undefined ? 1.5 : StyleSheet.hairlineWidth,
+            borderColor: error !== undefined ? colors.danger : focused ? colors.focus : colors.fieldBorder,
+            borderWidth: error !== undefined || focused ? 2 : 1,
           },
         ]}
       />
       {error !== undefined ? (
-        <Text
-          accessibilityRole="alert"
-          accessibilityLabel={`Errore: ${error}`}
-          style={[styles.hint, { color: colors.textPrimary }]}
-        >
-          <Text
+        <View style={styles.errorRow}>
+          <View
             aria-hidden
             accessibilityElementsHidden
-            importantForAccessibility="no"
-            style={[styles.mark, { backgroundColor: colors.invertBg, color: colors.invertFg }]}
+            importantForAccessibility="no-hide-descendants"
+            style={styles.mark}
           >
-            [!]
+            <AlertIcon size={14} color={colors.danger} />
+          </View>
+          <Text
+            accessibilityRole="alert"
+            accessibilityLabel={`Errore: ${error}`}
+            style={[styles.hint, styles.errorText, { color: colors.textPrimary }]}
+          >
+            {error}
           </Text>
-          {` ${error}`}
-        </Text>
+        </View>
       ) : hint !== undefined ? (
         <Text style={[styles.hint, { color: colors.textSecondary }]}>{hint}</Text>
       ) : null}
@@ -90,13 +93,22 @@ const styles = StyleSheet.create({
   label: {
     ...typeScale.label,
   },
+  errorRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.xs + 2,
+  },
   mark: {
-    fontFamily: fonts.monoMedium,
+    height: typeScale.small.lineHeight,
+    justifyContent: "center",
+  },
+  errorText: {
+    flex: 1,
   },
   input: {
     minHeight: 48,
     borderWidth: 1,
-    borderRadius: radius.md + 3,
+    borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontFamily: fonts.regular,

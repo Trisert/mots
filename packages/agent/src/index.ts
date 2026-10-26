@@ -2,6 +2,14 @@ export { isAllowedAgentModel, ModelNotAllowedError, type ModelCatalog } from "./
 export { createMotsHarnessOptions, type MotsHarnessOptions } from "./chat.ts";
 export { createStubModels } from "./stub-models.ts";
 export {
+  isOfferedModel,
+  modelCatalog,
+  modelPolicy,
+  PROVIDER_NAMES,
+  type CatalogSource,
+  type ModelPolicy,
+} from "./model-catalog.ts";
+export {
   API_KEY_ENV,
   createMotsModels,
   DEFAULT_MODELS,

@@ -491,7 +491,8 @@ describe("createMotsModels", () => {
     expect(urls).toEqual([]);
     expect(models.getModels("openrouter").length).toBeGreaterThan(0);
     expect(models.getModels("nvidia").length).toBeGreaterThan(0);
-    expect(models.getModels("kilo")).toEqual([]);
+    // Kilo's free tier is offered from the built-in list, without a fetch.
+    expect(models.getModel("kilo", "reflection/beam-free")).toBeDefined();
     expect(models.getModels("vercel-ai-gateway")).toEqual([]);
   });
 
@@ -507,7 +508,7 @@ describe("createMotsModels", () => {
     );
     expect(urls).toEqual([]);
     expect(models.getModels("nvidia").length).toBeGreaterThan(0);
-    expect(models.getModels("kilo")).toEqual([]);
+    expect(models.getModel("kilo", "kilo-auto/free")).toBeDefined();
     expect(models.getModels("vercel-ai-gateway")).toEqual([]);
   });
 
@@ -542,7 +543,7 @@ describe("createMotsModels", () => {
     );
     expect(urls).toEqual([VERCEL_GATEWAY_MODELS_URL]);
     expect(models.getModel("vercel-ai-gateway", "custom/vercel")).toBeDefined();
-    expect(models.getModels("kilo")).toEqual([]);
+    expect(models.getModel("kilo", "reflection/beam-free")).toBeDefined();
   });
 
   test("falls back to the hardcoded Kilo models when the catalog times out", async () => {
@@ -585,8 +586,23 @@ describe("createMotsModels", () => {
     );
     expect(urls).toEqual([VERCEL_GATEWAY_MODELS_URL]);
     expect(models.getModels("vercel-ai-gateway")).toEqual([]);
-    expect(models.getModels("kilo")).toEqual([]);
+    expect(models.getModel("kilo", "reflection/beam-free")).toBeDefined();
     expect(models.getModels("openrouter").length).toBeGreaterThan(0);
+  });
+
+  test("fetches the Vercel catalog for another session when its key is set", async () => {
+    const urls: string[] = [];
+    const fetchImpl: CatalogFetch = async (url, init) => {
+      urls.push(url);
+      if (url !== VERCEL_GATEWAY_MODELS_URL) return hangUntilAbort(url, init);
+      return jsonResponse(vercelCatalog);
+    };
+    const models = await createMotsModels({ AI_GATEWAY_API_KEY: "key" }, "openrouter", {
+      fetch: fetchImpl,
+      timeoutMs: 50,
+    });
+    expect(urls).toEqual([VERCEL_GATEWAY_MODELS_URL]);
+    expect(models.getModel("vercel-ai-gateway", "custom/vercel")).toBeDefined();
   });
 
   test("attaches an abort signal when the caller does not override the timeout", async () => {

@@ -7,13 +7,14 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "bun run --filter @mots/server dev",
+    "setup": "bun run scripts/setup.ts",
+    "dev": "bun run scripts/dev.ts",
     "dev:server": "bun run --cwd apps/server dev",
     "dev:server:lan": "bun run --cwd apps/server dev:lan",
     "dev:mobile": "bun run --cwd apps/mobile start",
     "dev:web": "bun run --cwd apps/mobile web",
     "typecheck": "bun run --filter '*' typecheck",
-    "test": "bun test packages/protocol packages/client packages/agent apps/server/test apps/mobile/test",
+    "test": "bun test packages/protocol packages/client packages/agent apps/server/test apps/mobile/test scripts/test",
     "check": "bun run typecheck && bun run check:server",
     "check:server": "bun run --cwd apps/server check",
     "check:server:staging": "bun run --cwd apps/server check:staging",

@@ -15,6 +15,13 @@ Aggiungi questi file alla conoscenza del progetto (dall'integrazione GitHub del 
 | `packages/protocol/src/index.ts` | Il protocollo wire: ogni nuova funzione passa da qui. |
 | `packages/agent/src/chat.ts` | Preambolo, tool e sezioni dell'agente. |
 | `apps/server/src/session.ts` | Il Durable Object `Session`. |
+| `apps/mobile/src/palette.ts`, `apps/mobile/src/theme.ts` | I token del design system nel codice. |
+| `packages/agent/src/model-catalog.ts` | Quali modelli e provider l'app può scegliere. |
+
+Il design system e i mockup sono Claude Artifact, non file del repository. Sono privati: per aprirli dal progetto devono essere condivisi con chi ci lavora.
+
+- Design system Mots: https://claude.ai/artifact/HWoqJFg45sk4wqpKVKuMSW
+- Mockup delle schermate: https://claude.ai/artifact/B2AKYaN547r1ghPJbMqSK9
 
 Dopo ogni merge su `main`, risincronizza i file del progetto.
 
@@ -49,14 +56,18 @@ Per lavori indipendenti si possono usare subagenti in parallelo, ognuno in un wo
 
 ## Stato alla data di questa pagina
 
-Branch `claude/funny-wozniak-jps2ms`, 2026-10-26:
+Branch `claude/funny-wozniak-jps2ms`, 2026-10-26. La PR #24 (fuso orario, `forget`, M12, M24, accessibilità) è già su `main`. Dopo, sul branch:
 
-- Fuso orario della sessione (`session.setTimezone`).
-- `forget` sicuro e avviso quando la memoria è piena.
-- M12: i comandi restano in coda mentre il socket si riconnette.
-- M24: `runError` è un codice; il testo italiano è nell'app.
-- `docs/ROADMAP.md`, questa pagina e `CLAUDE.md`.
+- Icone SVG al posto di `[!]`, `[+]`, `[~]` negli errori e nelle righe degli strumenti.
+- `bun run setup` e `bun run dev [--web]`: secret locali generati e app che punta al Worker sulla LAN, per provare sul telefono.
+- Campo di scrittura su una riga, senza il rettangolo di focus del browser.
+- Selettore modelli in una schermata dedicata, caricato da `GET /api/sessions/:code/models`. Le chiavi dei provider restano sul server.
+- Design system Mots nell'app: palette, Figtree, forme a pillola e la mascotte a fumetto animata.
 
-`bun run test`: 217 test, 0 falliti. `bun run check`: typecheck e dry-run del Worker passano. Non è stato avviato Wrangler né l'app: il comportamento live non è verificato.
+`bun run test`: 274 test, 0 falliti. `bun run check` passa. Provato nel browser contro un Worker locale con `MOTS_FAKE_LLM=stub`, in tema chiaro e scuro. Non provato su un telefono vero.
 
-Prossimi passi consigliati, in ordine: M15 (registrazione push nell'app), poi account e tetto di spesa (Fase 1 in `docs/ROADMAP.md`).
+Prossimi passi consigliati, in ordine:
+
+1. Routine e ricordi nel protocollo e nel server, poi la barra in basso (Chat, Routine, Memoria, Profilo) dei mockup.
+2. M15: registrazione push nell'app.
+3. Account e tetto di spesa (Fase 1 in `docs/ROADMAP.md`).

@@ -3,7 +3,6 @@ import {
   AccessibilityInfo,
   ActivityIndicator,
   Alert,
-  Animated,
   FlatList,
   Platform,
   Pressable,
@@ -31,16 +30,17 @@ import { Composer } from "../components/Composer";
 import { ChevronDownIcon, MenuIcon, PlusIcon } from "../components/Icon";
 import { MarkdownText } from "../components/MarkdownText";
 import { MessageBubble } from "../components/MessageBubble";
+import { ModelPicker } from "../components/ModelPicker";
 import { SessionSheet } from "../components/SessionSheet";
 import { probeSession, type SessionAccess } from "../api";
 import { useMotsSession } from "../hooks/useMotsSession";
-import { presentConnection, presentError, presentModel, presentRunError } from "../present";
-import { fonts, motion, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
+import { presentConnection, presentError, presentModel, presentRunError, providerLabel } from "../present";
+import { fonts, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TOOL_LABELS } from "../tools";
 import type { Identity } from "../storage";
 import { Banner } from "../ui/Banner";
 import { Button } from "../ui/Button";
-import { BrandMark } from "../ui/BrandMark";
+import { Mascot } from "../components/Mascot";
 import { IconButton } from "../ui/IconButton";
 
 const SUGGESTIONS = [
@@ -94,6 +94,8 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const closePicker = useCallback(() => setPickerOpen(false), []);
 
   useEffect(() => {
     let alive = true;
@@ -283,7 +285,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const titleLabel = connection.tone === "ok" && model !== undefined ? model.shortName : connection.label;
   const pillDescription = model === undefined
     ? `${connection.label}. Il server non ha ancora indicato il modello.`
-    : `${connection.label}. Modello ${model.provider}, ${model.modelId}.`;
+    : `${connection.label}. Modello ${providerLabel(model.provider)}, ${model.modelId}.`;
 
   const footer = (
     <View style={styles.footer}>
@@ -360,7 +362,9 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     </View>
   ) : (
     <View style={styles.empty}>
-      <BrandMark size={44} />
+      <View style={styles.emptyMascot}>
+        <Mascot mood="felice" size={120} shadow />
+      </View>
       <Text accessibilityRole="header" maxFontSizeMultiplier={1.6} style={styles.greeting}>
         Ciao{identity.username.length > 0 ? `, ${identity.username}` : ""}.
       </Text>
@@ -401,8 +405,8 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
           </IconButton>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${pillDescription} Apri il menu.`}
-            onPress={() => setSheetOpen(true)}
+            accessibilityLabel={`${pillDescription} Cambia modello.`}
+            onPress={() => setPickerOpen(true)}
             style={({ pressed }) => [styles.headerCenter, pressed && styles.pressed]}
           >
             {connection.tone === "ok" ? null : (
@@ -506,7 +510,19 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
           onApiUrlChange={(apiUrl) => {
             void onIdentityChange({ ...identity, apiUrl });
           }}
-          onModelSelect={(providerId, modelId) => {
+          onOpenModels={() => {
+            setSheetOpen(false);
+            setPickerOpen(true);
+          }}
+        />
+
+        <ModelPicker
+          visible={pickerOpen}
+          apiUrl={identity.apiUrl}
+          sessionId={identity.sessionId}
+          agent={active?.agent}
+          onClose={closePicker}
+          onSelect={(providerId, modelId) => {
             if (activeConversationId === undefined) return false;
             return client.setModel(activeConversationId, providerId, modelId);
           }}
@@ -516,62 +532,25 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   );
 }
 
-function useReduceMotion(): boolean {
-  const [reduceMotion, setReduceMotion] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    void AccessibilityInfo.isReduceMotionEnabled()
-      .then((enabled) => {
-        if (alive) setReduceMotion(enabled);
-      })
-      .catch(() => undefined);
-    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", (enabled) => {
-      if (alive) setReduceMotion(enabled);
-    });
-    return () => {
-      alive = false;
-      subscription.remove();
-    };
-  }, []);
-  return reduceMotion;
-}
-
+/** Mots thinking: the sky mascot with its rising dots. Still under reduced motion. */
 function Thinking() {
   const { colors } = useTheme();
-  const reduceMotion = useReduceMotion();
-  const opacity = useRef(new Animated.Value(0.45)).current;
-  useEffect(() => {
-    if (reduceMotion) return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: motion.slow,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 0.45,
-          duration: motion.slow,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [opacity, reduceMotion]);
-  if (reduceMotion) {
-    return <Text style={[stylesThinking.text, { color: colors.textSecondary }]}>Sta scrivendo</Text>;
-  }
   return (
-    <Animated.Text style={[stylesThinking.text, { color: colors.textSecondary, opacity }]}>
-      Sta scrivendo
-    </Animated.Text>
+    <View style={stylesThinking.row}>
+      <Mascot mood="pensa" size={44} />
+      <Text style={[stylesThinking.text, { color: colors.textSecondary }]}>Sta scrivendo</Text>
+    </View>
   );
 }
 
 const stylesThinking = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
   text: {
-    ...typeScale.body,
+    ...typeScale.small,
   },
 });
 
@@ -616,17 +595,22 @@ function createStyles(colors: ThemeColors) {
       minHeight: 56,
       flexDirection: "row",
       alignItems: "center",
+      justifyContent: "space-between",
+      gap: spacing.sm,
       paddingHorizontal: spacing.xs,
       backgroundColor: colors.bgMain,
     },
+    // The model as a white pill in the middle of the header; it opens the picker.
     headerCenter: {
-      flex: 1,
+      flexShrink: 1,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
       gap: 6,
       minHeight: 44,
-      paddingHorizontal: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.pill,
+      backgroundColor: colors.card,
     },
     headerTitle: {
       ...typeScale.bodyMedium,
@@ -654,10 +638,11 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.md,
       paddingVertical: spacing.xxl,
     },
+    emptyMascot: {
+      marginBottom: spacing.sm,
+    },
     greeting: {
       ...typeScale.display,
-      fontSize: 40,
-      lineHeight: 42,
       textAlign: "center",
       color: colors.textPrimary,
     },
@@ -676,14 +661,13 @@ function createStyles(colors: ThemeColors) {
     suggestion: {
       minHeight: 44,
       justifyContent: "center",
-      paddingHorizontal: spacing.md,
+      paddingHorizontal: spacing.lg,
       borderRadius: radius.pill,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.fieldBorder,
-      backgroundColor: colors.field,
+      backgroundColor: colors.card,
+      ...shadows.card,
     },
     suggestionPressed: {
-      backgroundColor: colors.surfaceSoft,
+      backgroundColor: colors.sky,
     },
     suggestionTitle: {
       ...typeScale.label,
