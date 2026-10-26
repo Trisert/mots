@@ -54,7 +54,7 @@ Run from the repo root unless noted.
 | --- | --- |
 | `bun install --frozen-lockfile` | Install workspace dependencies. |
 | `bun run typecheck` | `tsc` in every workspace. |
-| `bun run test` | Bun tests for protocol, client, agent, the Worker gate, and mobile pure functions. The suite is 257 tests. |
+| `bun run test` | Bun tests for protocol, client, agent, the Worker gate, and mobile pure functions. The suite is 274 tests. |
 | `bun run check:server` | `wrangler deploy --dry-run --env=""` for the top-level Worker `mots`. |
 | `bun run check:server:staging` | `wrangler deploy --dry-run --env staging` for `mots-staging`. Does not publish. |
 | `bun run check` | Typecheck, then the top-level Worker dry-run. This is the gate for a PR. |
@@ -108,7 +108,8 @@ Do not "fix" a 503 by editing Worker code. Fix the runtime first.
 - The code defaults to `kilo` / `reflection/beam-free` (`packages/agent/src/provider.ts`, `DEFAULT_MODELS`). An unknown `MOTS_PROVIDER` fails session startup.
 - Onboarding edits the server URL and saves it with the identity. Android still defaults to `http://10.0.2.2:8787`, everything else to `http://localhost:8787`, unless `EXPO_PUBLIC_MOTS_API_URL` is set at bundle time.
 - `ChatScreen` renders `state.error`. `failed` and `connecting` use different copy. Riprova after a terminal close builds a new `MotsClient`, because `connect()` ignores calls once the client has given up.
-- The model pill reads `snapshot.agent.model`. It does not change until the server reports the new model. A `model_not_allowed` refusal stays in `state.error`.
+- The model picker (`apps/mobile/src/components/ModelPicker.tsx`) loads `GET /api/sessions/:code/models`. The list and the `conversation.setModel` check share one policy, `modelPolicy` in `packages/agent/src/model-catalog.ts`: the selected provider, Kilo (free models only without `KILO_API_KEY`), and every provider whose key is set. Batch and `~…-latest` ids are hidden. There is no model list in the app; do not add one back.
+- The header title opens the picker and reads `snapshot.agent.model`. It does not change until the server reports the new model. A `model_not_allowed` refusal shows inside the picker.
 - The socket path still matches `[A-Za-z0-9_-]{1,128}`, but `getByName` runs only after `verifySessionCapability`. The Durable Object name is the uuid, never the full join code. `POST /api/sessions` does not create a Durable Object. The app stores and shares the full join code. Do not log session ids, prompts, or API keys.
 - Do not re-open a legacy uuid bypass. A stored bare uuid probes as `401` and the chat offers a new space or a join. The mobile adoption steps are in the README section "Mobile client adoption".
 - Rate limits in `apps/server/src/rate-limit.ts` are per Worker isolate. They use `CF-Connecting-IP` only. Do not add a second Durable Object class for them without a migration plan.

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  parseModelCatalog,
   formatScheduledInstruction,
   InvalidClientCommand,
   isTimezone,
@@ -369,5 +370,36 @@ describe("session timezone", () => {
         ),
       ).toThrow(InvalidClientCommand);
     }
+  });
+});
+
+describe("parseModelCatalog", () => {
+  const valid = {
+    providers: [{ id: "kilo", name: "Kilo" }],
+    models: [
+      {
+        provider: "kilo",
+        id: "reflection/beam-free",
+        name: "Reflection Beam",
+        free: true,
+        vision: false,
+        reasoning: true,
+        contextWindow: 128_000,
+        recommended: true,
+      },
+    ],
+    default: { provider: "kilo", modelId: "reflection/beam-free" },
+  };
+
+  test("accepts a well-formed catalog", () => {
+    expect(parseModelCatalog(valid)).toEqual(valid);
+  });
+
+  test("rejects malformed entries", () => {
+    expect(() => parseModelCatalog({ ...valid, models: [{ ...valid.models[0], free: "yes" }] })).toThrow();
+    expect(() => parseModelCatalog({ ...valid, models: [{ ...valid.models[0], contextWindow: -1 }] })).toThrow();
+    expect(() => parseModelCatalog({ ...valid, default: undefined })).toThrow();
+    expect(() => parseModelCatalog({ ...valid, providers: [{ id: "", name: "x" }] })).toThrow();
+    expect(() => parseModelCatalog(null)).toThrow();
   });
 });

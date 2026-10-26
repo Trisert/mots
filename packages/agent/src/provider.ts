@@ -601,39 +601,41 @@ export const kiloModels = async (
 };
 
 /**
- * Register the models this session can call. Kilo and Vercel publish live catalogs; those requests
- * run only for `provider` and abort after `CATALOG_TIMEOUT_MS`. OpenRouter and NVIDIA ship a
- * bundled catalog, so registering them does not touch the network.
+ * Register the models this session can call. Which of them a person may pick is `modelPolicy`'s call.
+ *
+ * - Kilo is always registered, because its free tier needs no key. Only a Kilo session fetches the
+ *   live catalog; any other session gets the built-in free models, so its startup stays offline.
+ * - Vercel is registered when it is selected or AI_GATEWAY_API_KEY is set, from its live catalog.
+ * - OpenRouter and NVIDIA ship a bundled catalog and never touch the network.
+ *
+ * Live catalogs are fetched in parallel, cached per isolate, and abort after `CATALOG_TIMEOUT_MS`.
  */
 export const createMotsModels = async (
   env: MotsEnvironment,
   provider: MotsProviderId,
   options?: CatalogLoadOptions,
 ): Promise<MutableModels> => {
+  if (!isMotsProviderId(provider)) throw new Error(`Unsupported provider: ${String(provider)}`);
   const models = createModels({ authContext: providerAuthContext(env) });
+  const wantsVercel =
+    provider === "vercel-ai-gateway" || (env[API_KEY_ENV["vercel-ai-gateway"]]?.trim().length ?? 0) > 0;
 
-  switch (provider) {
-    case "kilo":
-      try {
-        models.setProvider(kiloGatewayProvider(await kiloModels(options)));
-      } catch {
-        // kiloModels already falls back; this guards setProvider itself.
-      }
-      break;
-    case "vercel-ai-gateway":
-      try {
-        models.setProvider(vercelGatewayProvider(await gatewayModels(options)));
-      } catch {
-        // A timed-out or failed catalog leaves Vercel unregistered. Startup does not wait longer.
-      }
-      break;
-    case "openrouter":
-    case "nvidia":
-      break;
-    default: {
-      const unreachable: never = provider;
-      throw new Error(`Unsupported provider: ${String(unreachable)}`);
+  const [kilo, vercel] = await Promise.allSettled([
+    provider === "kilo" ? kiloModels(options) : Promise.resolve(KILO_FALLBACK_MODELS),
+    wantsVercel ? gatewayModels(options) : Promise.resolve(undefined),
+  ]);
+  try {
+    if (kilo.status === "fulfilled") models.setProvider(kiloGatewayProvider(kilo.value));
+  } catch {
+    // kiloModels already falls back; this guards setProvider itself.
+  }
+  try {
+    // A timed-out or failed catalog leaves Vercel unregistered. Startup does not wait longer.
+    if (vercel.status === "fulfilled" && vercel.value !== undefined) {
+      models.setProvider(vercelGatewayProvider(vercel.value));
     }
+  } catch {
+    // ignore
   }
 
   // Bundled catalogs. No network, so they do not delay startup for any provider.

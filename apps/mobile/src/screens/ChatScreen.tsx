@@ -31,10 +31,11 @@ import { Composer } from "../components/Composer";
 import { ChevronDownIcon, MenuIcon, PlusIcon } from "../components/Icon";
 import { MarkdownText } from "../components/MarkdownText";
 import { MessageBubble } from "../components/MessageBubble";
+import { ModelPicker } from "../components/ModelPicker";
 import { SessionSheet } from "../components/SessionSheet";
 import { probeSession, type SessionAccess } from "../api";
 import { useMotsSession } from "../hooks/useMotsSession";
-import { presentConnection, presentError, presentModel, presentRunError } from "../present";
+import { presentConnection, presentError, presentModel, presentRunError, providerLabel } from "../present";
 import { fonts, motion, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TOOL_LABELS } from "../tools";
 import type { Identity } from "../storage";
@@ -94,6 +95,8 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const closePicker = useCallback(() => setPickerOpen(false), []);
 
   useEffect(() => {
     let alive = true;
@@ -283,7 +286,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const titleLabel = connection.tone === "ok" && model !== undefined ? model.shortName : connection.label;
   const pillDescription = model === undefined
     ? `${connection.label}. Il server non ha ancora indicato il modello.`
-    : `${connection.label}. Modello ${model.provider}, ${model.modelId}.`;
+    : `${connection.label}. Modello ${providerLabel(model.provider)}, ${model.modelId}.`;
 
   const footer = (
     <View style={styles.footer}>
@@ -401,8 +404,8 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
           </IconButton>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${pillDescription} Apri il menu.`}
-            onPress={() => setSheetOpen(true)}
+            accessibilityLabel={`${pillDescription} Cambia modello.`}
+            onPress={() => setPickerOpen(true)}
             style={({ pressed }) => [styles.headerCenter, pressed && styles.pressed]}
           >
             {connection.tone === "ok" ? null : (
@@ -506,7 +509,19 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
           onApiUrlChange={(apiUrl) => {
             void onIdentityChange({ ...identity, apiUrl });
           }}
-          onModelSelect={(providerId, modelId) => {
+          onOpenModels={() => {
+            setSheetOpen(false);
+            setPickerOpen(true);
+          }}
+        />
+
+        <ModelPicker
+          visible={pickerOpen}
+          apiUrl={identity.apiUrl}
+          sessionId={identity.sessionId}
+          agent={active?.agent}
+          onClose={closePicker}
+          onSelect={(providerId, modelId) => {
             if (activeConversationId === undefined) return false;
             return client.setModel(activeConversationId, providerId, modelId);
           }}

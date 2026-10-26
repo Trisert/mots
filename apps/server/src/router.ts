@@ -1,4 +1,4 @@
-import { HTTP_ERROR } from "@mots/protocol";
+import { HTTP_ERROR, type ModelCatalogResponse } from "@mots/protocol";
 import { applyCors, corsPolicyFromEnv, decideCors } from "./cors.ts";
 import { clientAddress, MemoryRateLimiter, rateLimitPolicyFromEnv } from "./rate-limit.ts";
 import {
@@ -10,6 +10,7 @@ import {
 } from "./session-auth.ts";
 
 const sessionSocketRoute = /^\/api\/sessions\/([A-Za-z0-9_-]{1,128})\/?$/;
+const sessionModelsRoute = /^\/api\/sessions\/([A-Za-z0-9_-]{1,128})\/models\/?$/;
 
 export type SessionStub = {
   fetch(request: Request): Promise<Response>;
@@ -30,6 +31,8 @@ export type RouterDeps = {
   readonly limiter: MemoryRateLimiter;
   readonly now: () => number;
   readonly getSession: (sessionId: string) => SessionStub;
+  /** The models a session may switch to. The same policy guards `conversation.setModel`. */
+  readonly listModels: () => Promise<ModelCatalogResponse>;
 };
 
 const json = (body: unknown, status: number, headers?: HeadersInit): Response =>
@@ -126,6 +129,43 @@ export async function handleRequest(request: Request, deps: RouterDeps): Promise
         201,
       ),
     );
+  }
+
+  const modelsMatch = sessionModelsRoute.exec(url.pathname);
+  if (modelsMatch !== null) {
+    if (request.method !== "GET") {
+      return finish(json({ error: "Method not allowed" }, 405, { Allow: "GET" }));
+    }
+    const limited = deps.limiter.allow(
+      "connect",
+      address,
+      policy.connectLimit,
+      policy.connectWindowMs,
+      deps.now(),
+    );
+    if (!limited.ok) {
+      return finish(
+        json(errorBody(HTTP_ERROR.rateLimited, "Too many requests."), 429, {
+          "Retry-After": String(limited.retryAfterSeconds),
+        }),
+      );
+    }
+    const sessionSecret = configuredSecret(deps.env.MOTS_SESSION_SECRET);
+    if (sessionSecret === undefined) {
+      return finish(
+        json(
+          errorBody(HTTP_ERROR.sessionSecretUnconfigured, "The server has no MOTS_SESSION_SECRET."),
+          503,
+        ),
+      );
+    }
+    // Only someone holding a join code sees the catalog. It names the providers this server pays for.
+    if ((await verifySessionCapability(sessionSecret, modelsMatch[1]!)) === undefined) {
+      return finish(
+        json(errorBody(HTTP_ERROR.unauthorized, "The session code is not valid."), 401),
+      );
+    }
+    return finish(json(await deps.listModels(), 200, { "Cache-Control": "private, max-age=300" }));
   }
 
   const sessionMatch = sessionSocketRoute.exec(url.pathname);

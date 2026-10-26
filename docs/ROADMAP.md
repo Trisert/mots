@@ -39,6 +39,7 @@ Mots is a pocket companion: one session is a Cloudflare Durable Object running a
 Also landed on 2026-10-26, outside the M list:
 
 - **Session timezone.** The app sends `session.setTimezone` after every snapshot. The `app.timezone` doc feeds the clock section, so "at 9" means 9 local time. Without a stored zone the model still works in UTC.
+- **Model picker from the server.** `GET /api/sessions/:code/models` lists only models the session can switch to, with free, image, reasoning and context badges; the app no longer ships a hard-coded list. Keys stay on the server.
 - **Safe `forget`.** Exact match first; one substring match only for queries of 3+ characters; otherwise nothing is removed and candidates are listed. `remember` reports facts dropped at the 100-fact cap.
 
 ## Competitive landscape (October 2026)
