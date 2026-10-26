@@ -15,7 +15,7 @@ Aggiungi questi file alla conoscenza del progetto (dall'integrazione GitHub del 
 | `packages/protocol/src/index.ts` | Il protocollo wire: ogni nuova funzione passa da qui. |
 | `packages/agent/src/chat.ts` | Preambolo, tool e sezioni dell'agente. |
 | `apps/server/src/session.ts` | Il Durable Object `Session`. |
-| `apps/mobile/src/palette.ts`, `apps/mobile/src/theme.ts` | I token del design system nel codice. |
+| `apps/mobile/src/palette.ts`, `apps/mobile/src/theme.ts`, `apps/mobile/src/components/Mascot.tsx` | I token del design system e la mascotte nel codice. |
 | `packages/agent/src/model-catalog.ts` | Quali modelli e provider l'app può scegliere. |
 
 Il design system e i mockup sono Claude Artifact, non file del repository. Sono privati: per aprirli dal progetto devono essere condivisi con chi ci lavora.
@@ -56,7 +56,7 @@ Per lavori indipendenti si possono usare subagenti in parallelo, ognuno in un wo
 
 ## Stato alla data di questa pagina
 
-Branch `claude/funny-wozniak-jps2ms`, 2026-10-26. La PR #24 (fuso orario, `forget`, M12, M24, accessibilità) è già su `main`. Dopo, sul branch:
+Aggiornato su `main` (commit `714d63a`, PR #25 unita), 2026-10-26. La PR #24 (fuso orario, `forget`, M12, M24, accessibilità) e la PR #25 sono su `main`. Includono:
 
 - Icone SVG al posto di `[!]`, `[+]`, `[~]` negli errori e nelle righe degli strumenti.
 - `bun run setup` e `bun run dev [--web]`: secret locali generati e app che punta al Worker sulla LAN, per provare sul telefono.
