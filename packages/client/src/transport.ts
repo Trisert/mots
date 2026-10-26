@@ -1,5 +1,6 @@
 import {
   MAX_PROMPT_CHARACTERS,
+  parseClientCommand,
   parseServerEventEnvelope,
   ROOT_CONVERSATION_ID,
   type ClientCommand,
@@ -209,6 +210,29 @@ export class MotsClient {
         this.#outbox.cancel(command.requestId);
       }
     });
+  }
+
+  /**
+   * Send the phone's Expo push token. A token the protocol would reject is not sent:
+   * the server closes the socket on an invalid command.
+   */
+  registerPushToken(token: string): boolean {
+    const command = {
+      type: "pushToken.register",
+      requestId: newRequestId(),
+      token,
+    } satisfies Extract<ClientCommand, { readonly type: "pushToken.register" }>;
+    try {
+      parseClientCommand(JSON.stringify(command));
+    } catch {
+      return false;
+    }
+    return this.#send(command, false);
+  }
+
+  /** Drop the session's stored push token. No error is shown when the socket is down. */
+  clearPushToken(): boolean {
+    return this.#send({ type: "pushToken.clear", requestId: newRequestId() }, false);
   }
 
   setModel(conversationId: number, provider: string, modelId: string): Promise<boolean> {

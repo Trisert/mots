@@ -25,6 +25,7 @@ import { MessageBubble } from "../components/MessageBubble";
 import { SessionSheet } from "../components/SessionSheet";
 import { probeSession, type SessionAccess } from "../api";
 import { useMotsSession } from "../hooks/useMotsSession";
+import { usePushRegistration } from "../hooks/usePushRegistration";
 import { presentConnection, presentError, presentModel } from "../present";
 import { motion, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TOOL_LABELS } from "../tools";
@@ -128,6 +129,11 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const runningTools = (active?.tools ?? []).filter((tool) => tool.status !== "done");
   const typingOthers = (active?.typing ?? []).filter((name) => name !== identity.username);
   const connected = state.status === "connected";
+  const { notice: pushNotice, clearPushToken } = usePushRegistration({
+    client,
+    sessionId: identity.sessionId,
+    connected,
+  });
   const canWrite = connected && activeConversationId !== undefined;
   const connection = presentConnection(state.status, state.error);
   const model = presentModel(active?.agent);
@@ -218,11 +224,12 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
         style: "destructive",
         onPress: () => {
           setSheetOpen(false);
+          clearPushToken();
           onLeave();
         },
       },
     ]);
-  }, [onLeave]);
+  }, [clearPushToken, onLeave]);
 
   const fork = useCallback(
     (entry: TranscriptEntry) => {
@@ -404,6 +411,17 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
             keyboardDismissMode="interactive"
           />
           <View style={{ paddingBottom: keyboardVisible ? spacing.xs : Math.max(insets.bottom, spacing.sm) }}>
+            {pushNotice !== undefined ? (
+              <View style={styles.bannerWrap}>
+                <Banner
+                  tone="info"
+                  message={pushNotice.message}
+                  actionLabel={pushNotice.actionLabel}
+                  onAction={pushNotice.onAction}
+                  onDismiss={pushNotice.onDismiss}
+                />
+              </View>
+            ) : null}
             {showErrorBanner && state.error !== undefined ? (
               <View style={styles.bannerWrap}>
                 <Banner message={presentError(state.error)} onDismiss={() => client.clearError()} />
