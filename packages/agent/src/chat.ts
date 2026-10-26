@@ -15,6 +15,7 @@ import {
 } from "./provider.ts";
 import { useExpoAccessToken } from "./push-token.ts";
 import { fetchPageTool } from "./web.ts";
+import { createWebSearchTool, WEB_SEARCH_API_KEY_ENV } from "./web-search.ts";
 import { DeliverScheduledInstruction } from "./schedule.ts";
 import { scheduleLimitsFromEnv } from "./schedule-limits.ts";
 import { conversationSearchExtension, searchHistoryTool } from "./search.ts";
@@ -39,10 +40,20 @@ export async function createMotsHarnessOptions(
 ): Promise<HarnessOptions> {
   useExpoAccessToken(options.env?.EXPO_ACCESS_TOKEN);
   const scheduleTool = createScheduleTool(ensureWakeupAt, scheduleLimitsFromEnv(options.env));
+  // Without TAVILY_API_KEY the tool is absent, and the preamble does not mention it.
+  const webSearch = createWebSearchTool(options.env?.[WEB_SEARCH_API_KEY_ENV]);
+  const agentTools = [
+    rememberTool,
+    forgetTool,
+    scheduleTool,
+    searchHistoryTool,
+    fetchPageTool,
+    ...(webSearch === undefined ? [] : [webSearch]),
+  ];
   const motsExtension = defineExtension({
     name: "mots",
     tasks: [DeliverScheduledInstruction],
-    tools: [rememberTool, forgetTool, scheduleTool, searchHistoryTool, fetchPageTool],
+    tools: agentTools,
     sections: [
       section(
         "preamble",
@@ -52,7 +63,9 @@ export async function createMotsHarnessOptions(
           "Be concise by default and go deeper when the user asks. " +
           "You have durable memory, autonomous routines (scheduled cronjobs where you execute tasks and report back), and search across past conversations: " +
           "use remember for lasting facts and preferences, forget when asked to remove one, " +
-          "schedule for autonomous routines, scheduled cronjobs, and tasks that should happen later, search_history for earlier discussions, and fetch_page to read a public web link the user shares. " +
+          "schedule for autonomous routines, scheduled cronjobs, and tasks that should happen later, search_history for earlier discussions, " +
+          (webSearch === undefined ? "" : "web_search for current public information, ") +
+          "and fetch_page to read a public web link the user shares. " +
           "When setting up a routine or scheduled task, specify clear instructions for what you must execute. " +
           "When a scheduled routine fires, carry it out autonomously using your reasoning and tools, then report the results. " +
           "Never claim to have remembered, forgotten, or scheduled something unless the matching tool ran. " +
@@ -72,7 +85,7 @@ export async function createMotsHarnessOptions(
   const defaultAgent = {
     model: { provider, modelId },
     thinkingLevel: "off" as const,
-    tools: [rememberTool, forgetTool, scheduleTool, searchHistoryTool, fetchPageTool],
+    tools: agentTools,
   };
 
   return {

@@ -41,7 +41,8 @@ Also landed on 2026-10-26, outside the M list:
 - **Session timezone.** The app sends `session.setTimezone` after every snapshot. The `app.timezone` doc feeds the clock section, so "at 9" means 9 local time. Without a stored zone the model still works in UTC.
 - **Model picker from the server.** `GET /api/sessions/:code/models` lists only models the session can switch to, with free, image, reasoning and context badges; the app no longer ships a hard-coded list. Keys stay on the server.
 - **Mots design system in the app.** Pastel, rounded tokens, Figtree, and the animated speech-bubble mascot on onboarding, the empty chat, the thinking state and beside replies. The bottom tab bar from the mockups waits for Routine and Memoria data on the client.
-- **`fetch_page` tool.** Read-only: reads a public http(s) page and returns its title and text. Private, local and non-default-port addresses are refused, and redirects are checked hop by hop. Phase 2 still needs `web_search`.
+- **`fetch_page` tool.** Read-only: reads a public http(s) page and returns its title and text. Private, local and non-default-port addresses are refused, and redirects are checked hop by hop.
+- **`web_search` tool.** Tavily, enabled only when `TAVILY_API_KEY` is set; without the key the agent is not offered the tool. Returns up to five results, each with a title, URL and a snippet of at most 600 characters. Result addresses pass the same checks as `fetch_page`.
 - **Safe `forget`.** Exact match first; one substring match only for queries of 3+ characters; otherwise nothing is removed and candidates are listed. `remember` reports facts dropped at the 100-fact cap.
 
 ## Competitive landscape (October 2026)
@@ -82,7 +83,7 @@ One task per pull request, as `AGENTS.md` asks. Branch from current `main`, run 
 
 ### Phase 2. Act on the world
 
-- `web_search` and `fetch_page` tools (Cloudflare Browser Rendering is enough; no VM).
+- [x] `web_search` (Tavily, enabled by `TAVILY_API_KEY`) and `fetch_page` tools. No VM.
 - Connectors over MCP, read-only first: Google Calendar, then Gmail. OAuth tokens encrypted in the `User` object.
 - **Approvals.** A durable `AwaitApproval` task that blocks until the user answers a push with Approva / Rifiuta, and a protocol event for it. Every write tool goes through it.
 - **Cua Spaces** as the "computer" (see below).

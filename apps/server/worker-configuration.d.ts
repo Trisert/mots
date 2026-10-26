@@ -3,6 +3,8 @@ interface __BaseEnv_Env {
   OPENROUTER_API_KEY?: string;
   AI_GATEWAY_API_KEY?: string;
   NVIDIA_API_KEY?: string;
+  /** Optional. Enables the web_search tool (Tavily). Without it the agent is not offered the tool. */
+  TAVILY_API_KEY?: string;
   MOTS_PROVIDER?: string;
   MOTS_MODEL?: string;
   /** HMAC key for join codes. At least 16 characters. Rotating it invalidates every code. */
