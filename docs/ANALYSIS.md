@@ -1,5 +1,7 @@
 # Mots analysis
 
+> Status as of 2026-10-26: most M-tasks below are done. The live status table is in [ROADMAP.md](ROADMAP.md#m-task-status). This audit is kept as the record of why each task exists.
+
 Date: 2026-10-24. Scope: the whole monorepo as of `main` plus this setup PR. Method: read the Worker, Durable Object, protocol, client, agent, and mobile app; checked Pi Durable 1.2.0 types for `inspect` and `documentRetentionMs`; ran `bun run typecheck`, `bun run test`, and `wrangler deploy --dry-run`. No application behavior was changed.
 
 This is an MVP of a mobile AI companion: one session is a Durable Object, the model has memory, reminders, and history search, and the phone is a WebSocket client. The split between protocol, client, agent, and Worker is the right shape. It is not ready to put on the public internet. The README already says so. The gaps below are ordered so a later agent can pick one task, merge it, and leave the tree greener.

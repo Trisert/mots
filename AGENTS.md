@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Operating guide for cloud agents working on Mots. The product README is in Italian and is the user-facing overview. This file is the source of truth for how to change the repo. The prioritized audit and the task list live in [docs/ANALYSIS.md](docs/ANALYSIS.md). Take one task from that list per pull request.
+Operating guide for cloud agents working on Mots. The product README is in Italian and is the user-facing overview. This file is the source of truth for how to change the repo. The prioritized audit and the task list live in [docs/ANALYSIS.md](docs/ANALYSIS.md). Which tasks are done, and the product plan, are in [docs/ROADMAP.md](docs/ROADMAP.md). Take one task per pull request.
 
 ## What this repo is
 
@@ -54,7 +54,7 @@ Run from the repo root unless noted.
 | --- | --- |
 | `bun install --frozen-lockfile` | Install workspace dependencies. |
 | `bun run typecheck` | `tsc` in every workspace. |
-| `bun run test` | Bun tests for protocol, client, agent, the Worker gate, and mobile pure functions. The suite is 134 tests. |
+| `bun run test` | Bun tests for protocol, client, agent, the Worker gate, and mobile pure functions. The suite is 217 tests. |
 | `bun run check:server` | `wrangler deploy --dry-run --env=""` for the top-level Worker `mots`. |
 | `bun run check:server:staging` | `wrangler deploy --dry-run --env staging` for `mots-staging`. Does not publish. |
 | `bun run check` | Typecheck, then the top-level Worker dry-run. This is the gate for a PR. |
