@@ -6,6 +6,7 @@ import {
   type Tx,
 } from "@earendil-works/pi-durable";
 import { formatScheduledInstruction } from "@mots/protocol";
+import { PushTokenDoc, readStoredPushToken, sendReminderPush } from "./push-token.ts";
 
 export type ScheduleCadence = {
   readonly unit: "minute" | "hour" | "day" | "week" | "month";
@@ -301,6 +302,21 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
               `Scheduled instruction ${task.input.id} conversation ${task.input.conversationId} is missing`,
             ),
           );
+        }
+        // The turn is already in the conversation. A push failure must not
+        // change `delivered`, or the next recurrence row is skipped.
+        if (delivered) {
+          try {
+            const stored = await runtime.snapshot(PushTokenDoc, context);
+            const token = readStoredPushToken(stored);
+            if (token !== undefined) await sendReminderPush(task.input, token);
+          } catch (error) {
+            try {
+              runtime.report(error);
+            } catch {
+              // Reporting the push failure must not skip the next row either.
+            }
+          }
         }
         await runtime.commit(async (tx) => {
           await commitDeliveryOutcome(tx, task.input, runtime.now(), delivered);

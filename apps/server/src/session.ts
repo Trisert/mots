@@ -18,11 +18,13 @@ import {
 } from "@earendil-works/pi-durable";
 import { openDurableObjectSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/cloudflare";
 import {
+  applyPushTokenCommand,
   createMotsHarnessOptions,
   createStubModels,
   isAllowedAgentModel,
   ModelNotAllowedError,
   type MotsEnvironment,
+  PushTokenDoc,
   resolveMotsProvider,
   scheduledDeadline,
 } from "@mots/agent";
@@ -515,6 +517,19 @@ export class Session extends DurableObject<Env> {
           requestId: command.requestId,
           ok: true,
           conversationId: command.conversationId,
+        });
+        return;
+      }
+      case "pushToken.register":
+      case "pushToken.clear": {
+        await this.#harness.commit(async (tx) => {
+          applyPushTokenCommand(await tx.doc(PushTokenDoc), command);
+        }, BACKGROUND_CONTEXT);
+        this.#send(socket, {
+          type: "command.result",
+          command: command.type,
+          requestId: command.requestId,
+          ok: true,
         });
         return;
       }
