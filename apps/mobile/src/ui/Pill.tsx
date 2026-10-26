@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../context/ThemeContext";
-import { radius, spacing, type as typeScale, type ThemeColors } from "../theme";
+import { radius, spacing, type as typeScale } from "../theme";
 import type { ConnectionTone } from "../present";
 
 type Props = {
@@ -9,32 +9,40 @@ type Props = {
   readonly accessibilityLabel?: string;
 };
 
+/**
+ * Outlined mono tag. State never depends on colour: online is a filled dot, waiting an
+ * outlined one, and a failure inverts the whole pill, the system's only highlight.
+ */
 export function Pill({ label, tone = "neutral", accessibilityLabel }: Props) {
   const { colors } = useTheme();
+  const inverted = tone === "danger";
+  const foreground = inverted ? colors.invertFg : colors.textPrimary;
   return (
     <View
       accessibilityLabel={accessibilityLabel ?? label}
-      style={[styles.pill, { backgroundColor: colors.cardSurfacePrimary, borderColor: colors.borderSubtle }]}
+      style={[
+        styles.pill,
+        {
+          backgroundColor: inverted ? colors.invertBg : "transparent",
+          borderColor: inverted ? colors.invertBg : colors.rule,
+        },
+      ]}
     >
-      <View style={[styles.dot, { backgroundColor: dotColor(colors, tone) }]} />
-      <Text numberOfLines={1} style={[styles.label, { color: colors.textPrimary }]}>
+      {tone === "neutral" ? null : (
+        <View
+          style={[
+            styles.dot,
+            tone === "ok"
+              ? { backgroundColor: foreground, borderColor: foreground }
+              : { backgroundColor: "transparent", borderColor: foreground },
+          ]}
+        />
+      )}
+      <Text numberOfLines={1} style={[styles.label, { color: foreground }]}>
         {label}
       </Text>
     </View>
   );
-}
-
-function dotColor(colors: ThemeColors, tone: ConnectionTone | "neutral"): string {
-  switch (tone) {
-    case "ok":
-      return colors.success;
-    case "danger":
-      return colors.danger;
-    case "wait":
-      return colors.accent;
-    default:
-      return colors.textFaint;
-  }
 }
 
 const styles = StyleSheet.create({
@@ -45,16 +53,17 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
     borderRadius: radius.pill,
     borderWidth: 1,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 4,
+    paddingHorizontal: spacing.md - 2,
+    paddingVertical: 3,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    borderWidth: 1,
   },
   label: {
-    ...typeScale.caption,
+    ...typeScale.mono,
     flexShrink: 1,
   },
 });

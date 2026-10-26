@@ -7,13 +7,20 @@ import {
   Text,
   View,
 } from "react-native";
+import { useFonts } from "expo-font";
 import {
-  useFonts,
-  InstrumentSans_400Regular,
-  InstrumentSans_500Medium,
-  InstrumentSans_600SemiBold,
-  InstrumentSans_700Bold,
-} from "@expo-google-fonts/instrument-sans";
+  InstrumentSerif_400Regular,
+  InstrumentSerif_400Regular_Italic,
+} from "@expo-google-fonts/instrument-serif";
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+} from "@expo-google-fonts/inter";
+import {
+  JetBrainsMono_400Regular,
+  JetBrainsMono_500Medium,
+} from "@expo-google-fonts/jetbrains-mono";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
@@ -44,10 +51,13 @@ function Splash() {
 function MainApp() {
   const { colors, isDark } = useTheme();
   const [fontsLoaded, fontError] = useFonts({
-    InstrumentSans_400Regular,
-    InstrumentSans_500Medium,
-    InstrumentSans_600SemiBold,
-    InstrumentSans_700Bold,
+    InstrumentSerif_400Regular,
+    InstrumentSerif_400Regular_Italic,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    JetBrainsMono_400Regular,
+    JetBrainsMono_500Medium,
   });
 
   const [identity, setIdentity] = useState<Identity | undefined>(undefined);
@@ -57,13 +67,13 @@ function MainApp() {
   useEffect(() => {
     let alive = true;
     if (Platform.OS === "web" && typeof document !== "undefined") {
-      const fontLinkId = "mots-google-font-instrument-sans";
+      const fontLinkId = "mots-google-fonts";
       if (!document.getElementById(fontLinkId)) {
         const link = document.createElement("link");
         link.id = fontLinkId;
         link.rel = "stylesheet";
         link.href =
-          "https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap";
+          "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap";
         document.head.appendChild(link);
       }
 
@@ -76,7 +86,7 @@ function MainApp() {
             height: 100%;
             margin: 0;
             padding: 0;
-            font-family: 'Instrument Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           }
           :focus-visible {
             outline: 2px solid var(--mots-focus, currentColor);

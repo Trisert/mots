@@ -26,7 +26,7 @@ import { SessionSheet } from "../components/SessionSheet";
 import { probeSession, type SessionAccess } from "../api";
 import { useMotsSession } from "../hooks/useMotsSession";
 import { presentConnection, presentError, presentModel, presentRunError } from "../present";
-import { motion, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
+import { fonts, motion, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TOOL_LABELS } from "../tools";
 import type { Identity } from "../storage";
 import { Banner } from "../ui/Banner";
@@ -320,23 +320,27 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     </View>
   ) : (
     <View style={styles.empty}>
+      <Text style={styles.kicker}>Mots · il tuo spazio</Text>
       <Text accessibilityRole="header" maxFontSizeMultiplier={1.6} style={styles.greeting}>
-        Ciao{identity.username.length > 0 ? `, ${identity.username}` : ""}
+        Ciao{identity.username.length > 0 ? `, ${identity.username}` : ""}.
       </Text>
       <Text style={styles.lead}>
         Quando vuoi. Puoi chiedermi di ricordare, di pianificare, o solo di parlare.
       </Text>
       <View style={styles.suggestions}>
-        {SUGGESTIONS.map((item) => (
+        {SUGGESTIONS.map((item, index) => (
           <Pressable
             key={item.title}
             accessibilityRole="button"
             accessibilityLabel={`${item.title}. ${item.hint}`}
             onPress={() => setInput(item.prompt)}
-            style={({ pressed }) => [styles.suggestion, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.suggestion, pressed && styles.suggestionPressed]}
           >
-            <Text style={styles.suggestionTitle}>{item.title}</Text>
-            <Text style={styles.suggestionHint}>{item.hint}</Text>
+            <Text style={styles.suggestionNumber}>{String(index + 1).padStart(2, "0")}</Text>
+            <View style={styles.suggestionText}>
+              <Text style={styles.suggestionTitle}>{item.title}</Text>
+              <Text style={styles.suggestionHint}>{item.hint}</Text>
+            </View>
           </Pressable>
         ))}
       </View>
@@ -503,7 +507,7 @@ function createStyles(colors: ThemeColors) {
     frameWide: {
       maxWidth: 440,
       marginVertical: spacing.lg,
-      borderRadius: radius.xl,
+      borderRadius: radius.card,
       overflow: "hidden",
       borderWidth: 1,
       borderColor: colors.borderSubtle,
@@ -517,7 +521,7 @@ function createStyles(colors: ThemeColors) {
       alignItems: "center",
       paddingHorizontal: spacing.sm,
       borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.borderSubtle,
+      borderBottomColor: colors.rule,
       backgroundColor: colors.bgMain,
     },
     headerCenter: {
@@ -527,8 +531,10 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.sm,
     },
     brand: {
-      ...typeScale.bodyMedium,
-      fontWeight: "700",
+      fontFamily: fonts.serif,
+      fontSize: 28,
+      lineHeight: 30,
+      letterSpacing: -0.6,
       color: colors.textPrimary,
     },
     list: {
@@ -541,12 +547,16 @@ function createStyles(colors: ThemeColors) {
     },
     empty: {
       flex: 1,
-      justifyContent: "center",
-      gap: spacing.lg,
-      paddingVertical: spacing.xxl,
+      justifyContent: "flex-end",
+      gap: spacing.md,
+      paddingVertical: spacing.xl,
+    },
+    kicker: {
+      ...typeScale.kicker,
+      color: colors.textSecondary,
     },
     greeting: {
-      ...typeScale.title,
+      ...typeScale.display,
       color: colors.textPrimary,
     },
     lead: {
@@ -554,25 +564,39 @@ function createStyles(colors: ThemeColors) {
       color: colors.textSecondary,
     },
     suggestions: {
-      gap: spacing.sm,
+      marginTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.rule,
     },
     suggestion: {
       minHeight: 64,
-      justifyContent: "center",
-      gap: 2,
-      paddingHorizontal: spacing.lg,
+      flexDirection: "row",
+      alignItems: "baseline",
+      gap: spacing.lg,
       paddingVertical: spacing.md,
-      borderRadius: radius.lg,
-      backgroundColor: colors.cardSurfacePrimary,
-      borderWidth: 1,
-      borderColor: colors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.borderMedium,
+    },
+    suggestionPressed: {
+      backgroundColor: colors.surfaceSoft,
+    },
+    suggestionNumber: {
+      ...typeScale.mono,
+      color: colors.textSecondary,
+      width: 20,
+    },
+    suggestionText: {
+      flex: 1,
+      gap: 2,
     },
     suggestionTitle: {
       ...typeScale.bodyMedium,
       color: colors.textPrimary,
     },
     suggestionHint: {
-      ...typeScale.small,
+      fontFamily: fonts.serifItalic,
+      fontSize: 18,
+      lineHeight: 22,
       color: colors.textSecondary,
     },
     connection: {
@@ -607,19 +631,19 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: spacing.sm,
     },
     danger: {
-      ...typeScale.small,
-      color: colors.danger,
+      ...typeScale.mono,
+      color: colors.textSecondary,
     },
     queued: {
-      borderRadius: radius.md,
-      backgroundColor: colors.cardSurfacePrimary,
+      borderRadius: radius.card,
       borderWidth: 1,
-      borderColor: colors.borderSubtle,
+      borderStyle: "dashed",
+      borderColor: colors.rule,
       padding: spacing.md,
       gap: 2,
     },
     queuedLabel: {
-      ...typeScale.caption,
+      ...typeScale.kicker,
       color: colors.textSecondary,
     },
     queuedText: {
@@ -632,11 +656,11 @@ function createStyles(colors: ThemeColors) {
       alignItems: "center",
       justifyContent: "space-between",
       paddingHorizontal: spacing.lg,
-      backgroundColor: colors.dangerSoft,
+      backgroundColor: colors.invertBg,
     },
     stripText: {
       ...typeScale.label,
-      color: colors.danger,
+      color: colors.invertFg,
       flex: 1,
     },
     stripAction: {
@@ -646,8 +670,8 @@ function createStyles(colors: ThemeColors) {
     },
     stripActionLabel: {
       ...typeScale.label,
-      fontWeight: "700",
-      color: colors.danger,
+      textDecorationLine: "underline",
+      color: colors.invertFg,
     },
     bannerWrap: {
       paddingHorizontal: spacing.lg,

@@ -21,6 +21,9 @@ type Props = {
   readonly hint?: string;
 };
 
+/** One line of text plus its vertical padding: the same height as the round buttons beside it. */
+const INPUT_MIN_HEIGHT = hit;
+
 const QUICK_ACTIONS = [
   {
     label: "Routine",
@@ -79,7 +82,7 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
       <View
         style={[
           styles.field,
-          { borderColor: focused ? colors.accent : colors.borderSubtle },
+          { borderColor: focused ? colors.rule : colors.borderMedium },
         ]}
       >
         <Pressable
@@ -89,7 +92,7 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
           onPress={() => setToolsOpen((open) => !open)}
           style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
         >
-          <PlusIcon size={18} color={toolsOpen ? colors.accent : colors.textSecondary} />
+          <PlusIcon size={18} color={toolsOpen ? colors.textPrimary : colors.textSecondary} />
         </Pressable>
         <TextInput
           accessibilityLabel="Messaggio"
@@ -99,12 +102,14 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
           placeholderTextColor={colors.textFaint}
           style={[styles.input, inputHeight !== undefined ? { height: inputHeight } : null]}
           multiline
+          // React Native Web renders a two-row textarea by default; start at one line and grow.
+          numberOfLines={1}
           maxLength={100_000}
-          selectionColor={colors.accent}
+          selectionColor={colors.textPrimary}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onContentSizeChange={(event) => {
-            const next = Math.min(Math.max(24, Math.round(event.nativeEvent.contentSize.height)), 140);
+            const next = Math.min(Math.max(INPUT_MIN_HEIGHT, Math.round(event.nativeEvent.contentSize.height)), 140);
             setInputHeight(next);
           }}
           onKeyPress={(event) => {
@@ -126,17 +131,19 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
           disabled={!canSend}
           style={({ pressed }) => [
             styles.send,
-            { backgroundColor: canSend ? colors.textPrimary : colors.surfaceSoft },
+            canSend
+              ? { backgroundColor: colors.invertBg, borderColor: colors.invertBg }
+              : { backgroundColor: "transparent", borderColor: colors.borderMedium },
             pressed && canSend && styles.pressed,
           ]}
         >
           {sending ? (
-            <ActivityIndicator color={colors.bgMain} />
+            <ActivityIndicator color={colors.textPrimary} />
           ) : (
             <ArrowUpIcon
               size={18}
-              color={canSend ? colors.bgMain : colors.textFaint}
-              strokeWidth={2.2}
+              color={canSend ? colors.invertFg : colors.textFaint}
+              strokeWidth={2}
             />
           )}
         </Pressable>
@@ -165,31 +172,27 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.sm,
     },
     tool: {
-      minHeight: hit,
+      minHeight: 36,
       flexDirection: "row",
       alignItems: "center",
       gap: spacing.sm,
       paddingHorizontal: spacing.md,
       borderRadius: radius.pill,
       borderWidth: 1,
-      borderColor: colors.borderSubtle,
-      backgroundColor: colors.cardSurfacePrimary,
+      borderColor: colors.rule,
     },
     toolLabel: {
       ...typeScale.label,
       color: colors.textPrimary,
     },
     field: {
-      minHeight: 56,
       flexDirection: "row",
       alignItems: "flex-end",
       gap: spacing.xs,
-      borderRadius: 28,
+      borderRadius: radius.card,
       borderWidth: 1,
-      backgroundColor: colors.cardSurfacePrimary,
-      paddingLeft: spacing.xs,
-      paddingRight: spacing.xs,
-      paddingVertical: spacing.xs,
+      backgroundColor: "transparent",
+      padding: spacing.xs,
     },
     iconButton: {
       width: hit,
@@ -200,10 +203,10 @@ function createStyles(colors: ThemeColors) {
     },
     input: {
       flex: 1,
-      minHeight: 24,
+      minHeight: INPUT_MIN_HEIGHT,
       maxHeight: 140,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.xs,
+      paddingVertical: (INPUT_MIN_HEIGHT - 22) / 2,
       fontFamily: fonts.regular,
       fontSize: 16,
       lineHeight: 22,
@@ -213,6 +216,7 @@ function createStyles(colors: ThemeColors) {
       width: hit,
       height: hit,
       borderRadius: hit / 2,
+      borderWidth: 1,
       alignItems: "center",
       justifyContent: "center",
     },
