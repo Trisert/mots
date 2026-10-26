@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import { BackHandler, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,6 +8,7 @@ import { useTheme } from "../context/ThemeContext";
 import { presentModel, providerLabel, type PresentedModel } from "../present";
 import { PROVIDER_MODELS, PROVIDERS } from "../models";
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon, CloseIcon, PlusIcon } from "./Icon";
+import { FOCUSABLE_SELECTOR, isEnabledElement, tabTrapIndex } from "../focus-trap";
 import { fonts, hit, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { Button } from "../ui/Button";
 import { TextField } from "../ui/TextField";
@@ -129,6 +130,50 @@ export function SessionSheet({
     return () => subscription.remove();
   }, [visible, onClose]);
 
+  const panelRef = useRef<ComponentRef<typeof View>>(null);
+  const closeRef = useRef<ComponentRef<typeof View>>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  // Web only: focus moves into the drawer, Escape closes it, Tab stays inside, and focus returns on close.
+  useEffect(() => {
+    if (!visible || Platform.OS !== "web") return;
+    const previous = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current as unknown as HTMLElement | null;
+    const close = closeRef.current as unknown as HTMLElement | null;
+    (close ?? panel)?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || panel === null) return;
+      const focusable = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+        isEnabledElement,
+      );
+      const active = document.activeElement;
+      const target = tabTrapIndex({
+        count: focusable.length,
+        index: focusable.findIndex((element) => element === active),
+        shift: event.shiftKey,
+        inside: active !== null && panel.contains(active),
+      });
+      if (target === undefined) return;
+      event.preventDefault();
+      focusable[target]?.focus();
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      if (previous !== null && document.body.contains(previous)) previous.focus();
+    };
+  }, [visible]);
+
   if (!visible) return null;
 
   const models = PROVIDER_MODELS[selectedProviderId] ?? [];
@@ -172,9 +217,20 @@ export function SessionSheet({
 
   return (
     <View style={styles.container} accessibilityViewIsModal>
-      <Pressable accessibilityLabel="Chiudi menu" style={styles.backdrop} onPress={onClose} />
+      <Pressable
+        style={styles.backdrop}
+        onPress={onClose}
+        focusable={false}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+        aria-hidden={true}
+      />
       <View
+        ref={panelRef}
         testID="session-sheet"
+        role="dialog"
+        aria-modal={true}
+        aria-label="Menu"
         style={[styles.sheet, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + spacing.sm }]}
       >
         <View style={styles.header}>
@@ -182,6 +238,7 @@ export function SessionSheet({
             Mots
           </Text>
           <Pressable
+            ref={closeRef}
             accessibilityRole="button"
             accessibilityLabel="Chiudi menu"
             onPress={onClose}
@@ -236,6 +293,7 @@ export function SessionSheet({
                       pressed && styles.rowPressed,
                     ]}
                   >
+                    {active ? <View style={styles.activeBar} /> : null}
                     <Text numberOfLines={1} style={[styles.itemTitle, active && styles.itemTitleActive]}>
                       {name}
                     </Text>
@@ -304,6 +362,7 @@ export function SessionSheet({
                       onPress={() => chooseModel(model.id)}
                       style={({ pressed }) => [styles.item, live && styles.itemActive, pressed && styles.rowPressed]}
                     >
+                      {live ? <View style={styles.activeBar} /> : null}
                       <View style={styles.itemCopy}>
                         <Text style={[styles.itemTitle, live && styles.itemTitleActive]}>{model.name}</Text>
                         <Text style={styles.itemMeta}>{model.tag}</Text>
@@ -557,6 +616,15 @@ function createStyles(colors: ThemeColors) {
     itemActive: {
       backgroundColor: colors.surfaceSoft,
     },
+    activeBar: {
+      position: "absolute",
+      left: 0,
+      top: "20%",
+      height: "60%",
+      width: 3,
+      borderRadius: 2,
+      backgroundColor: colors.textPrimary,
+    },
     rowPressed: {
       backgroundColor: colors.surfaceSoft,
     },
@@ -607,6 +675,7 @@ function createStyles(colors: ThemeColors) {
       flex: 1,
     },
     leave: {
+      minWidth: hit,
       minHeight: hit,
       justifyContent: "center",
       paddingHorizontal: spacing.sm,

@@ -177,9 +177,12 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
         <Modal visible transparent animationType="fade" onRequestClose={() => setModalOpen(false)}>
           <KeyboardAvoidingView style={styles.modalBackdrop} behavior="padding">
             <Pressable
-              accessibilityLabel="Chiudi"
               style={styles.modalOverlay}
               onPress={() => setModalOpen(false)}
+              focusable={false}
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+              aria-hidden={true}
             />
             <View style={styles.modalSheet}>
               <View style={styles.modalHeader}>
