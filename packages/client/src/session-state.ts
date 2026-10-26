@@ -21,6 +21,9 @@ import {
   type ServerEvent,
 } from "@mots/protocol";
 
+/** Stable reason for a run that ended silently. The app owns the wording. */
+export type RunErrorCode = "no_response";
+
 export interface TranscriptToolCall {
   readonly callId: string;
   readonly name: string;
@@ -99,7 +102,7 @@ export interface ConversationSnapshot {
     readonly message: string;
   };
   /** Set when a run ends without producing any assistant message. */
-  readonly runError?: string;
+  readonly runError?: RunErrorCode;
   readonly runHasAssistant?: boolean;
 }
 
@@ -258,8 +261,7 @@ function reduceAgentEvent(
         tools: [],
         ...(silentFailure
           ? {
-              runError:
-                "Il modello non ha risposto. Controlla i limiti o i crediti del provider e riprova.",
+              runError: "no_response",
             }
           : {}),
       };

@@ -31,6 +31,7 @@ export {
 } from "./schedule-limits.ts";
 export { applyPushTokenCommand, PushTokenDoc } from "./push-token.ts";
 export { scheduledDeadline } from "./schedule.ts";
+export { applyTimezone, clockText, TimezoneDoc } from "./timezone.ts";
 export {
   forgetTool,
   memorySection,

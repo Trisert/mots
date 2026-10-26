@@ -2,7 +2,7 @@
 
 Mots è un compagno AI mobile-first: ricorda le cose importanti, organizza promemoria, cerca nelle conversazioni passate e resta nella tua tasca. L'obiettivo è un'architettura platform-agnostic con un'app mobile come primo client, costruita sopra [Pi Durable](https://github.com/earendil-works/pi/tree/main/packages/durable) e Cloudflare Durable Objects.
 
-> **Stato: MVP in sviluppo attivo.** Monorepo funzionante. Typecheck di tutti i workspace, suite `bun run test` (134 test), dry-run del Worker e bundle Android verificati. Il Worker rifiuta sessioni anonime. Account utente, copertura E2E con LLM reale e deploy pubblico restano i prossimi passi.
+> **Stato: MVP in sviluppo attivo.** Monorepo funzionante. Typecheck di tutti i workspace, suite `bun run test` (217 test), dry-run del Worker e bundle Android verificati. Il Worker rifiuta sessioni anonime. Account utente, copertura E2E con LLM reale e deploy pubblico restano i prossimi passi.
 
 ## Cosa c'è già
 
@@ -231,7 +231,7 @@ I tool dell'agente (`remember`, `forget`, `schedule`, `search_history`) richiedo
 | `bun run dev:mobile` | Avvia Expo. |
 | `bun run dev:web` | Avvia l'anteprima web di Expo. |
 | `bun run typecheck` | Typecheck di tutti i package. |
-| `bun run test` | 134 test: protocollo, client, agent, gate del Worker e funzioni pure del mobile. |
+| `bun run test` | 217 test: protocollo, client, agent, gate del Worker e funzioni pure del mobile. |
 | `bun run check` | Typecheck + dry-run del Worker. |
 | `bun run check:server` | Solo `wrangler deploy --dry-run --env=""`. Resta sul Worker `mots`. |
 | `bun run check:server:staging` | Dry-run di `wrangler deploy --env staging`. Non pubblica. |
@@ -267,7 +267,7 @@ La persona dell'agente, l'orologio e la memoria vengono iniettati come sezioni d
 - [x] Agente con memoria, promemoria e ricerca. Provider predefinito: Kilo. Alternative da ambiente: OpenRouter, Vercel AI Gateway, NVIDIA.
 - [x] App mobile con onboarding, chat, sessioni e fork.
 - [x] Typecheck, dry-run Worker, bundle Android.
-- [x] Suite automatica (`bun run test`, 134 test): protocollo, client, agent, gate del Worker e funzioni pure del mobile.
+- [x] Suite automatica (`bun run test`, 217 test): protocollo, client, agent, gate del Worker e funzioni pure del mobile.
 - [x] Verifica end-to-end locale: health, creazione sessione, WebSocket e nuova conversazione.
 - [x] Gate di sessione: codice firmato, token di creazione, rate limit per isolate, CORS da ambiente, allowlist di `conversation.setModel`, tetto sul numero di routine e sulla cadenza. Non sono account utente.
 - [ ] Notifiche push per i promemoria.

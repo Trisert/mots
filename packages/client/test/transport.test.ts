@@ -183,9 +183,7 @@ describe("MotsClient", () => {
           ],
         }),
       );
-      expect(client.getSnapshot().snapshots[1]?.runError).toContain(
-        "Il modello non ha risposto",
-      );
+      expect(client.getSnapshot().snapshots[1]?.runError).toBe("no_response");
     } finally {
       client.dispose();
     }
@@ -249,6 +247,216 @@ describe("MotsClient", () => {
       );
       await expect(accepted).resolves.toBe(false);
       expect(client.getSnapshot().error).toBe("Try again later");
+    } finally {
+      client.dispose();
+    }
+  });
+});
+
+const snapshotFrame = JSON.stringify({
+  type: "session.snapshot",
+  session: { conversations: [{ id: 1 }] },
+});
+
+function ackFrame(command: string, requestId: string): string {
+  return JSON.stringify({
+    type: "command.result",
+    command,
+    requestId,
+    ok: true,
+    conversationId: 1,
+  });
+}
+
+function requestIdOf(frame: string | undefined): string {
+  const command = JSON.parse(frame ?? "null") as { readonly requestId: string };
+  return command.requestId;
+}
+
+/** A client whose sockets are recorded in order, so a test can drop one and reconnect. */
+function clientWithSockets() {
+  const sockets: FakeSocket[] = [];
+  const client = new MotsClient({
+    baseUrl: "https://mots.example",
+    sessionId: "session-1",
+    username: "Luca",
+    socketFactory: (url) => {
+      const socket = new FakeSocket(url);
+      sockets.push(socket);
+      return socket;
+    },
+  });
+  return { client, sockets };
+}
+
+describe("MotsClient outbox while disconnected", () => {
+  test("queues a prompt while disconnected and sends it once after reconnect", async () => {
+    const { client, sockets } = clientWithSockets();
+    try {
+      client.connect();
+      const first = sockets[0]!;
+      first.open();
+      first.message(snapshotFrame);
+      first.close(1006, "network lost");
+
+      const accepted = client.submitPrompt(1, "Ciao Mots");
+      expect(first.sent).toHaveLength(0);
+
+      client.connect();
+      const second = sockets[1]!;
+      second.open();
+      expect(second.sent).toHaveLength(0);
+      second.message(snapshotFrame);
+      expect(second.sent).toHaveLength(1);
+      expect(JSON.parse(second.sent[0]!)).toMatchObject({
+        type: "prompt.submit",
+        conversationId: 1,
+        content: "Ciao Mots",
+      });
+
+      second.message(ackFrame("prompt.submit", requestIdOf(second.sent[0])));
+      await expect(accepted).resolves.toBe(true);
+
+      // An acknowledged command leaves the outbox, so the next reconnect does not resend it.
+      second.close(1006, "network lost");
+      client.connect();
+      const third = sockets[2]!;
+      third.open();
+      third.message(snapshotFrame);
+      expect(third.sent).toHaveLength(0);
+    } finally {
+      client.dispose();
+    }
+  });
+
+  test("queues a model change while disconnected and sends it once after reconnect", async () => {
+    const { client, sockets } = clientWithSockets();
+    try {
+      client.connect();
+      sockets[0]!.open();
+      sockets[0]!.message(snapshotFrame);
+      sockets[0]!.close(1006, "network lost");
+
+      const accepted = client.setModel(1, "openrouter", "reflection/beam-free");
+      client.connect();
+      const second = sockets[1]!;
+      second.open();
+      second.message(snapshotFrame);
+      expect(second.sent).toHaveLength(1);
+      expect(JSON.parse(second.sent[0]!)).toMatchObject({
+        type: "conversation.setModel",
+        conversationId: 1,
+        provider: "openrouter",
+        modelId: "reflection/beam-free",
+      });
+
+      second.message(ackFrame("conversation.setModel", requestIdOf(second.sent[0])));
+      await expect(accepted).resolves.toBe(true);
+    } finally {
+      client.dispose();
+    }
+  });
+
+  test("rejects a second prompt while the first is queued offline", async () => {
+    const { client, sockets } = clientWithSockets();
+    try {
+      client.connect();
+      sockets[0]!.open();
+      sockets[0]!.message(snapshotFrame);
+      sockets[0]!.close(1006, "network lost");
+
+      const queued = client.submitPrompt(1, "Uno");
+      expect(() => client.submitPrompt(1, "Due")).toThrow("already pending");
+
+      client.dispose();
+      await expect(queued).resolves.toBe(false);
+    } finally {
+      client.dispose();
+    }
+  });
+
+  test("does not send a queued prompt twice when it was sent before the snapshot", async () => {
+    const { client, sockets } = clientWithSockets();
+    try {
+      client.connect();
+      const socket = sockets[0]!;
+      socket.open();
+      const accepted = client.submitPrompt(1, "Ciao");
+      expect(socket.sent).toHaveLength(1);
+
+      socket.message(snapshotFrame);
+      expect(socket.sent).toHaveLength(1);
+
+      socket.message(ackFrame("prompt.submit", requestIdOf(socket.sent[0])));
+      await expect(accepted).resolves.toBe(true);
+    } finally {
+      client.dispose();
+    }
+  });
+
+  test("replays a prompt sent before a drop but never acknowledged, once", async () => {
+    const { client, sockets } = clientWithSockets();
+    try {
+      client.connect();
+      const first = sockets[0]!;
+      first.open();
+      first.message(snapshotFrame);
+      const accepted = client.submitPrompt(1, "Ciao");
+      expect(first.sent).toHaveLength(1);
+      first.close(1006, "network lost");
+
+      client.connect();
+      const second = sockets[1]!;
+      second.open();
+      second.message(snapshotFrame);
+      expect(second.sent).toHaveLength(1);
+      expect(requestIdOf(second.sent[0])).toBe(requestIdOf(first.sent[0]));
+
+      second.message(ackFrame("prompt.submit", requestIdOf(second.sent[0])));
+      await expect(accepted).resolves.toBe(true);
+    } finally {
+      client.dispose();
+    }
+  });
+
+  test("does not queue typing presence while disconnected", () => {
+    const { client, sockets } = clientWithSockets();
+    try {
+      client.connect();
+      sockets[0]!.open();
+      sockets[0]!.message(snapshotFrame);
+      sockets[0]!.close(1006, "network lost");
+
+      client.setTyping(1, true);
+      client.connect();
+      const second = sockets[1]!;
+      second.open();
+      second.message(snapshotFrame);
+      expect(second.sent).toHaveLength(0);
+    } finally {
+      client.dispose();
+    }
+  });
+
+  test("a terminal close resolves queued commands false and rejects new ones", async () => {
+    const { client, sockets } = clientWithSockets();
+    try {
+      client.connect();
+      sockets[0]!.open();
+      sockets[0]!.message(snapshotFrame);
+      sockets[0]!.close(1006, "network lost");
+
+      const prompt = client.submitPrompt(1, "Ciao");
+      const model = client.setModel(1, "openrouter", "reflection/beam-free");
+
+      client.connect();
+      sockets[1]!.close(1002, "Invalid protocol frame");
+
+      await expect(prompt).resolves.toBe(false);
+      await expect(model).resolves.toBe(false);
+      expect(client.getSnapshot().status).toBe("failed");
+      await expect(client.submitPrompt(1, "Tardi")).resolves.toBe(false);
+      expect(sockets[1]!.sent).toHaveLength(0);
     } finally {
       client.dispose();
     }

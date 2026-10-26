@@ -3,19 +3,14 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import type { TranscriptEntry } from "@mots/client";
 import { useTheme } from "../context/ThemeContext";
-import { formatTime as formatTimestamp } from "../format";
-import { fonts, radius, spacing, type ThemeColors } from "../theme";
+import { fonts, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TOOL_LABELS, toolSummary } from "../tools";
 import {
-  BookmarkIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
-  ClockIcon,
   CopyIcon,
   ForkIcon,
-  SearchIcon,
-  SparkleIcon,
 } from "./Icon";
 import { MarkdownText } from "./MarkdownText";
 
@@ -34,20 +29,10 @@ function extractThinkingAndText(raw: string): { thinking?: string; text: string 
   return { text: clean };
 }
 
-function ToolIcon({ name, isError }: { readonly name: string; readonly isError?: boolean }) {
-  const { colors } = useTheme();
-  const color = isError ? colors.danger : colors.textPrimary;
-  switch (name) {
-    case "schedule":
-      return <ClockIcon size={16} color={color} />;
-    case "remember":
-    case "forget":
-      return <BookmarkIcon size={16} color={color} />;
-    case "search_history":
-      return <SearchIcon size={16} color={color} />;
-    default:
-      return <SparkleIcon size={16} color={color} />;
-  }
+/** Build Log markers: [+] adds, [~] reads or changes, [!] broke. Typed, never drawn. */
+function toolMarker(name: string, isError: boolean): string {
+  if (isError) return "[!]";
+  return name === "remember" || name === "schedule" ? "[+]" : "[~]";
 }
 
 type Props = {
@@ -69,7 +54,6 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
       <View style={styles.systemRow}>
         <View style={styles.systemRule} />
         <View style={styles.systemBadge}>
-          <SparkleIcon size={12} color={colors.starHighlight} />
           <Text style={styles.systemText}>
             {entry.role === "compaction" ? "Contesto compattato" : "Nuovo contesto"}
           </Text>
@@ -88,33 +72,21 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
 
     return (
       <View style={styles.toolRow}>
-        <View style={[styles.toolCard, isError && styles.toolCardError]}>
-          <View style={styles.toolHeader}>
-            <View style={styles.toolIconWrap}>
-              <ToolIcon name={name} isError={isError} />
-            </View>
-            <View style={styles.toolTitleBlock}>
-              <Text style={styles.toolName}>{TOOL_LABELS[name] ?? name}</Text>
-              {detail !== undefined && detail.length > 0 ? (
-                <Text style={styles.toolSummary}>{detail}</Text>
-              ) : null}
-            </View>
-            <View
-              style={[
-                styles.toolStatusBadge,
-                isError ? styles.toolBadgeError : styles.toolBadgeSuccess,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.toolStatusText,
-                  isError ? styles.toolStatusTextError : styles.toolStatusTextSuccess,
-                ]}
-              >
-                {isError ? "Errore" : "Eseguito"}
-              </Text>
-            </View>
-          </View>
+        <Text
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+          style={[styles.toolMark, isError && styles.toolMarkError]}
+        >
+          {toolMarker(name, isError)}
+        </Text>
+        <View style={styles.toolTitleBlock}>
+          <Text style={styles.toolName} numberOfLines={2}>
+            {TOOL_LABELS[name] ?? name}
+            {detail !== undefined && detail.length > 0 ? (
+              <Text style={styles.toolSummary}>{` · ${detail}`}</Text>
+            ) : null}
+            {isError ? <Text style={styles.toolSummary}> · errore</Text> : null}
+          </Text>
         </View>
       </View>
     );
@@ -122,7 +94,6 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
 
   const isUser = entry.role === "user";
   const isScheduled = entry.role === "scheduled";
-  const time = formatTimestamp(entry.timestamp);
   const { thinking, text } = extractThinkingAndText(entry.text);
 
   const onlyToolCalls = text.length === 0 && (entry.toolCalls?.length ?? 0) > 0;
@@ -149,7 +120,6 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
       >
         {isScheduled ? (
           <View style={styles.scheduledHeader}>
-            <ClockIcon size={14} color={colors.accent} />
             <Text style={styles.scheduledLabel}>Routine</Text>
           </View>
         ) : null}
@@ -159,7 +129,6 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
           <View style={styles.toolCalls}>
             {entry.toolCalls.map((call) => (
               <View key={call.callId} style={styles.toolChip}>
-                <ToolIcon name={call.name} />
                 <Text style={styles.toolChipText}>
                   {TOOL_LABELS[call.name] ?? call.name}
                 </Text>
@@ -181,7 +150,6 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
               ]}
             >
               <View style={styles.reasoningTitleRow}>
-                <SparkleIcon size={14} color={colors.accent} />
                 <Text style={styles.reasoningTitle}>Ragionamento</Text>
               </View>
               {reasoningExpanded ? (
@@ -234,7 +202,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
                 ]}
               >
                 {copied ? (
-                  <CheckIcon size={14} color={colors.accentGreen} />
+                  <CheckIcon size={14} color={colors.textPrimary} />
                 ) : (
                   <CopyIcon size={14} color={colors.textSecondary} />
                 )}
@@ -256,11 +224,8 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
               ) : null}
             </View>
 
-            {time !== undefined ? <Text style={styles.time}>{time}</Text> : null}
           </View>
-        ) : (
-          time !== undefined ? <Text style={styles.timeUser}>{time}</Text> : null
-        )}
+        ) : null}
       </View>
     </View>
   );
@@ -272,7 +237,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
   return StyleSheet.create({
     row: {
       width: "100%",
-      marginTop: spacing.md,
+      marginTop: spacing.lg,
       flexDirection: "row",
     },
     rowUser: {
@@ -294,72 +259,43 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       alignSelf: "flex-end",
       maxWidth: "84%",
       backgroundColor: colors.userBubble,
-      borderRadius: 22,
+      borderRadius: radius.bubble,
       paddingHorizontal: 16,
-      paddingVertical: 11,
-      elevation: 1,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: isDark ? 0.25 : 0.05,
-      shadowRadius: 3,
-      borderWidth: isDark ? 1 : 0,
-      borderColor: isDark ? "rgba(255, 255, 255, 0.06)" : "transparent",
+      paddingVertical: 10,
     },
     bubbleScheduled: {
-      backgroundColor: colors.cardSurfaceAmber,
-      borderRadius: 16,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      borderWidth: 1,
-      borderColor: colors.reasoningBorder,
+      paddingHorizontal: 2,
     },
     text: {
-      fontFamily: fonts.medium,
+      fontFamily: fonts.regular,
       color: colors.textPrimary,
-      fontSize: 15.5,
-      lineHeight: 23,
+      fontSize: 16,
+      lineHeight: 24,
     },
     textUser: {
-      fontFamily: fonts.medium,
+      fontFamily: fonts.regular,
       color: colors.userBubbleText,
     },
     scheduledHeader: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
       marginBottom: spacing.xs,
     },
     scheduledLabel: {
-      fontFamily: fonts.bold,
-      color: colors.accent,
-      fontSize: 10,
-      fontWeight: "700",
-      letterSpacing: 1.2,
-    },
-    time: {
-      fontFamily: fonts.medium,
+      ...typeScale.kicker,
       color: colors.textSecondary,
-      fontSize: 11,
-      opacity: 0.8,
-    },
-    timeUser: {
-      fontFamily: fonts.medium,
-      marginTop: 4,
-      alignSelf: "flex-end",
-      color: isDark ? "rgba(245, 245, 247, 0.55)" : "rgba(255, 255, 255, 0.55)",
-      fontSize: 10.5,
     },
     assistantFooter: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      marginTop: 6,
-      paddingTop: 2,
+      marginTop: 2,
     },
     actionIconsRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
+      marginLeft: -14,
+      opacity: 0.8,
     },
     iconActionButton: {
       width: 44,
@@ -370,8 +306,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       backgroundColor: "transparent",
     },
     actionButtonPressed: {
-      opacity: 0.5,
-      backgroundColor: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.05)",
+      backgroundColor: colors.surfaceSoft,
     },
     toolCalls: {
       flexDirection: "row",
@@ -380,23 +315,19 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       marginBottom: spacing.sm,
     },
     toolChip: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 5,
       borderRadius: radius.pill,
-      backgroundColor: colors.cardSurfaceAmber,
+      borderWidth: 1,
+      borderColor: colors.rule,
       paddingHorizontal: spacing.sm,
-      paddingVertical: 3,
+      paddingVertical: 2,
     },
     toolChipText: {
-      fontFamily: fonts.semiBold,
-      color: colors.textPrimary,
+      ...typeScale.mono,
       fontSize: 11,
-      fontWeight: "600",
+      color: colors.textPrimary,
     },
     reasoningCard: {
-      backgroundColor: colors.reasoningSurface,
-      borderRadius: radius.md,
+      borderRadius: radius.card,
       borderWidth: 1,
       borderColor: colors.reasoningBorder,
       overflow: "hidden",
@@ -406,23 +337,19 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
+      minHeight: 40,
       paddingHorizontal: spacing.md,
-      paddingVertical: 8,
     },
     reasoningHeaderPressed: {
-      opacity: 0.7,
+      backgroundColor: colors.surfaceSoft,
     },
     reasoningTitleRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 6,
     },
     reasoningTitle: {
-      fontFamily: fonts.bold,
-      color: colors.reasoningText,
-      fontSize: 12,
-      fontWeight: "700",
-      letterSpacing: 0.2,
+      ...typeScale.kicker,
+      color: colors.textSecondary,
     },
     reasoningContent: {
       paddingHorizontal: spacing.md,
@@ -432,94 +359,50 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       paddingTop: spacing.sm,
     },
     reasoningText: {
-      fontFamily: "monospace",
+      ...typeScale.mono,
       color: colors.reasoningText,
-      fontSize: 12,
       lineHeight: 18,
     },
     toolRow: {
-      alignItems: "flex-start",
-      marginTop: spacing.sm,
-      paddingLeft: spacing.xs,
-    },
-    toolCard: {
-      maxWidth: "92%",
-      borderRadius: radius.card,
-      backgroundColor: colors.cardSurfacePrimary,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
-      borderWidth: 1,
-      borderColor: colors.cardBorderSubtle,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: isDark ? 0.2 : 0.03,
-      shadowRadius: 4,
-      elevation: 1,
-    },
-    toolCardError: {
-      backgroundColor: colors.badgePinkBg,
-      borderColor: colors.cardSurfacePink,
-    },
-    toolHeader: {
       flexDirection: "row",
-      alignItems: "center",
+      alignItems: "flex-start",
       gap: spacing.sm,
+      marginTop: spacing.sm,
+      paddingHorizontal: 2,
     },
-    toolIconWrap: {
-      width: 32,
-      height: 32,
-      borderRadius: radius.pill,
-      backgroundColor: colors.cardSurfaceAmber,
-      alignItems: "center",
-      justifyContent: "center",
+    toolMark: {
+      fontFamily: fonts.mono,
+      fontSize: 12,
+      lineHeight: 20,
+      color: colors.textSecondary,
+      paddingHorizontal: 2,
+    },
+    toolMarkError: {
+      backgroundColor: colors.invertBg,
+      color: colors.invertFg,
+      borderRadius: radius.xs,
+      overflow: "hidden",
     },
     toolTitleBlock: {
       flex: 1,
     },
     toolName: {
-      fontFamily: fonts.bold,
-      color: colors.textPrimary,
+      fontFamily: fonts.medium,
+      color: colors.textSecondary,
       fontSize: 13,
-      fontWeight: "700",
-      letterSpacing: 0.2,
+      lineHeight: 20,
     },
     toolSummary: {
       fontFamily: fonts.regular,
-      marginTop: 2,
       color: colors.textSecondary,
-      fontSize: 12,
-      lineHeight: 16,
-    },
-    toolStatusBadge: {
-      borderRadius: radius.pill,
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-    },
-    toolBadgeSuccess: {
-      backgroundColor: colors.badgeMintBg,
-    },
-    toolBadgeError: {
-      backgroundColor: colors.badgePinkBg,
-    },
-    toolStatusText: {
-      fontFamily: fonts.semiBold,
-      fontSize: 11,
-      fontWeight: "600",
-    },
-    toolStatusTextSuccess: {
-      color: colors.badgeMintText,
-    },
-    toolStatusTextError: {
-      color: colors.badgePinkText,
     },
     diagnostics: {
       marginTop: spacing.sm,
       gap: spacing.xs,
     },
     diagnostic: {
-      fontFamily: fonts.regular,
-      color: colors.danger,
-      fontSize: 12,
+      ...typeScale.mono,
+      color: colors.textSecondary,
       lineHeight: 17,
     },
     systemRow: {
@@ -527,7 +410,6 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       alignItems: "center",
       gap: spacing.sm,
       marginTop: spacing.lg,
-      paddingHorizontal: spacing.xl,
       justifyContent: "center",
     },
     systemRule: {
@@ -536,20 +418,11 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       backgroundColor: colors.borderMedium,
     },
     systemBadge: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 3,
-      borderRadius: radius.pill,
-      backgroundColor: colors.cardSurfacePrimary,
+      paddingHorizontal: spacing.sm,
     },
     systemText: {
-      fontFamily: fonts.semiBold,
+      ...typeScale.kicker,
       color: colors.textSecondary,
-      fontSize: 11,
-      fontWeight: "600",
-      letterSpacing: 0.3,
     },
   });
 }

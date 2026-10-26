@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Alert,
   Animated,
   FlatList,
+  Platform,
   Pressable,
   Share,
   StyleSheet,
@@ -17,22 +19,29 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAvoidingView, useKeyboardState } from "react-native-keyboard-controller";
 import type { TranscriptEntry } from "@mots/client";
+import {
+  lastAssistantId,
+  markTranscript,
+  replyAnnouncement,
+  thinkingAnnouncement,
+  type TranscriptMark,
+} from "../announce";
 import { useTheme } from "../context/ThemeContext";
 import { Composer } from "../components/Composer";
-import { MenuIcon, PlusIcon } from "../components/Icon";
+import { ChevronDownIcon, MenuIcon, PlusIcon } from "../components/Icon";
 import { MarkdownText } from "../components/MarkdownText";
 import { MessageBubble } from "../components/MessageBubble";
 import { SessionSheet } from "../components/SessionSheet";
 import { probeSession, type SessionAccess } from "../api";
 import { useMotsSession } from "../hooks/useMotsSession";
-import { presentConnection, presentError, presentModel } from "../present";
-import { motion, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
+import { presentConnection, presentError, presentModel, presentRunError } from "../present";
+import { fonts, motion, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TOOL_LABELS } from "../tools";
 import type { Identity } from "../storage";
 import { Banner } from "../ui/Banner";
 import { Button } from "../ui/Button";
+import { BrandMark } from "../ui/BrandMark";
 import { IconButton } from "../ui/IconButton";
-import { Pill } from "../ui/Pill";
 
 const SUGGESTIONS = [
   {
@@ -54,6 +63,8 @@ const SUGGESTIONS = [
 ];
 
 type AccessView = SessionAccess | "checking";
+
+type Announcement = { readonly text: string; readonly key: number };
 
 type Props = {
   readonly identity: Identity;
@@ -132,6 +143,34 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const connection = presentConnection(state.status, state.error);
   const model = presentModel(active?.agent);
   const showErrorBanner = state.error !== undefined && (connected || entries.length > 0);
+  const conversationTitle = activeConversationId === 1 ? "Chat principale" : "Diramazione";
+
+  // Screen reader status: a polite live region plus AccessibilityInfo on native.
+  const [announcement, setAnnouncement] = useState<Announcement | undefined>(undefined);
+  const announcementSeq = useRef(0);
+  const announce = useCallback((text: string) => {
+    announcementSeq.current += 1;
+    setAnnouncement({ text, key: announcementSeq.current });
+    if (Platform.OS !== "web") AccessibilityInfo.announceForAccessibility(text);
+  }, []);
+
+  const transcriptMark = useRef<TranscriptMark | undefined>(undefined);
+  const entryCount = entries.length;
+  const latestAssistantId = lastAssistantId(entries);
+  useEffect(() => {
+    const next = markTranscript(activeConversationId, entries);
+    const text = replyAnnouncement(transcriptMark.current, next);
+    transcriptMark.current = next;
+    if (text !== undefined) announce(text);
+    // Depends on the count and the last assistant id only; `entries` changes identity on every render.
+  }, [activeConversationId, entryCount, latestAssistantId, announce]);
+
+  const wasLive = useRef<boolean | undefined>(undefined);
+  useEffect(() => {
+    const text = thinkingAnnouncement(wasLive.current, liveActive);
+    wasLive.current = liveActive;
+    if (text !== undefined) announce(text);
+  }, [liveActive, announce]);
 
   const send = useCallback(async () => {
     if (activeConversationId === undefined) return;
@@ -240,7 +279,8 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     [client],
   );
 
-  const pillLabel = model === undefined ? connection.label : `${connection.label} · ${model.shortName}`;
+  // Online, the title is just the model, as in the Claude app. Any other state names itself.
+  const titleLabel = connection.tone === "ok" && model !== undefined ? model.shortName : connection.label;
   const pillDescription = model === undefined
     ? `${connection.label}. Il server non ha ancora indicato il modello.`
     : `${connection.label}. Modello ${model.provider}, ${model.modelId}.`;
@@ -273,7 +313,9 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
         </View>
       ))}
       {active?.failure !== undefined ? <Banner message={active.failure.message} /> : null}
-      {active?.runError !== undefined ? <Banner message={active.runError} /> : null}
+      {active?.runError !== undefined ? (
+        <Banner message={presentRunError(active.runError)} />
+      ) : null}
     </View>
   );
 
@@ -318,12 +360,11 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     </View>
   ) : (
     <View style={styles.empty}>
+      <BrandMark size={44} />
       <Text accessibilityRole="header" maxFontSizeMultiplier={1.6} style={styles.greeting}>
-        Ciao{identity.username.length > 0 ? `, ${identity.username}` : ""}
+        Ciao{identity.username.length > 0 ? `, ${identity.username}` : ""}.
       </Text>
-      <Text style={styles.lead}>
-        Quando vuoi. Puoi chiedermi di ricordare, di pianificare, o solo di parlare.
-      </Text>
+      <Text style={styles.lead}>Ricordare, pianificare, o solo parlare.</Text>
       <View style={styles.suggestions}>
         {SUGGESTIONS.map((item) => (
           <Pressable
@@ -331,10 +372,9 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
             accessibilityRole="button"
             accessibilityLabel={`${item.title}. ${item.hint}`}
             onPress={() => setInput(item.prompt)}
-            style={({ pressed }) => [styles.suggestion, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.suggestion, pressed && styles.suggestionPressed]}
           >
             <Text style={styles.suggestionTitle}>{item.title}</Text>
-            <Text style={styles.suggestionHint}>{item.hint}</Text>
           </Pressable>
         ))}
       </View>
@@ -352,16 +392,34 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   return (
     <View testID="chat-screen" style={[styles.outer, isWide && styles.outerWide]}>
       <View style={[styles.frame, isWide && styles.frameWide]}>
+        <Text key={announcement?.key ?? 0} aria-live="polite" style={visuallyHidden.hidden}>
+          {announcement?.text ?? ""}
+        </Text>
         <View style={[styles.header, { paddingTop: insets.top }]}>
           <IconButton label="Menu" onPress={() => setSheetOpen(true)}>
             <MenuIcon size={20} color={colors.textPrimary} />
           </IconButton>
-          <View style={styles.headerCenter}>
-            <Text accessibilityRole="header" style={styles.brand}>
-              Mots
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${pillDescription} Apri il menu.`}
+            onPress={() => setSheetOpen(true)}
+            style={({ pressed }) => [styles.headerCenter, pressed && styles.pressed]}
+          >
+            {connection.tone === "ok" ? null : (
+              <View
+                style={[
+                  styles.statusDot,
+                  connection.tone === "danger"
+                    ? { backgroundColor: colors.textPrimary }
+                    : { borderColor: colors.textSecondary, borderWidth: 1 },
+                ]}
+              />
+            )}
+            <Text numberOfLines={1} style={styles.headerTitle}>
+              {titleLabel}
             </Text>
-            <Pill label={pillLabel} tone={connection.tone} accessibilityLabel={pillDescription} />
-          </View>
+            <ChevronDownIcon size={14} color={colors.textSecondary} />
+          </Pressable>
           <IconButton
             label="Nuova chat"
             disabled={!connected}
@@ -387,23 +445,32 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
               ) : null}
             </View>
           ) : null}
-          <FlatList
-            ref={listRef}
-            data={entries}
-            keyExtractor={(entry) => String(entry.id)}
-            renderItem={({ item }) => <MessageBubble entry={item} onFork={fork} />}
-            contentContainerStyle={[styles.list, entries.length === 0 && styles.listEmpty]}
-            ListEmptyComponent={empty}
-            ListFooterComponent={footer}
-            onScroll={onScroll}
-            onContentSizeChange={onContentSizeChange}
-            onLayout={onListLayout}
-            showsVerticalScrollIndicator={false}
-            scrollEventThrottle={100}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
-          />
-          <View style={{ paddingBottom: keyboardVisible ? spacing.xs : Math.max(insets.bottom, spacing.sm) }}>
+          <View role="main" style={styles.flex}>
+            <Text role="heading" aria-level={1} style={visuallyHidden.hidden}>
+              {conversationTitle}
+            </Text>
+            <FlatList
+              ref={listRef}
+              data={entries}
+              keyExtractor={(entry) => String(entry.id)}
+              renderItem={({ item }) => <MessageBubble entry={item} onFork={fork} />}
+              contentContainerStyle={[styles.list, entries.length === 0 && styles.listEmpty]}
+              ListEmptyComponent={empty}
+              ListFooterComponent={footer}
+              onScroll={onScroll}
+              onContentSizeChange={onContentSizeChange}
+              onLayout={onListLayout}
+              showsVerticalScrollIndicator={false}
+              scrollEventThrottle={100}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+            />
+          </View>
+          <View
+            role="form"
+            aria-label="Scrivi a Mots"
+            style={{ paddingBottom: keyboardVisible ? spacing.xs : Math.max(insets.bottom, spacing.sm) }}
+          >
             {showErrorBanner && state.error !== undefined ? (
               <View style={styles.bannerWrap}>
                 <Banner message={presentError(state.error)} onDismiss={() => client.clearError()} />
@@ -449,10 +516,32 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   );
 }
 
+function useReduceMotion(): boolean {
+  const [reduceMotion, setReduceMotion] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (alive) setReduceMotion(enabled);
+      })
+      .catch(() => undefined);
+    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", (enabled) => {
+      if (alive) setReduceMotion(enabled);
+    });
+    return () => {
+      alive = false;
+      subscription.remove();
+    };
+  }, []);
+  return reduceMotion;
+}
+
 function Thinking() {
   const { colors } = useTheme();
+  const reduceMotion = useReduceMotion();
   const opacity = useRef(new Animated.Value(0.45)).current;
   useEffect(() => {
+    if (reduceMotion) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, {
@@ -469,7 +558,10 @@ function Thinking() {
     );
     loop.start();
     return () => loop.stop();
-  }, [opacity]);
+  }, [opacity, reduceMotion]);
+  if (reduceMotion) {
+    return <Text style={[stylesThinking.text, { color: colors.textSecondary }]}>Sta scrivendo</Text>;
+  }
   return (
     <Animated.Text style={[stylesThinking.text, { color: colors.textSecondary, opacity }]}>
       Sta scrivendo
@@ -480,6 +572,17 @@ function Thinking() {
 const stylesThinking = StyleSheet.create({
   text: {
     ...typeScale.body,
+  },
+});
+
+// Visually hidden but kept in the accessibility tree (clip pattern).
+const visuallyHidden = StyleSheet.create({
+  hidden: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    overflow: "hidden",
+    margin: -1,
   },
 });
 
@@ -501,7 +604,7 @@ function createStyles(colors: ThemeColors) {
     frameWide: {
       maxWidth: 440,
       marginVertical: spacing.lg,
-      borderRadius: radius.xl,
+      borderRadius: radius.card,
       overflow: "hidden",
       borderWidth: 1,
       borderColor: colors.borderSubtle,
@@ -510,24 +613,31 @@ function createStyles(colors: ThemeColors) {
       flex: 1,
     },
     header: {
-      minHeight: 64,
+      minHeight: 56,
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: spacing.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.borderSubtle,
+      paddingHorizontal: spacing.xs,
       backgroundColor: colors.bgMain,
     },
     headerCenter: {
       flex: 1,
+      flexDirection: "row",
       alignItems: "center",
-      gap: 4,
+      justifyContent: "center",
+      gap: 6,
+      minHeight: 44,
       paddingHorizontal: spacing.sm,
     },
-    brand: {
+    headerTitle: {
       ...typeScale.bodyMedium,
-      fontWeight: "700",
+      fontSize: 15,
       color: colors.textPrimary,
+      flexShrink: 1,
+    },
+    statusDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 4,
     },
     list: {
       paddingHorizontal: spacing.lg,
@@ -539,39 +649,45 @@ function createStyles(colors: ThemeColors) {
     },
     empty: {
       flex: 1,
+      alignItems: "center",
       justifyContent: "center",
-      gap: spacing.lg,
+      gap: spacing.md,
       paddingVertical: spacing.xxl,
     },
     greeting: {
-      ...typeScale.title,
+      ...typeScale.display,
+      fontSize: 40,
+      lineHeight: 42,
+      textAlign: "center",
       color: colors.textPrimary,
     },
     lead: {
       ...typeScale.body,
+      textAlign: "center",
       color: colors.textSecondary,
     },
     suggestions: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "center",
       gap: spacing.sm,
+      marginTop: spacing.lg,
     },
     suggestion: {
-      minHeight: 64,
+      minHeight: 44,
       justifyContent: "center",
-      gap: 2,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
-      borderRadius: radius.lg,
-      backgroundColor: colors.cardSurfacePrimary,
-      borderWidth: 1,
-      borderColor: colors.borderSubtle,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.pill,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.fieldBorder,
+      backgroundColor: colors.field,
+    },
+    suggestionPressed: {
+      backgroundColor: colors.surfaceSoft,
     },
     suggestionTitle: {
-      ...typeScale.bodyMedium,
+      ...typeScale.label,
       color: colors.textPrimary,
-    },
-    suggestionHint: {
-      ...typeScale.small,
-      color: colors.textSecondary,
     },
     connection: {
       flex: 1,
@@ -605,19 +721,15 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: spacing.sm,
     },
     danger: {
-      ...typeScale.small,
-      color: colors.danger,
+      ...typeScale.mono,
+      color: colors.textSecondary,
     },
     queued: {
-      borderRadius: radius.md,
-      backgroundColor: colors.cardSurfacePrimary,
-      borderWidth: 1,
-      borderColor: colors.borderSubtle,
-      padding: spacing.md,
-      gap: 2,
+      borderRadius: radius.bubble,
+      backgroundColor: colors.field,
     },
     queuedLabel: {
-      ...typeScale.caption,
+      ...typeScale.kicker,
       color: colors.textSecondary,
     },
     queuedText: {
@@ -630,11 +742,11 @@ function createStyles(colors: ThemeColors) {
       alignItems: "center",
       justifyContent: "space-between",
       paddingHorizontal: spacing.lg,
-      backgroundColor: colors.dangerSoft,
+      backgroundColor: colors.invertBg,
     },
     stripText: {
       ...typeScale.label,
-      color: colors.danger,
+      color: colors.invertFg,
       flex: 1,
     },
     stripAction: {
@@ -644,8 +756,8 @@ function createStyles(colors: ThemeColors) {
     },
     stripActionLabel: {
       ...typeScale.label,
-      fontWeight: "700",
-      color: colors.danger,
+      textDecorationLine: "underline",
+      color: colors.invertFg,
     },
     bannerWrap: {
       paddingHorizontal: spacing.lg,

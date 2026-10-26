@@ -21,6 +21,11 @@ type Props = {
   readonly hint?: string;
 };
 
+/** One line of text plus its vertical padding. */
+const INPUT_MIN_HEIGHT = 40;
+const ACTION_SIZE = 34;
+const TARGET_INSET = (hit - ACTION_SIZE) / 2;
+
 const QUICK_ACTIONS = [
   {
     label: "Routine",
@@ -76,21 +81,7 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
         </View>
       ) : null}
 
-      <View
-        style={[
-          styles.field,
-          { borderColor: focused ? colors.accent : colors.borderSubtle },
-        ]}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Azioni rapide"
-          accessibilityState={{ expanded: toolsOpen }}
-          onPress={() => setToolsOpen((open) => !open)}
-          style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
-        >
-          <PlusIcon size={18} color={toolsOpen ? colors.accent : colors.textSecondary} />
-        </Pressable>
+      <View style={[styles.field, focused && styles.fieldFocused]}>
         <TextInput
           accessibilityLabel="Messaggio"
           value={value}
@@ -99,12 +90,14 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
           placeholderTextColor={colors.textFaint}
           style={[styles.input, inputHeight !== undefined ? { height: inputHeight } : null]}
           multiline
+          // React Native Web renders a two-row textarea by default; start at one line and grow.
+          numberOfLines={1}
           maxLength={100_000}
-          selectionColor={colors.accent}
+          selectionColor={colors.textPrimary}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onContentSizeChange={(event) => {
-            const next = Math.min(Math.max(24, Math.round(event.nativeEvent.contentSize.height)), 140);
+            const next = Math.min(Math.max(INPUT_MIN_HEIGHT, Math.round(event.nativeEvent.contentSize.height)), 160);
             setInputHeight(next);
           }}
           onKeyPress={(event) => {
@@ -118,28 +111,44 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
             if (canSend) onSend();
           }}
         />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Invia messaggio"
-          accessibilityState={{ disabled: !canSend, busy: sending }}
-          onPress={onSend}
-          disabled={!canSend}
-          style={({ pressed }) => [
-            styles.send,
-            { backgroundColor: canSend ? colors.textPrimary : colors.surfaceSoft },
-            pressed && canSend && styles.pressed,
-          ]}
-        >
-          {sending ? (
-            <ActivityIndicator color={colors.bgMain} />
-          ) : (
-            <ArrowUpIcon
-              size={18}
-              color={canSend ? colors.bgMain : colors.textFaint}
-              strokeWidth={2.2}
-            />
-          )}
-        </Pressable>
+        <View style={styles.actions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Azioni rapide"
+            accessibilityState={{ expanded: toolsOpen }}
+            onPress={() => setToolsOpen((open) => !open)}
+            style={({ pressed }) => [styles.target, pressed && styles.pressed]}
+          >
+            <View style={[styles.circle, styles.circleBorder, toolsOpen && styles.circleOpen]}>
+              <PlusIcon size={18} color={colors.textPrimary} />
+            </View>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Invia messaggio"
+            accessibilityState={{ disabled: !canSend, busy: sending }}
+            onPress={onSend}
+            disabled={!canSend}
+            style={({ pressed }) => [styles.target, pressed && canSend && styles.pressed]}
+          >
+            <View
+              style={[
+                styles.circle,
+                { backgroundColor: canSend ? colors.invertBg : colors.surfaceSoft },
+              ]}
+            >
+              {sending ? (
+                <ActivityIndicator color={colors.invertFg} />
+              ) : (
+                <ArrowUpIcon
+                  size={17}
+                  color={canSend ? colors.invertFg : colors.textFaint}
+                  strokeWidth={2.2}
+                />
+              )}
+            </View>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -149,20 +158,21 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     wrapper: {
       gap: spacing.sm,
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.xs,
+      paddingBottom: spacing.xs,
       backgroundColor: colors.bgMain,
     },
     hint: {
       ...typeScale.small,
       color: colors.textSecondary,
-      paddingHorizontal: spacing.xs,
+      paddingHorizontal: spacing.sm,
     },
     tools: {
       flexDirection: "row",
       flexWrap: "wrap",
       gap: spacing.sm,
+      paddingHorizontal: spacing.xs,
     },
     tool: {
       minHeight: hit,
@@ -171,53 +181,66 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.sm,
       paddingHorizontal: spacing.md,
       borderRadius: radius.pill,
-      borderWidth: 1,
-      borderColor: colors.borderSubtle,
-      backgroundColor: colors.cardSurfacePrimary,
+      backgroundColor: colors.field,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.fieldBorder,
     },
     toolLabel: {
       ...typeScale.label,
       color: colors.textPrimary,
     },
     field: {
-      minHeight: 56,
-      flexDirection: "row",
-      alignItems: "flex-end",
-      gap: spacing.xs,
-      borderRadius: 28,
-      borderWidth: 1,
-      backgroundColor: colors.cardSurfacePrimary,
-      paddingLeft: spacing.xs,
-      paddingRight: spacing.xs,
-      paddingVertical: spacing.xs,
+      borderRadius: radius.composer,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.fieldBorder,
+      backgroundColor: colors.field,
+      paddingTop: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      paddingBottom: spacing.sm,
     },
-    iconButton: {
-      width: hit,
-      height: hit,
-      borderRadius: hit / 2,
-      alignItems: "center",
-      justifyContent: "center",
+    fieldFocused: {
+      borderColor: colors.borderMedium,
     },
     input: {
-      flex: 1,
-      minHeight: 24,
-      maxHeight: 140,
+      minHeight: INPUT_MIN_HEIGHT,
+      maxHeight: 160,
       paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.md,
+      paddingVertical: (INPUT_MIN_HEIGHT - 22) / 2,
       fontFamily: fonts.regular,
       fontSize: 16,
       lineHeight: 22,
       color: colors.textPrimary,
     },
-    send: {
+    actions: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    // 44px touch target on every platform (hitSlop is ignored on web). The
+    // negative margin pulls it back so the visible 34px circle stays where it was.
+    target: {
       width: hit,
       height: hit,
-      borderRadius: hit / 2,
+      margin: -TARGET_INSET,
       alignItems: "center",
       justifyContent: "center",
     },
+    circle: {
+      width: ACTION_SIZE,
+      height: ACTION_SIZE,
+      borderRadius: ACTION_SIZE / 2,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    circleBorder: {
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.fieldBorder,
+    },
+    circleOpen: {
+      backgroundColor: colors.surfaceSoft,
+    },
     pressed: {
-      opacity: 0.75,
+      opacity: 0.7,
     },
   });
 }

@@ -17,6 +17,7 @@ import { useExpoAccessToken } from "./push-token.ts";
 import { DeliverScheduledInstruction } from "./schedule.ts";
 import { scheduleLimitsFromEnv } from "./schedule-limits.ts";
 import { conversationSearchExtension, searchHistoryTool } from "./search.ts";
+import { clockSection } from "./timezone.ts";
 import { createScheduleTool } from "./tools.ts";
 
 export type MotsHarnessOptions = {
@@ -57,12 +58,7 @@ export async function createMotsHarnessOptions(
           "User messages may begin with a display name in brackets; treat it as speaker attribution.",
         { tag: false },
       ),
-      section(
-        "clock",
-        () =>
-          `Current time: ${new Date().toISOString().slice(0, 16)}Z. Unless the user states a timezone, treat times as UTC.`,
-        { tag: false },
-      ),
+      clockSection,
       memorySection,
     ],
   });

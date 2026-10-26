@@ -47,21 +47,34 @@ export function TextField({
         autoFocus={autoFocus}
         maxLength={maxLength}
         keyboardType={keyboardType}
-        selectionColor={colors.accent}
+        selectionColor={colors.textPrimary}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         style={[
           styles.input,
           {
             color: colors.textPrimary,
-            backgroundColor: colors.bgMain,
-            borderColor: error !== undefined ? colors.danger : focused ? colors.accent : colors.borderSubtle,
+            backgroundColor: colors.field,
+            borderColor: error !== undefined ? colors.rule : focused ? colors.borderMedium : colors.fieldBorder,
+            borderWidth: error !== undefined ? 1.5 : StyleSheet.hairlineWidth,
           },
         ]}
       />
       {error !== undefined ? (
-        <Text accessibilityRole="alert" style={[styles.hint, { color: colors.danger }]}>
-          {error}
+        <Text
+          accessibilityRole="alert"
+          accessibilityLabel={`Errore: ${error}`}
+          style={[styles.hint, { color: colors.textPrimary }]}
+        >
+          <Text
+            aria-hidden
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            style={[styles.mark, { backgroundColor: colors.invertBg, color: colors.invertFg }]}
+          >
+            [!]
+          </Text>
+          {` ${error}`}
         </Text>
       ) : hint !== undefined ? (
         <Text style={[styles.hint, { color: colors.textSecondary }]}>{hint}</Text>
@@ -77,10 +90,13 @@ const styles = StyleSheet.create({
   label: {
     ...typeScale.label,
   },
+  mark: {
+    fontFamily: fonts.monoMedium,
+  },
   input: {
     minHeight: 48,
     borderWidth: 1,
-    borderRadius: radius.md,
+    borderRadius: radius.md + 3,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontFamily: fonts.regular,
