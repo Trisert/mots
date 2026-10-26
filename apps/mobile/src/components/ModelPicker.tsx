@@ -144,7 +144,7 @@ export function ModelPicker({ visible, apiUrl, sessionId, agent, onClose, onSele
             accessibilityLabel="Cerca un modello"
             value={query}
             onChangeText={setQuery}
-            placeholder="Cerca per nome o fornitore"
+            placeholder="Cerca per nome o provider"
             placeholderTextColor={colors.textFaint}
             autoCapitalize="none"
             autoCorrect={false}
