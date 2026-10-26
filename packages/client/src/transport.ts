@@ -112,6 +112,7 @@ export class MotsClient {
       if (this.#socket !== socket) return;
       this.#reconnectAttempt = 0;
       this.#conversationOpened = false;
+      this.#outbox.startConnection();
       this.#dispatch({ type: "connection", status: "connected" });
       this.#dispatch({ type: "clear-error" });
     });
@@ -207,9 +208,7 @@ export class MotsClient {
     } satisfies Extract<ClientCommand, { readonly type: "prompt.submit" }>;
     return new Promise((resolve) => {
       this.#outbox.enqueue(command, resolve);
-      if (!this.#send(command)) {
-        this.#outbox.cancel(command.requestId);
-      }
+      this.#transmit(command);
     });
   }
 
@@ -223,9 +222,7 @@ export class MotsClient {
     } satisfies Extract<ClientCommand, { readonly type: "conversation.setModel" }>;
     return new Promise((resolve) => {
       this.#outbox.enqueue(command, resolve);
-      if (!this.#send(command)) {
-        this.#outbox.cancel(command.requestId);
-      }
+      this.#transmit(command);
     });
   }
 
@@ -291,7 +288,7 @@ export class MotsClient {
           false,
         );
       }
-      this.#outbox.replay((command) => this.#send(command));
+      this.#outbox.replay((command) => this.#transmit(command));
     }
 
     if (event.type === "command.result") {
@@ -359,7 +356,33 @@ export class MotsClient {
 
   #sendRetriable(command: RetriableCommand): void {
     this.#outbox.enqueue(command);
-    if (!this.#send(command)) this.#outbox.cancel(command.requestId);
+    this.#transmit(command);
+  }
+
+  /**
+   * Sends an outbox command, or leaves it queued for the next session.snapshot when the socket
+   * is not open. Commands that stay queued resolve when the server acks them, or false when the
+   * outbox is cleared on a terminal close.
+   */
+  #transmit(command: RetriableCommand): void {
+    if (this.#terminal || this.#closed) {
+      // Nothing replays the outbox after a terminal close, so fail now rather than queue forever.
+      this.#outbox.cancel(command.requestId);
+      this.#dispatch({ type: "error", message: "The session is not connected" });
+      return;
+    }
+    const socket = this.#socket;
+    if (socket === undefined || socket.readyState !== 1) return;
+    try {
+      socket.send(JSON.stringify(command));
+    } catch {
+      // The socket reported open but send threw, so the frame may or may not have left. Replaying
+      // it later could duplicate it, so fail it now, as before.
+      this.#outbox.cancel(command.requestId);
+      this.#dispatch({ type: "error", message: "The session connection failed" });
+      return;
+    }
+    this.#outbox.markSent(command.requestId);
   }
 
   #dispatch(action: Parameters<typeof sessionReducer>[1]): void {
