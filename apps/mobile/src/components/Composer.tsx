@@ -24,6 +24,7 @@ type Props = {
 /** One line of text plus its vertical padding. */
 const INPUT_MIN_HEIGHT = 40;
 const ACTION_SIZE = 34;
+const TARGET_INSET = (hit - ACTION_SIZE) / 2;
 
 const QUICK_ACTIONS = [
   {
@@ -114,39 +115,38 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Azioni rapide"
-            hitSlop={(hit - ACTION_SIZE) / 2}
             accessibilityState={{ expanded: toolsOpen }}
             onPress={() => setToolsOpen((open) => !open)}
-            style={({ pressed }) => [
-              styles.iconButton,
-              toolsOpen && styles.iconButtonOpen,
-              pressed && styles.pressed,
-            ]}
+            style={({ pressed }) => [styles.target, pressed && styles.pressed]}
           >
-            <PlusIcon size={18} color={colors.textPrimary} />
+            <View style={[styles.circle, styles.circleBorder, toolsOpen && styles.circleOpen]}>
+              <PlusIcon size={18} color={colors.textPrimary} />
+            </View>
           </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Invia messaggio"
-            hitSlop={(hit - ACTION_SIZE) / 2}
             accessibilityState={{ disabled: !canSend, busy: sending }}
             onPress={onSend}
             disabled={!canSend}
-            style={({ pressed }) => [
-              styles.send,
-              { backgroundColor: canSend ? colors.invertBg : colors.surfaceSoft },
-              pressed && canSend && styles.pressed,
-            ]}
+            style={({ pressed }) => [styles.target, pressed && canSend && styles.pressed]}
           >
-            {sending ? (
-              <ActivityIndicator color={colors.invertFg} />
-            ) : (
-              <ArrowUpIcon
-                size={17}
-                color={canSend ? colors.invertFg : colors.textFaint}
-                strokeWidth={2.2}
-              />
-            )}
+            <View
+              style={[
+                styles.circle,
+                { backgroundColor: canSend ? colors.invertBg : colors.surfaceSoft },
+              ]}
+            >
+              {sending ? (
+                <ActivityIndicator color={colors.invertFg} />
+              ) : (
+                <ArrowUpIcon
+                  size={17}
+                  color={canSend ? colors.invertFg : colors.textFaint}
+                  strokeWidth={2.2}
+                />
+              )}
+            </View>
           </Pressable>
         </View>
       </View>
@@ -175,7 +175,7 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.xs,
     },
     tool: {
-      minHeight: 36,
+      minHeight: hit,
       flexDirection: "row",
       alignItems: "center",
       gap: spacing.sm,
@@ -216,24 +216,28 @@ function createStyles(colors: ThemeColors) {
       alignItems: "center",
       justifyContent: "space-between",
     },
-    iconButton: {
+    // 44px touch target on every platform (hitSlop is ignored on web). The
+    // negative margin pulls it back so the visible 34px circle stays where it was.
+    target: {
+      width: hit,
+      height: hit,
+      margin: -TARGET_INSET,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    circle: {
       width: ACTION_SIZE,
       height: ACTION_SIZE,
       borderRadius: ACTION_SIZE / 2,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    circleBorder: {
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.fieldBorder,
-      alignItems: "center",
-      justifyContent: "center",
     },
-    iconButtonOpen: {
+    circleOpen: {
       backgroundColor: colors.surfaceSoft,
-    },
-    send: {
-      width: ACTION_SIZE,
-      height: ACTION_SIZE,
-      borderRadius: ACTION_SIZE / 2,
-      alignItems: "center",
-      justifyContent: "center",
     },
     pressed: {
       opacity: 0.7,
