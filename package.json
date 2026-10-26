@@ -16,6 +16,7 @@
     "test": "bun test packages/protocol packages/client packages/agent apps/server/test apps/mobile/test",
     "check": "bun run typecheck && bun run check:server",
     "check:server": "bun run --cwd apps/server check",
+    "check:server:staging": "bun run --cwd apps/server check:staging",
     "build:mobile": "bun run --cwd apps/mobile export",
     "gateway:models": "bun run scripts/gateway-models.ts"
   },

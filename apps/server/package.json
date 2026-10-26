@@ -9,8 +9,9 @@
   "scripts": {
     "dev": "wrangler dev",
     "dev:lan": "wrangler dev --ip 0.0.0.0",
-    "deploy": "wrangler deploy",
-    "check": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "deploy": "wrangler deploy --env=\"\"",
+    "check": "wrangler deploy --dry-run --env=\"\" --outdir .wrangler/dry-run",
+    "check:staging": "wrangler deploy --dry-run --env staging --outdir .wrangler/dry-run-staging",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

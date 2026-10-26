@@ -26,3 +26,7 @@ jobs:
         run: bun run check:server
         env:
           WRANGLER_SEND_METRICS: "false"
+      - name: Staging Worker dry-run
+        run: bun run check:server:staging
+        env:
+          WRANGLER_SEND_METRICS: "false"
