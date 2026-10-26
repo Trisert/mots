@@ -69,7 +69,7 @@ export const lightColors = {
   accent: ink,
   accentSoft: vellum,
   accentInk: paper,
-  userBubble: bone,
+  userBubble: vellum,
   userBubbleText: ink,
   onAccentFaint: graphite,
   danger: ink,
@@ -82,6 +82,9 @@ export const lightColors = {
   invertBg: ink,
   invertFg: paper,
   rule: ink,
+  /** Raised input surfaces such as the composer, and their quiet outline. */
+  field: chalk,
+  fieldBorder: putty,
 } as const;
 
 export const darkColors = {
@@ -132,7 +135,7 @@ export const darkColors = {
   accent: paper,
   accentSoft: "#1C1C1A",
   accentInk: ink,
-  userBubble: ink,
+  userBubble: "#262624",
   userBubbleText: paper,
   onAccentFaint: putty,
   danger: paper,
@@ -144,6 +147,8 @@ export const darkColors = {
   invertBg: paper,
   invertFg: ink,
   rule: paper,
+  field: "#141413",
+  fieldBorder: "#2E2E2B",
 } as const;
 
 export type ThemeColors = {
@@ -171,6 +176,9 @@ export const radius = {
   xl: 9,
   card: 9,
   cardLarge: 9,
+  /** Soft shapes for the conversation itself: message bubbles and the composer. */
+  bubble: 18,
+  composer: 24,
   pill: 9999,
 } as const;
 

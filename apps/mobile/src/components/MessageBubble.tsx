@@ -3,7 +3,6 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import type { TranscriptEntry } from "@mots/client";
 import { useTheme } from "../context/ThemeContext";
-import { formatTime as formatTimestamp } from "../format";
 import { fonts, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TOOL_LABELS, toolSummary } from "../tools";
 import {
@@ -81,13 +80,13 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
           {toolMarker(name, isError)}
         </Text>
         <View style={styles.toolTitleBlock}>
-          <Text style={styles.toolName}>
+          <Text style={styles.toolName} numberOfLines={2}>
             {TOOL_LABELS[name] ?? name}
-            <Text style={styles.toolStatus}>{isError ? "  · errore" : "  · fatto"}</Text>
+            {detail !== undefined && detail.length > 0 ? (
+              <Text style={styles.toolSummary}>{` · ${detail}`}</Text>
+            ) : null}
+            {isError ? <Text style={styles.toolSummary}> · errore</Text> : null}
           </Text>
-          {detail !== undefined && detail.length > 0 ? (
-            <Text style={styles.toolSummary}>{detail}</Text>
-          ) : null}
         </View>
       </View>
     );
@@ -95,7 +94,6 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
 
   const isUser = entry.role === "user";
   const isScheduled = entry.role === "scheduled";
-  const time = formatTimestamp(entry.timestamp);
   const { thinking, text } = extractThinkingAndText(entry.text);
 
   const onlyToolCalls = text.length === 0 && (entry.toolCalls?.length ?? 0) > 0;
@@ -226,11 +224,8 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
               ) : null}
             </View>
 
-            {time !== undefined ? <Text style={styles.time}>{time}</Text> : null}
           </View>
-        ) : (
-          time !== undefined ? <Text style={styles.timeUser}>{time}</Text> : null
-        )}
+        ) : null}
       </View>
     </View>
   );
@@ -242,7 +237,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
   return StyleSheet.create({
     row: {
       width: "100%",
-      marginTop: spacing.md,
+      marginTop: spacing.lg,
       flexDirection: "row",
     },
     rowUser: {
@@ -263,21 +258,13 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     bubbleUser: {
       alignSelf: "flex-end",
       maxWidth: "84%",
-      backgroundColor: "transparent",
-      borderRadius: radius.card,
-      borderWidth: 1,
-      borderColor: colors.rule,
-      paddingHorizontal: 14,
-      paddingTop: 10,
-      paddingBottom: 8,
+      backgroundColor: colors.userBubble,
+      borderRadius: radius.bubble,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
     },
     bubbleScheduled: {
-      backgroundColor: "transparent",
-      borderRadius: radius.card,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      borderWidth: 1,
-      borderColor: colors.rule,
+      paddingHorizontal: 2,
     },
     text: {
       fontFamily: fonts.regular,
@@ -298,18 +285,6 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       ...typeScale.kicker,
       color: colors.textSecondary,
     },
-    time: {
-      ...typeScale.mono,
-      fontSize: 11,
-      color: colors.textSecondary,
-    },
-    timeUser: {
-      ...typeScale.mono,
-      fontSize: 11,
-      marginTop: 4,
-      alignSelf: "flex-end",
-      color: colors.textSecondary,
-    },
     assistantFooter: {
       flexDirection: "row",
       alignItems: "center",
@@ -319,7 +294,8 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     actionIconsRow: {
       flexDirection: "row",
       alignItems: "center",
-      marginLeft: -12,
+      marginLeft: -14,
+      opacity: 0.8,
     },
     iconActionButton: {
       width: 44,
@@ -390,18 +366,15 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     toolRow: {
       flexDirection: "row",
       alignItems: "flex-start",
-      gap: spacing.md,
-      marginTop: spacing.md,
-      paddingVertical: spacing.sm,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.borderMedium,
+      gap: spacing.sm,
+      marginTop: spacing.sm,
+      paddingHorizontal: 2,
     },
     toolMark: {
-      fontFamily: fonts.monoMedium,
-      fontSize: 13,
+      fontFamily: fonts.mono,
+      fontSize: 12,
       lineHeight: 20,
-      color: colors.textPrimary,
+      color: colors.textSecondary,
       paddingHorizontal: 2,
     },
     toolMarkError: {
@@ -415,21 +388,13 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     },
     toolName: {
       fontFamily: fonts.medium,
-      color: colors.textPrimary,
-      fontSize: 14,
-      lineHeight: 20,
-    },
-    toolStatus: {
-      fontFamily: fonts.mono,
-      fontSize: 12,
       color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 20,
     },
     toolSummary: {
       fontFamily: fonts.regular,
-      marginTop: 2,
       color: colors.textSecondary,
-      fontSize: 13,
-      lineHeight: 18,
     },
     diagnostics: {
       marginTop: spacing.sm,

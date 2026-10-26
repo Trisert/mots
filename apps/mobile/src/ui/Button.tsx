@@ -49,7 +49,7 @@ export function Button({
         <Text
           style={[
             styles.label,
-            { color: palette.label, fontWeight: variant === "ghost" ? "500" : "600" },
+            { color: palette.label },
           ]}
         >
           {label}
@@ -59,38 +59,42 @@ export function Button({
   );
 }
 
+/**
+ * Primary is the inversion, the system's one highlight. Secondary is a hairline outline.
+ * Ghost is plain text. Danger stays colourless and is marked by its label.
+ */
 function palettes(colors: ThemeColors): Record<
   Variant,
   { readonly background: string; readonly border: string; readonly label: string }
 > {
   return {
     primary: {
-      background: colors.textPrimary,
-      border: colors.textPrimary,
-      label: colors.bgMain,
+      background: colors.invertBg,
+      border: colors.invertBg,
+      label: colors.invertFg,
     },
     secondary: {
-      background: colors.cardSurfacePrimary,
-      border: colors.borderSubtle,
+      background: "transparent",
+      border: colors.rule,
       label: colors.textPrimary,
     },
     ghost: {
       background: "transparent",
       border: "transparent",
-      label: colors.textSecondary,
+      label: colors.textPrimary,
     },
     danger: {
-      background: colors.dangerSoft,
-      border: "transparent",
-      label: colors.danger,
+      background: "transparent",
+      border: colors.rule,
+      label: colors.textPrimary,
     },
   };
 }
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: hit,
-    borderRadius: radius.pill,
+    minHeight: 48,
+    borderRadius: radius.md + 3,
     borderWidth: 1,
     paddingHorizontal: 18,
     alignItems: "center",
@@ -100,7 +104,7 @@ const styles = StyleSheet.create({
     minHeight: hit,
   },
   label: {
-    fontFamily: fonts.semiBold,
+    fontFamily: fonts.medium,
     fontSize: 16,
     lineHeight: 20,
   },

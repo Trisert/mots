@@ -21,8 +21,9 @@ type Props = {
   readonly hint?: string;
 };
 
-/** One line of text plus its vertical padding: the same height as the round buttons beside it. */
-const INPUT_MIN_HEIGHT = hit;
+/** One line of text plus its vertical padding. */
+const INPUT_MIN_HEIGHT = 40;
+const ACTION_SIZE = 34;
 
 const QUICK_ACTIONS = [
   {
@@ -79,21 +80,7 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
         </View>
       ) : null}
 
-      <View
-        style={[
-          styles.field,
-          { borderColor: focused ? colors.rule : colors.borderMedium },
-        ]}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Azioni rapide"
-          accessibilityState={{ expanded: toolsOpen }}
-          onPress={() => setToolsOpen((open) => !open)}
-          style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
-        >
-          <PlusIcon size={18} color={toolsOpen ? colors.textPrimary : colors.textSecondary} />
-        </Pressable>
+      <View style={[styles.field, focused && styles.fieldFocused]}>
         <TextInput
           accessibilityLabel="Messaggio"
           value={value}
@@ -109,7 +96,7 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onContentSizeChange={(event) => {
-            const next = Math.min(Math.max(INPUT_MIN_HEIGHT, Math.round(event.nativeEvent.contentSize.height)), 140);
+            const next = Math.min(Math.max(INPUT_MIN_HEIGHT, Math.round(event.nativeEvent.contentSize.height)), 160);
             setInputHeight(next);
           }}
           onKeyPress={(event) => {
@@ -123,30 +110,45 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
             if (canSend) onSend();
           }}
         />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Invia messaggio"
-          accessibilityState={{ disabled: !canSend, busy: sending }}
-          onPress={onSend}
-          disabled={!canSend}
-          style={({ pressed }) => [
-            styles.send,
-            canSend
-              ? { backgroundColor: colors.invertBg, borderColor: colors.invertBg }
-              : { backgroundColor: "transparent", borderColor: colors.borderMedium },
-            pressed && canSend && styles.pressed,
-          ]}
-        >
-          {sending ? (
-            <ActivityIndicator color={colors.textPrimary} />
-          ) : (
-            <ArrowUpIcon
-              size={18}
-              color={canSend ? colors.invertFg : colors.textFaint}
-              strokeWidth={2}
-            />
-          )}
-        </Pressable>
+        <View style={styles.actions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Azioni rapide"
+            hitSlop={(hit - ACTION_SIZE) / 2}
+            accessibilityState={{ expanded: toolsOpen }}
+            onPress={() => setToolsOpen((open) => !open)}
+            style={({ pressed }) => [
+              styles.iconButton,
+              toolsOpen && styles.iconButtonOpen,
+              pressed && styles.pressed,
+            ]}
+          >
+            <PlusIcon size={18} color={colors.textPrimary} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Invia messaggio"
+            hitSlop={(hit - ACTION_SIZE) / 2}
+            accessibilityState={{ disabled: !canSend, busy: sending }}
+            onPress={onSend}
+            disabled={!canSend}
+            style={({ pressed }) => [
+              styles.send,
+              { backgroundColor: canSend ? colors.invertBg : colors.surfaceSoft },
+              pressed && canSend && styles.pressed,
+            ]}
+          >
+            {sending ? (
+              <ActivityIndicator color={colors.invertFg} />
+            ) : (
+              <ArrowUpIcon
+                size={17}
+                color={canSend ? colors.invertFg : colors.textFaint}
+                strokeWidth={2.2}
+              />
+            )}
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -156,20 +158,21 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     wrapper: {
       gap: spacing.sm,
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.sm,
-      paddingBottom: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.xs,
+      paddingBottom: spacing.xs,
       backgroundColor: colors.bgMain,
     },
     hint: {
       ...typeScale.small,
       color: colors.textSecondary,
-      paddingHorizontal: spacing.xs,
+      paddingHorizontal: spacing.sm,
     },
     tools: {
       flexDirection: "row",
       flexWrap: "wrap",
       gap: spacing.sm,
+      paddingHorizontal: spacing.xs,
     },
     tool: {
       minHeight: 36,
@@ -178,50 +181,62 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.sm,
       paddingHorizontal: spacing.md,
       borderRadius: radius.pill,
-      borderWidth: 1,
-      borderColor: colors.rule,
+      backgroundColor: colors.field,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.fieldBorder,
     },
     toolLabel: {
       ...typeScale.label,
       color: colors.textPrimary,
     },
     field: {
-      flexDirection: "row",
-      alignItems: "flex-end",
-      gap: spacing.xs,
-      borderRadius: radius.card,
-      borderWidth: 1,
-      backgroundColor: "transparent",
-      padding: spacing.xs,
+      borderRadius: radius.composer,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.fieldBorder,
+      backgroundColor: colors.field,
+      paddingTop: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      paddingBottom: spacing.sm,
     },
-    iconButton: {
-      width: hit,
-      height: hit,
-      borderRadius: hit / 2,
-      alignItems: "center",
-      justifyContent: "center",
+    fieldFocused: {
+      borderColor: colors.borderMedium,
     },
     input: {
-      flex: 1,
       minHeight: INPUT_MIN_HEIGHT,
-      maxHeight: 140,
-      paddingHorizontal: spacing.xs,
+      maxHeight: 160,
+      paddingHorizontal: spacing.sm,
       paddingVertical: (INPUT_MIN_HEIGHT - 22) / 2,
       fontFamily: fonts.regular,
       fontSize: 16,
       lineHeight: 22,
       color: colors.textPrimary,
     },
+    actions: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    iconButton: {
+      width: ACTION_SIZE,
+      height: ACTION_SIZE,
+      borderRadius: ACTION_SIZE / 2,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.fieldBorder,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    iconButtonOpen: {
+      backgroundColor: colors.surfaceSoft,
+    },
     send: {
-      width: hit,
-      height: hit,
-      borderRadius: hit / 2,
-      borderWidth: 1,
+      width: ACTION_SIZE,
+      height: ACTION_SIZE,
+      borderRadius: ACTION_SIZE / 2,
       alignItems: "center",
       justifyContent: "center",
     },
     pressed: {
-      opacity: 0.75,
+      opacity: 0.7,
     },
   });
 }

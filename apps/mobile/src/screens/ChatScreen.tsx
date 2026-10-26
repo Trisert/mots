@@ -19,7 +19,7 @@ import { KeyboardAvoidingView, useKeyboardState } from "react-native-keyboard-co
 import type { TranscriptEntry } from "@mots/client";
 import { useTheme } from "../context/ThemeContext";
 import { Composer } from "../components/Composer";
-import { MenuIcon, PlusIcon } from "../components/Icon";
+import { ChevronDownIcon, MenuIcon, PlusIcon } from "../components/Icon";
 import { MarkdownText } from "../components/MarkdownText";
 import { MessageBubble } from "../components/MessageBubble";
 import { SessionSheet } from "../components/SessionSheet";
@@ -31,8 +31,8 @@ import { TOOL_LABELS } from "../tools";
 import type { Identity } from "../storage";
 import { Banner } from "../ui/Banner";
 import { Button } from "../ui/Button";
+import { BrandMark } from "../ui/BrandMark";
 import { IconButton } from "../ui/IconButton";
-import { Pill } from "../ui/Pill";
 
 const SUGGESTIONS = [
   {
@@ -240,7 +240,8 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     [client],
   );
 
-  const pillLabel = model === undefined ? connection.label : `${connection.label} · ${model.shortName}`;
+  // Online, the title is just the model, as in the Claude app. Any other state names itself.
+  const titleLabel = connection.tone === "ok" && model !== undefined ? model.shortName : connection.label;
   const pillDescription = model === undefined
     ? `${connection.label}. Il server non ha ancora indicato il modello.`
     : `${connection.label}. Modello ${model.provider}, ${model.modelId}.`;
@@ -320,15 +321,13 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     </View>
   ) : (
     <View style={styles.empty}>
-      <Text style={styles.kicker}>Mots · il tuo spazio</Text>
+      <BrandMark size={44} />
       <Text accessibilityRole="header" maxFontSizeMultiplier={1.6} style={styles.greeting}>
         Ciao{identity.username.length > 0 ? `, ${identity.username}` : ""}.
       </Text>
-      <Text style={styles.lead}>
-        Quando vuoi. Puoi chiedermi di ricordare, di pianificare, o solo di parlare.
-      </Text>
+      <Text style={styles.lead}>Ricordare, pianificare, o solo parlare.</Text>
       <View style={styles.suggestions}>
-        {SUGGESTIONS.map((item, index) => (
+        {SUGGESTIONS.map((item) => (
           <Pressable
             key={item.title}
             accessibilityRole="button"
@@ -336,11 +335,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
             onPress={() => setInput(item.prompt)}
             style={({ pressed }) => [styles.suggestion, pressed && styles.suggestionPressed]}
           >
-            <Text style={styles.suggestionNumber}>{String(index + 1).padStart(2, "0")}</Text>
-            <View style={styles.suggestionText}>
-              <Text style={styles.suggestionTitle}>{item.title}</Text>
-              <Text style={styles.suggestionHint}>{item.hint}</Text>
-            </View>
+            <Text style={styles.suggestionTitle}>{item.title}</Text>
           </Pressable>
         ))}
       </View>
@@ -362,12 +357,27 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
           <IconButton label="Menu" onPress={() => setSheetOpen(true)}>
             <MenuIcon size={20} color={colors.textPrimary} />
           </IconButton>
-          <View style={styles.headerCenter}>
-            <Text accessibilityRole="header" style={styles.brand}>
-              Mots
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${pillDescription} Apri il menu.`}
+            onPress={() => setSheetOpen(true)}
+            style={({ pressed }) => [styles.headerCenter, pressed && styles.pressed]}
+          >
+            {connection.tone === "ok" ? null : (
+              <View
+                style={[
+                  styles.statusDot,
+                  connection.tone === "danger"
+                    ? { backgroundColor: colors.textPrimary }
+                    : { borderColor: colors.textSecondary, borderWidth: 1 },
+                ]}
+              />
+            )}
+            <Text accessibilityRole="header" numberOfLines={1} style={styles.headerTitle}>
+              {titleLabel}
             </Text>
-            <Pill label={pillLabel} tone={connection.tone} accessibilityLabel={pillDescription} />
-          </View>
+            <ChevronDownIcon size={14} color={colors.textSecondary} />
+          </Pressable>
           <IconButton
             label="Nuova chat"
             disabled={!connected}
@@ -516,26 +526,31 @@ function createStyles(colors: ThemeColors) {
       flex: 1,
     },
     header: {
-      minHeight: 64,
+      minHeight: 56,
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: spacing.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.rule,
+      paddingHorizontal: spacing.xs,
       backgroundColor: colors.bgMain,
     },
     headerCenter: {
       flex: 1,
+      flexDirection: "row",
       alignItems: "center",
-      gap: 4,
+      justifyContent: "center",
+      gap: 6,
+      minHeight: 44,
       paddingHorizontal: spacing.sm,
     },
-    brand: {
-      fontFamily: fonts.serif,
-      fontSize: 28,
-      lineHeight: 30,
-      letterSpacing: -0.6,
+    headerTitle: {
+      ...typeScale.bodyMedium,
+      fontSize: 15,
       color: colors.textPrimary,
+      flexShrink: 1,
+    },
+    statusDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 4,
     },
     list: {
       paddingHorizontal: spacing.lg,
@@ -547,57 +562,45 @@ function createStyles(colors: ThemeColors) {
     },
     empty: {
       flex: 1,
-      justifyContent: "flex-end",
+      alignItems: "center",
+      justifyContent: "center",
       gap: spacing.md,
-      paddingVertical: spacing.xl,
-    },
-    kicker: {
-      ...typeScale.kicker,
-      color: colors.textSecondary,
+      paddingVertical: spacing.xxl,
     },
     greeting: {
       ...typeScale.display,
+      fontSize: 40,
+      lineHeight: 42,
+      textAlign: "center",
       color: colors.textPrimary,
     },
     lead: {
       ...typeScale.body,
+      textAlign: "center",
       color: colors.textSecondary,
     },
     suggestions: {
-      marginTop: spacing.md,
-      borderTopWidth: 1,
-      borderTopColor: colors.rule,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "center",
+      gap: spacing.sm,
+      marginTop: spacing.lg,
     },
     suggestion: {
-      minHeight: 64,
-      flexDirection: "row",
-      alignItems: "baseline",
-      gap: spacing.lg,
-      paddingVertical: spacing.md,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.borderMedium,
+      minHeight: 36,
+      justifyContent: "center",
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.pill,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.fieldBorder,
+      backgroundColor: colors.field,
     },
     suggestionPressed: {
       backgroundColor: colors.surfaceSoft,
     },
-    suggestionNumber: {
-      ...typeScale.mono,
-      color: colors.textSecondary,
-      width: 20,
-    },
-    suggestionText: {
-      flex: 1,
-      gap: 2,
-    },
     suggestionTitle: {
-      ...typeScale.bodyMedium,
+      ...typeScale.label,
       color: colors.textPrimary,
-    },
-    suggestionHint: {
-      fontFamily: fonts.serifItalic,
-      fontSize: 18,
-      lineHeight: 22,
-      color: colors.textSecondary,
     },
     connection: {
       flex: 1,
@@ -635,12 +638,8 @@ function createStyles(colors: ThemeColors) {
       color: colors.textSecondary,
     },
     queued: {
-      borderRadius: radius.card,
-      borderWidth: 1,
-      borderStyle: "dashed",
-      borderColor: colors.rule,
-      padding: spacing.md,
-      gap: 2,
+      borderRadius: radius.bubble,
+      backgroundColor: colors.field,
     },
     queuedLabel: {
       ...typeScale.kicker,

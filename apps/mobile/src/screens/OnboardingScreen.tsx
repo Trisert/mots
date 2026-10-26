@@ -4,7 +4,7 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { createSession, parseJoinTarget } from "../api";
 import { DEFAULT_API_URL, normalizeBaseUrl } from "../config";
-import { CloseIcon } from "../components/Icon";
+import { ChevronDownIcon, ChevronUpIcon, CloseIcon } from "../components/Icon";
 import { useTheme } from "../context/ThemeContext";
 import type { Identity } from "../storage";
 import { hit, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
@@ -32,6 +32,7 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
   const [busy, setBusy] = useState<Busy>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
   const [modalOpen, setModalOpen] = useState(initialJoin);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
     if (initialJoin) setModalOpen(true);
@@ -42,6 +43,7 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
   const create = async () => {
     const baseUrl = normalizeBaseUrl(apiUrl);
     if (baseUrl.length === 0) {
+      setAdvancedOpen(true);
       setError("Inserisci l'indirizzo del server.");
       return;
     }
@@ -105,7 +107,7 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
           </Text>
         </View>
 
-        <View style={styles.card}>
+        <View style={styles.form}>
           <TextField
             label="Il tuo nome"
             value={username}
@@ -114,16 +116,6 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
             autoCapitalize="words"
             maxLength={40}
             hint="Se lo lasci vuoto, userò Utente."
-          />
-          <TextField
-            label="Server"
-            value={apiUrl}
-            onChangeText={setApiUrl}
-            placeholder="http://localhost:8787"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            hint="Sul telefono usa l'indirizzo del computer, non localhost."
           />
           {error !== undefined && !modalOpen ? <Banner message={error} /> : null}
           <Button
@@ -145,9 +137,39 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
           />
         </View>
 
-        <View style={styles.themeBlock}>
-          <Text style={styles.themeLabel}>Tema</Text>
-          <ThemeSwitcher />
+        <View style={styles.advanced}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Avanzate"
+            accessibilityState={{ expanded: advancedOpen }}
+            onPress={() => setAdvancedOpen((open) => !open)}
+            style={({ pressed }) => [styles.advancedToggle, pressed && styles.pressed]}
+          >
+            <Text style={styles.advancedLabel}>Avanzate</Text>
+            {advancedOpen ? (
+              <ChevronUpIcon size={14} color={colors.textSecondary} />
+            ) : (
+              <ChevronDownIcon size={14} color={colors.textSecondary} />
+            )}
+          </Pressable>
+          {advancedOpen ? (
+            <View style={styles.advancedBody}>
+              <TextField
+                label="Server"
+                value={apiUrl}
+                onChangeText={setApiUrl}
+                placeholder="http://localhost:8787"
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                hint="Sul telefono usa l'indirizzo del computer, non localhost."
+              />
+              <View style={styles.themeBlock}>
+                <Text style={styles.themeLabel}>Tema</Text>
+                <ThemeSwitcher />
+              </View>
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -214,35 +236,56 @@ function createStyles(colors: ThemeColors) {
     },
     column: {
       width: "100%",
-      maxWidth: 440,
+      maxWidth: 400,
       alignSelf: "center",
-      gap: spacing.xl,
+      gap: spacing.xxl,
     },
     intro: {
+      alignItems: "center",
       gap: spacing.md,
     },
     title: {
       ...typeScale.display,
+      fontSize: 56,
+      lineHeight: 56,
+      textAlign: "center",
       color: colors.textPrimary,
     },
     lead: {
       ...typeScale.body,
+      textAlign: "center",
       color: colors.textSecondary,
-      maxWidth: 360,
+      maxWidth: 320,
     },
-    card: {
+    form: {
       gap: spacing.lg,
-      backgroundColor: colors.cardSurfacePrimary,
-      borderRadius: radius.card,
-      borderWidth: 1,
-      borderColor: colors.borderSubtle,
-      padding: spacing.xl,
+    },
+    advanced: {
+      alignItems: "stretch",
+      gap: spacing.lg,
+    },
+    advancedToggle: {
+      minHeight: hit,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+    },
+    advancedLabel: {
+      ...typeScale.label,
+      color: colors.textSecondary,
+    },
+    advancedBody: {
+      gap: spacing.lg,
+    },
+    pressed: {
+      opacity: 0.7,
     },
     themeBlock: {
       gap: spacing.sm,
     },
     themeLabel: {
-      ...typeScale.caption,
+      ...typeScale.kicker,
       color: colors.textSecondary,
     },
     modalBackdrop: {
@@ -256,10 +299,8 @@ function createStyles(colors: ThemeColors) {
     },
     modalSheet: {
       gap: spacing.lg,
-      borderRadius: radius.xl,
+      borderRadius: radius.composer,
       backgroundColor: colors.bgMain,
-      borderWidth: 1,
-      borderColor: colors.borderSubtle,
       padding: spacing.xl,
     },
     modalHeader: {
