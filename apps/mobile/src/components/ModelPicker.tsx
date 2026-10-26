@@ -180,11 +180,11 @@ export function ModelPicker({ visible, apiUrl, sessionId, agent, onClose, onSele
                   style={[
                     styles.chip,
                     selected
-                      ? { backgroundColor: colors.invertBg, borderColor: colors.invertBg }
-                      : { borderColor: colors.fieldBorder },
+                      ? { backgroundColor: colors.sky, borderColor: colors.sky }
+                      : { backgroundColor: colors.sunk, borderColor: colors.sunk },
                   ]}
                 >
-                  <Text style={[styles.chipLabel, { color: selected ? colors.invertFg : colors.textPrimary }]}>
+                  <Text style={[styles.chipLabel, { color: selected ? colors.inkOnPastel : colors.textPrimary }]}>
                     {option.name}
                   </Text>
                 </Pressable>
@@ -315,10 +315,10 @@ function createStyles(colors: ThemeColors) {
       marginTop: spacing.lg,
       paddingLeft: spacing.md,
       minHeight: hit,
-      borderRadius: radius.pill,
-      borderWidth: StyleSheet.hairlineWidth,
+      borderRadius: radius.md,
+      borderWidth: 1,
       borderColor: colors.fieldBorder,
-      backgroundColor: colors.field,
+      backgroundColor: colors.card,
     },
     searchInput: {
       flex: 1,
@@ -388,7 +388,7 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: spacing.md,
     },
     rowActive: {
-      backgroundColor: colors.surfaceSoft,
+      backgroundColor: colors.skySoft,
     },
     pressed: {
       opacity: 0.7,
@@ -419,12 +419,11 @@ function createStyles(colors: ThemeColors) {
     badge: {
       ...typeScale.caption,
       fontFamily: fonts.medium,
-      color: colors.textSecondary,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.fieldBorder,
-      borderRadius: radius.xs,
-      paddingHorizontal: 6,
-      paddingVertical: 1,
+      color: colors.textPrimary,
+      backgroundColor: colors.sunk,
+      borderRadius: radius.pill,
+      paddingHorizontal: 10,
+      paddingVertical: 2,
       overflow: "hidden",
     },
   });

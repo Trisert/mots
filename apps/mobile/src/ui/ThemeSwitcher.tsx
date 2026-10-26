@@ -11,7 +11,7 @@ const OPTIONS: readonly { readonly id: ThemeMode; readonly label: string }[] = [
 export function ThemeSwitcher() {
   const { mode, setMode, colors } = useTheme();
   return (
-    <View accessibilityLabel="Tema" style={[styles.row, { borderColor: colors.rule }]}>
+    <View accessibilityLabel="Tema" style={[styles.row, { borderColor: colors.sunk, backgroundColor: colors.sunk }]}>
       {OPTIONS.map((option) => {
         const selected = mode === option.id;
         return (
@@ -23,14 +23,14 @@ export function ThemeSwitcher() {
             onPress={() => setMode(option.id)}
             style={({ pressed }) => [
               styles.chip,
-              { backgroundColor: selected ? colors.invertBg : "transparent" },
+              { backgroundColor: selected ? colors.card : "transparent" },
               pressed && styles.pressed,
             ]}
           >
             <Text
               style={[
                 styles.label,
-                { color: selected ? colors.invertFg : colors.textPrimary },
+                { color: colors.textPrimary },
               ]}
             >
               {option.label}
@@ -47,13 +47,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 4,
     padding: 3,
-    borderRadius: radius.card,
+    borderRadius: radius.pill,
     borderWidth: 1,
   },
   chip: {
     flex: 1,
     minHeight: hit - 6,
-    borderRadius: radius.xs,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.sm,

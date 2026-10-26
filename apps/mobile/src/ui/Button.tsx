@@ -60,8 +60,8 @@ export function Button({
 }
 
 /**
- * Primary is the inversion, the system's one highlight. Secondary is a hairline outline.
- * Ghost is plain text. Danger stays colourless and is marked by its label.
+ * Full pills. Primary is the action fill (black on light, white on dark), one per screen.
+ * Secondary is a quiet sunk fill. Ghost is plain text. Danger is plain text in the danger colour.
  */
 function palettes(colors: ThemeColors): Record<
   Variant,
@@ -74,8 +74,8 @@ function palettes(colors: ThemeColors): Record<
       label: colors.invertFg,
     },
     secondary: {
-      background: "transparent",
-      border: colors.rule,
+      background: colors.sunk,
+      border: colors.sunk,
       label: colors.textPrimary,
     },
     ghost: {
@@ -85,8 +85,8 @@ function palettes(colors: ThemeColors): Record<
     },
     danger: {
       background: "transparent",
-      border: colors.rule,
-      label: colors.textPrimary,
+      border: "transparent",
+      label: colors.danger,
     },
   };
 }
@@ -94,9 +94,9 @@ function palettes(colors: ThemeColors): Record<
 const styles = StyleSheet.create({
   base: {
     minHeight: 48,
-    borderRadius: radius.md + 3,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    paddingHorizontal: 18,
+    paddingHorizontal: 24,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -106,10 +106,10 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: fonts.medium,
     fontSize: 16,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   inactive: {
-    opacity: 0.45,
+    opacity: 0.4,
   },
   pressed: {
     opacity: 0.82,

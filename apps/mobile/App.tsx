@@ -9,14 +9,11 @@ import {
 } from "react-native";
 import { useFonts } from "expo-font";
 import {
-  InstrumentSerif_400Regular,
-  InstrumentSerif_400Regular_Italic,
-} from "@expo-google-fonts/instrument-serif";
-import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-} from "@expo-google-fonts/inter";
+  Figtree_400Regular,
+  Figtree_500Medium,
+  Figtree_600SemiBold,
+  Figtree_700Bold,
+} from "@expo-google-fonts/figtree";
 import {
   JetBrainsMono_400Regular,
   JetBrainsMono_500Medium,
@@ -33,13 +30,13 @@ import {
   type Identity,
 } from "./src/storage";
 import { spacing, type as typeScale } from "./src/theme";
-import { BrandMark } from "./src/ui/BrandMark";
+import { Mascot } from "./src/components/Mascot";
 
 function Splash() {
   const { colors } = useTheme();
   return (
     <View style={[styles.splash, { backgroundColor: colors.bgMain }]}>
-      <BrandMark size={56} />
+      <Mascot mood="calmo" size={96} />
       <Text accessibilityRole="header" style={[styles.wordmark, { color: colors.textPrimary }]}>
         Mots
       </Text>
@@ -51,11 +48,10 @@ function Splash() {
 function MainApp() {
   const { colors, isDark } = useTheme();
   const [fontsLoaded, fontError] = useFonts({
-    InstrumentSerif_400Regular,
-    InstrumentSerif_400Regular_Italic,
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
+    Figtree_400Regular,
+    Figtree_500Medium,
+    Figtree_600SemiBold,
+    Figtree_700Bold,
     JetBrainsMono_400Regular,
     JetBrainsMono_500Medium,
   });
@@ -76,7 +72,7 @@ function MainApp() {
         link.id = fontLinkId;
         link.rel = "stylesheet";
         link.href =
-          "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap";
+          "https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap";
         document.head.appendChild(link);
       }
 
@@ -89,7 +85,7 @@ function MainApp() {
             height: 100%;
             margin: 0;
             padding: 0;
-            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Figtree', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           }
           :focus-visible {
             outline: 2px solid var(--mots-focus, currentColor);
@@ -120,7 +116,7 @@ function MainApp() {
       if (document.documentElement) {
         document.documentElement.style.backgroundColor = colors.bgMain;
         document.documentElement.style.colorScheme = isDark ? "dark" : "light";
-        document.documentElement.style.setProperty("--mots-focus", colors.accent);
+        document.documentElement.style.setProperty("--mots-focus", colors.focus);
       }
       const root = document.getElementById("root");
       if (root) {

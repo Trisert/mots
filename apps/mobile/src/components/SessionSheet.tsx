@@ -402,9 +402,9 @@ function createStyles(colors: ThemeColors) {
       bottom: 0,
       width: "86%",
       maxWidth: 360,
-      backgroundColor: colors.bgMain,
-      borderRightWidth: StyleSheet.hairlineWidth,
-      borderRightColor: colors.fieldBorder,
+      backgroundColor: colors.card,
+      borderTopRightRadius: radius.xl,
+      borderBottomRightRadius: radius.xl,
       paddingHorizontal: spacing.md,
     },
     header: {
@@ -415,10 +415,7 @@ function createStyles(colors: ThemeColors) {
       paddingLeft: spacing.sm,
     },
     title: {
-      fontFamily: fonts.serif,
-      fontSize: 28,
-      lineHeight: 32,
-      letterSpacing: -0.5,
+      ...typeScale.title,
       color: colors.textPrimary,
     },
     close: {
@@ -531,10 +528,10 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.md,
       paddingHorizontal: spacing.sm,
       paddingVertical: spacing.xs,
-      borderRadius: radius.sm,
+      borderRadius: radius.md,
     },
     itemActive: {
-      backgroundColor: colors.surfaceSoft,
+      backgroundColor: colors.skySoft,
     },
     activeBar: {
       position: "absolute",
@@ -572,7 +569,7 @@ function createStyles(colors: ThemeColors) {
       paddingTop: spacing.sm,
       paddingHorizontal: spacing.sm,
       borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: colors.fieldBorder,
+      borderTopColor: colors.line,
     },
     avatar: {
       width: 32,
@@ -580,13 +577,13 @@ function createStyles(colors: ThemeColors) {
       borderRadius: 16,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: colors.invertBg,
+      backgroundColor: colors.blush,
     },
     avatarLetter: {
-      fontFamily: fonts.serif,
-      fontSize: 18,
-      lineHeight: 22,
-      color: colors.invertFg,
+      fontFamily: fonts.semiBold,
+      fontSize: 16,
+      lineHeight: 20,
+      color: colors.inkOnPastel,
     },
     footerName: {
       ...typeScale.bodyMedium,

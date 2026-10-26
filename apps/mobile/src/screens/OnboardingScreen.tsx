@@ -9,7 +9,7 @@ import { useTheme } from "../context/ThemeContext";
 import type { Identity } from "../storage";
 import { hit, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { Banner } from "../ui/Banner";
-import { BrandMark } from "../ui/BrandMark";
+import { Mascot } from "../components/Mascot";
 import { Button } from "../ui/Button";
 import { TextField } from "../ui/TextField";
 import { ThemeSwitcher } from "../ui/ThemeSwitcher";
@@ -98,12 +98,14 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
     >
       <View role="main" style={styles.column}>
         <View style={styles.intro}>
-          <BrandMark size={52} />
+          <View style={styles.mascotPanel}>
+            <Mascot mood="felice" size={176} shadow />
+          </View>
           <Text role="heading" aria-level={1} maxFontSizeMultiplier={1.6} style={styles.title}>
-            Mots
+            Ciao, sono Mots
           </Text>
           <Text style={styles.lead}>
-            Uno spazio calmo per pensare, ricordare e tornare sulle cose dopo.
+            Ricordo quello che mi dici, ti avviso quando serve e ti tengo compagnia.
           </Text>
         </View>
 
@@ -247,10 +249,17 @@ function createStyles(colors: ThemeColors) {
       alignItems: "center",
       gap: spacing.md,
     },
+    mascotPanel: {
+      alignSelf: "stretch",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: spacing.xxl,
+      marginBottom: spacing.sm,
+      borderRadius: radius.xl,
+      backgroundColor: colors.blushSoft,
+    },
     title: {
-      ...typeScale.display,
-      fontSize: 56,
-      lineHeight: 56,
+      ...typeScale.title,
       textAlign: "center",
       color: colors.textPrimary,
     },

@@ -56,8 +56,8 @@ export function TextField({
           {
             color: colors.textPrimary,
             backgroundColor: colors.field,
-            borderColor: error !== undefined ? colors.rule : focused ? colors.textSecondary : colors.fieldBorder,
-            borderWidth: error !== undefined ? 1.5 : StyleSheet.hairlineWidth,
+            borderColor: error !== undefined ? colors.danger : focused ? colors.focus : colors.fieldBorder,
+            borderWidth: error !== undefined || focused ? 2 : 1,
           },
         ]}
       />
@@ -69,7 +69,7 @@ export function TextField({
             importantForAccessibility="no-hide-descendants"
             style={styles.mark}
           >
-            <AlertIcon size={14} color={colors.textPrimary} />
+            <AlertIcon size={14} color={colors.danger} />
           </View>
           <Text
             accessibilityRole="alert"
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   input: {
     minHeight: 48,
     borderWidth: 1,
-    borderRadius: radius.md + 3,
+    borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontFamily: fonts.regular,

@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { ArrowUpIcon, BookmarkIcon, ClockIcon, PlusIcon, SearchIcon } from "./Icon";
-import { fonts, hit, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
+import { fonts, hit, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
 
 type Props = {
   readonly value: string;
@@ -21,11 +21,11 @@ type Props = {
   readonly hint?: string;
 };
 
-const ACTION_SIZE = 34;
+const ACTION_SIZE = 40;
 /** One line of text, as tall as the buttons beside it. */
 const INPUT_MIN_HEIGHT = ACTION_SIZE;
 const TARGET_INSET = (hit - ACTION_SIZE) / 2;
-const FIELD_PADDING = 5;
+const FIELD_PADDING = 6;
 
 const QUICK_ACTIONS = [
   {
@@ -91,7 +91,7 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
           style={({ pressed }) => [styles.target, pressed && styles.pressed]}
         >
           <View style={[styles.circle, styles.circleBorder, toolsOpen && styles.circleOpen]}>
-            <PlusIcon size={18} color={colors.textPrimary} />
+            <PlusIcon size={18} color={toolsOpen ? colors.inkOnPastel : colors.textPrimary} />
           </View>
         </Pressable>
         <TextInput
@@ -134,7 +134,7 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
           <View
             style={[
               styles.circle,
-              { backgroundColor: canSend ? colors.invertBg : colors.surfaceSoft },
+              { backgroundColor: canSend ? colors.action : colors.sunk },
             ]}
           >
             {sending ? (
@@ -142,7 +142,7 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
             ) : (
               <ArrowUpIcon
                 size={17}
-                color={canSend ? colors.invertFg : colors.textFaint}
+                color={canSend ? colors.onAction : colors.textSecondary}
                 strokeWidth={2.2}
               />
             )}
@@ -178,11 +178,10 @@ function createStyles(colors: ThemeColors) {
       flexDirection: "row",
       alignItems: "center",
       gap: spacing.sm,
-      paddingHorizontal: spacing.md,
+      paddingHorizontal: spacing.lg,
       borderRadius: radius.pill,
-      backgroundColor: colors.field,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.fieldBorder,
+      backgroundColor: colors.card,
+      ...shadows.card,
     },
     toolLabel: {
       ...typeScale.label,
@@ -195,13 +194,14 @@ function createStyles(colors: ThemeColors) {
       alignItems: "flex-end",
       gap: spacing.sm,
       borderRadius: radius.composer,
-      borderWidth: StyleSheet.hairlineWidth,
+      borderWidth: 1,
       borderColor: colors.fieldBorder,
-      backgroundColor: colors.field,
+      backgroundColor: colors.card,
       padding: FIELD_PADDING,
+      ...shadows.card,
     },
     fieldFocused: {
-      borderColor: colors.textSecondary,
+      borderColor: colors.focus,
     },
     input: {
       flex: 1,
@@ -231,11 +231,10 @@ function createStyles(colors: ThemeColors) {
       justifyContent: "center",
     },
     circleBorder: {
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.fieldBorder,
+      backgroundColor: colors.sunk,
     },
     circleOpen: {
-      backgroundColor: colors.surfaceSoft,
+      backgroundColor: colors.sky,
     },
     pressed: {
       opacity: 0.7,
