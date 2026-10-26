@@ -1,3 +1,4 @@
+import type { RunErrorCode } from "@mots/client";
 import type { ConnectionStatus } from "@mots/protocol";
 
 /** Enough of the server agent to read the model it actually configured. */
@@ -75,6 +76,15 @@ export function presentError(message: string): string {
     return `Un messaggio non può superare ${length[1]} caratteri.`;
   }
   return trimmed;
+}
+
+const RUN_ERRORS: Readonly<Record<RunErrorCode, string>> = {
+  no_response: "Il modello non ha risposto. Controlla i limiti o i crediti del provider e riprova.",
+};
+
+/** Italian copy for a run that the client reports by code. */
+export function presentRunError(code: RunErrorCode): string {
+  return RUN_ERRORS[code];
 }
 
 /**

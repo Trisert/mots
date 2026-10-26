@@ -183,9 +183,7 @@ describe("MotsClient", () => {
           ],
         }),
       );
-      expect(client.getSnapshot().snapshots[1]?.runError).toContain(
-        "Il modello non ha risposto",
-      );
+      expect(client.getSnapshot().snapshots[1]?.runError).toBe("no_response");
     } finally {
       client.dispose();
     }

@@ -10,6 +10,7 @@ export {
   type ConversationSnapshot,
   type LiveCompaction,
   type LiveConversation,
+  type RunErrorCode,
   type SessionAction,
   type SessionState,
   type ToolProgress,

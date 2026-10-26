@@ -25,7 +25,7 @@ import { MessageBubble } from "../components/MessageBubble";
 import { SessionSheet } from "../components/SessionSheet";
 import { probeSession, type SessionAccess } from "../api";
 import { useMotsSession } from "../hooks/useMotsSession";
-import { presentConnection, presentError, presentModel } from "../present";
+import { presentConnection, presentError, presentModel, presentRunError } from "../present";
 import { motion, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TOOL_LABELS } from "../tools";
 import type { Identity } from "../storage";
@@ -273,7 +273,9 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
         </View>
       ))}
       {active?.failure !== undefined ? <Banner message={active.failure.message} /> : null}
-      {active?.runError !== undefined ? <Banner message={active.runError} /> : null}
+      {active?.runError !== undefined ? (
+        <Banner message={presentRunError(active.runError)} />
+      ) : null}
     </View>
   );
 

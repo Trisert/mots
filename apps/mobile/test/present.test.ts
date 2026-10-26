@@ -3,6 +3,7 @@ import {
   presentConnection,
   presentError,
   presentModel,
+  presentRunError,
   providerLabel,
   shortModelName,
 } from "../src/present.ts";
@@ -90,5 +91,13 @@ describe("presentConnection", () => {
     expect(connected.tone).toBe("ok");
     expect(connected.canRetry).toBe(false);
     expect(connected.busy).toBe(false);
+  });
+});
+
+describe("presentRunError", () => {
+  test("maps a silent run failure to the Italian copy", () => {
+    expect(presentRunError("no_response")).toBe(
+      "Il modello non ha risposto. Controlla i limiti o i crediti del provider e riprova.",
+    );
   });
 });
