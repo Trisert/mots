@@ -302,6 +302,19 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
           // A user abort withdraws the input, and that stops the routine. Any other
           // unanswered turn is a failure, and the routine goes on.
           ended = turn.status === "done" || turn.reason !== "aborted";
+          if (turn.status !== "done") {
+            // The next run is still scheduled, so report the miss instead of
+            // letting a failing routine repeat silently.
+            try {
+              runtime.report(
+                new Error(
+                  `Scheduled instruction ${task.input.id} did not complete (${turn.status}${turn.reason === undefined ? "" : `: ${turn.reason}`})`,
+                ),
+              );
+            } catch {
+              // Reporting must not skip the next row either.
+            }
+          }
         } else {
           runtime.report(
             new Error(

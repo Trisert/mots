@@ -78,5 +78,5 @@ Do not deploy a Worker that the mobile app cannot authenticate against: a client
 ## Notes
 
 - The Durable Object's `documentRetentionMs: 0` setting drops idle Pi documents from memory. SQLite data stays.
-- Recurring routines do not reschedule themselves. After a delivery, the agent must call `schedule` with `sourceScheduleId`, or the routine stops.
+- Recurring routines reschedule themselves. The Durable Object writes the next run when a delivery finishes, even if the turn failed. Only cancelling the run or a missing conversation stops the routine.
 - Rate limits live in each Worker isolate and key on `CF-Connecting-IP`. They are not a global limit.

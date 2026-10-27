@@ -31,6 +31,8 @@ describe("scheduled instructions", () => {
       },
     });
     expect(text).toContain("It repeats every 2 days in Europe/Rome");
+    expect(text).toContain("do not call schedule to repeat this routine");
+    expect(text).not.toContain("sourceScheduleId");
     expect(parseScheduledInstruction(text)).toBe("Fai una passeggiata");
   });
 
