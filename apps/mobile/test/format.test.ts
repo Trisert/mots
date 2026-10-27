@@ -33,7 +33,7 @@ describe("formatDateTime", () => {
     const formatted = formatDateTime("2026-03-15T14:30:00.000Z");
     expect(formatted).toBeDefined();
     expect(formatted).toMatch(/15/);
-    expect(formatted).toMatch(/mar/);
+    expect(formatted).toMatch(/Mar/);
     expect(formatted).not.toMatch(/AM|PM/i);
   });
 

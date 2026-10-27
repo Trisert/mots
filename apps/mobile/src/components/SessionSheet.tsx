@@ -5,12 +5,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ROOT_CONVERSATION_ID, type ConversationSummary } from "@mots/protocol";
 import { normalizeBaseUrl } from "../config";
 import { useTheme } from "../context/ThemeContext";
+import { useI18n, type Translate } from "../i18n";
 import { presentModel, type PresentedModel } from "../present";
 import { CheckIcon, ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CloseIcon, PlusIcon } from "./Icon";
 import { FOCUSABLE_SELECTOR, isEnabledElement, tabTrapIndex } from "../focus-trap";
 import { fonts, hit, radius, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { Button } from "../ui/Button";
 import { TextField } from "../ui/TextField";
+import { LanguageSwitcher } from "../ui/LanguageSwitcher";
 import { ThemeSwitcher } from "../ui/ThemeSwitcher";
 
 type Props = {
@@ -31,11 +33,11 @@ type Props = {
   readonly onOpenModels: () => void;
 };
 
-type Section = "share" | "server" | "theme";
+type Section = "share" | "server" | "theme" | "language";
 
-function conversationName(conversation: ConversationSummary, index: number): string {
-  if (conversation.id === ROOT_CONVERSATION_ID) return "Chat principale";
-  return `Diramazione ${index}`;
+function conversationName(conversation: ConversationSummary, index: number, t: Translate): string {
+  if (conversation.id === ROOT_CONVERSATION_ID) return t("menu.mainChat");
+  return t("menu.branch", { index });
 }
 
 type SettingRowProps = {
@@ -94,6 +96,7 @@ export function SessionSheet({
 }: Props) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const { t, locale } = useI18n();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const activeModel: PresentedModel | undefined = presentModel(agent);
 
@@ -184,7 +187,7 @@ export function SessionSheet({
   const saveUrl = () => {
     const next = normalizeBaseUrl(draftUrl);
     if (next.length === 0) {
-      setUrlError("Inserisci l'indirizzo del server.");
+      setUrlError(t("menu.serverRequired"));
       return;
     }
     setUrlError(undefined);
@@ -194,7 +197,7 @@ export function SessionSheet({
   const toggle = (section: Section) =>
     setOpenSection((current) => (current === section ? undefined : section));
 
-  const displayName = username !== undefined && username.length > 0 ? username : "Utente";
+  const displayName = username !== undefined && username.length > 0 ? username : t("common.user");
 
   return (
     <View style={styles.container} accessibilityViewIsModal>
@@ -211,7 +214,7 @@ export function SessionSheet({
         testID="session-sheet"
         role="dialog"
         aria-modal={true}
-        aria-label="Menu"
+        aria-label={t("menu.label")}
         style={[styles.sheet, { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + spacing.sm }]}
       >
         <View style={styles.header}>
@@ -221,7 +224,7 @@ export function SessionSheet({
           <Pressable
             ref={closeRef}
             accessibilityRole="button"
-            accessibilityLabel="Chiudi menu"
+            accessibilityLabel={t("menu.close")}
             onPress={onClose}
             style={({ pressed }) => [styles.close, pressed && styles.pressed]}
           >
@@ -231,7 +234,7 @@ export function SessionSheet({
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Nuova chat"
+          accessibilityLabel={t("menu.newChat")}
           onPress={() => {
             onCreate();
             onClose();
@@ -241,7 +244,7 @@ export function SessionSheet({
           <View style={styles.newChatIcon}>
             <PlusIcon size={14} color={colors.invertFg} />
           </View>
-          <Text style={styles.newChatLabel}>Nuova chat</Text>
+          <Text style={styles.newChatLabel}>{t("menu.newChat")}</Text>
         </Pressable>
 
         <ScrollView
@@ -251,13 +254,13 @@ export function SessionSheet({
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.block}>
-            <Text style={styles.section}>Chat</Text>
+            <Text style={styles.section}>{t("menu.chats")}</Text>
             {conversations.length === 0 ? (
-              <Text style={styles.empty}>Nessuna chat ancora.</Text>
+              <Text style={styles.empty}>{t("menu.noChats")}</Text>
             ) : (
               conversations.map((conversation, index) => {
                 const active = conversation.id === activeConversationId;
-                const name = conversationName(conversation, index);
+                const name = conversationName(conversation, index, t);
                 return (
                   <Pressable
                     key={conversation.id}
@@ -285,18 +288,18 @@ export function SessionSheet({
           </View>
 
           <View style={styles.block}>
-            <Text style={styles.section}>Impostazioni</Text>
+            <Text style={styles.section}>{t("menu.settings")}</Text>
 
             <SettingRow
-              label="Modello"
+              label={t("menu.model")}
               value={activeModel?.shortName ?? "—"}
               onPress={onOpenModels}
               styles={styles}
               color={colors.textSecondary}
             />
             <SettingRow
-              label="Condivisione"
-              value="Codice"
+              label={t("menu.sharing")}
+              value={t("menu.code")}
               open={openSection === "share"}
               onPress={() => toggle("share")}
               styles={styles}
@@ -304,29 +307,29 @@ export function SessionSheet({
             />
             {openSection === "share" ? (
               <View style={styles.settingBody}>
-                <Text selectable accessibilityLabel={`Codice sessione ${sessionId}`} style={styles.code}>
+                <Text selectable accessibilityLabel={t("menu.codeLabel", { code: sessionId })} style={styles.code}>
                   {sessionId}
                 </Text>
                 <Text style={styles.body}>
-                  Condividi il codice per intero. La parte dopo il trattino basso è la firma.
+                  {t("menu.shareHint")}
                 </Text>
                 <View style={styles.row}>
                   <View style={styles.rowItem}>
                     <Button
-                      label={copied ? "Copiato" : "Copia codice"}
+                      label={copied ? t("common.copied") : t("menu.copyCode")}
                       variant="secondary"
                       onPress={() => void copyCode()}
                     />
                   </View>
                   <View style={styles.rowItem}>
-                    <Button label="Condividi" variant="secondary" onPress={onShare} />
+                    <Button label={t("menu.share")} variant="secondary" onPress={onShare} />
                   </View>
                 </View>
               </View>
             ) : null}
 
             <SettingRow
-              label="Server"
+              label={t("menu.server")}
               value={apiUrl.replace(/^https?:\/\//, "")}
               open={openSection === "server"}
               onPress={() => toggle("server")}
@@ -336,21 +339,21 @@ export function SessionSheet({
             {openSection === "server" ? (
               <View style={styles.settingBody}>
                 <TextField
-                  label="Indirizzo"
+                  label={t("menu.address")}
                   value={draftUrl}
                   onChangeText={setDraftUrl}
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType="url"
                   error={urlError}
-                  hint="Salvare riconnette questa sessione al nuovo indirizzo."
+                  hint={t("menu.serverHint")}
                 />
-                <Button label="Salva server" variant="secondary" onPress={saveUrl} />
+                <Button label={t("menu.saveServer")} variant="secondary" onPress={saveUrl} />
               </View>
             ) : null}
 
             <SettingRow
-              label="Tema"
+              label={t("menu.theme")}
               open={openSection === "theme"}
               onPress={() => toggle("theme")}
               styles={styles}
@@ -359,6 +362,20 @@ export function SessionSheet({
             {openSection === "theme" ? (
               <View style={styles.settingBody}>
                 <ThemeSwitcher />
+              </View>
+            ) : null}
+
+            <SettingRow
+              label={t("menu.language")}
+              value={t(locale === "it" ? "language.it" : "language.en")}
+              open={openSection === "language"}
+              onPress={() => toggle("language")}
+              styles={styles}
+              color={colors.textSecondary}
+            />
+            {openSection === "language" ? (
+              <View style={styles.settingBody}>
+                <LanguageSwitcher />
               </View>
             ) : null}
           </View>
@@ -373,11 +390,11 @@ export function SessionSheet({
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Esci dalla sessione"
+            accessibilityLabel={t("menu.leaveLabel")}
             onPress={onLeave}
             style={({ pressed }) => [styles.leave, pressed && styles.pressed]}
           >
-            <Text style={styles.leaveLabel}>Esci</Text>
+            <Text style={styles.leaveLabel}>{t("menu.leave")}</Text>
           </Pressable>
         </View>
       </View>

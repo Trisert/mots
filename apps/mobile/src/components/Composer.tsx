@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
+import { useI18n, type Translate } from "../i18n";
 import { ArrowUpIcon, BookmarkIcon, ClockIcon, PlusIcon, SearchIcon } from "./Icon";
 import { fonts, hit, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
 
@@ -27,26 +28,31 @@ const INPUT_MIN_HEIGHT = ACTION_SIZE;
 const TARGET_INSET = (hit - ACTION_SIZE) / 2;
 const FIELD_PADDING = 6;
 
-const QUICK_ACTIONS = [
-  {
-    label: "Routine",
-    prefix: "Imposta una routine per ",
-    icon: (color: string) => <ClockIcon size={15} color={color} />,
-  },
-  {
-    label: "Ricorda",
-    prefix: "Ricorda che ",
-    icon: (color: string) => <BookmarkIcon size={15} color={color} />,
-  },
-  {
-    label: "Cerca",
-    prefix: "Cosa abbiamo detto su ",
-    icon: (color: string) => <SearchIcon size={15} color={color} />,
-  },
-];
+/** The quick actions insert a prefix the person completes; the prefix is in the app language. */
+function quickActions(t: Translate) {
+  return [
+    {
+      label: t("composer.routine"),
+      prefix: t("composer.routinePrefix"),
+      icon: (color: string) => <ClockIcon size={15} color={color} />,
+    },
+    {
+      label: t("composer.remember"),
+      prefix: t("composer.rememberPrefix"),
+      icon: (color: string) => <BookmarkIcon size={15} color={color} />,
+    },
+    {
+      label: t("composer.search"),
+      prefix: t("composer.searchPrefix"),
+      icon: (color: string) => <SearchIcon size={15} color={color} />,
+    },
+  ];
+}
 
 export function Composer({ value, onChange, onSend, disabled, sending, hint }: Props) {
   const { colors } = useTheme();
+  const { t } = useI18n();
+  const actions = useMemo(() => quickActions(t), [t]);
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -64,7 +70,7 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
       ) : null}
       {toolsOpen ? (
         <View style={styles.tools}>
-          {QUICK_ACTIONS.map((action) => (
+          {actions.map((action) => (
             <Pressable
               key={action.label}
               accessibilityRole="button"
@@ -85,7 +91,7 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
       <View style={[styles.field, focused && styles.fieldFocused]}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Azioni rapide"
+          accessibilityLabel={t("composer.quickActions")}
           accessibilityState={{ expanded: toolsOpen }}
           onPress={() => setToolsOpen((open) => !open)}
           style={({ pressed }) => [styles.target, pressed && styles.pressed]}
@@ -95,10 +101,10 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
           </View>
         </Pressable>
         <TextInput
-          accessibilityLabel="Messaggio"
+          accessibilityLabel={t("composer.message")}
           value={value}
           onChangeText={onChange}
-          placeholder="Scrivi a Mots"
+          placeholder={t("composer.placeholder")}
           placeholderTextColor={colors.textFaint}
           style={[styles.input, inputHeight !== undefined ? { height: inputHeight } : null]}
           multiline
@@ -125,7 +131,7 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
         />
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Invia messaggio"
+          accessibilityLabel={t("composer.send")}
           accessibilityState={{ disabled: !canSend, busy: sending }}
           onPress={onSend}
           disabled={!canSend}

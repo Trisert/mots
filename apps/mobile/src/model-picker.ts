@@ -1,4 +1,5 @@
 import type { ModelCatalogEntry, ModelCatalogResponse } from "@mots/protocol";
+import type { Translate } from "./i18n/translate";
 
 export type ModelSection = {
   readonly title: string;
@@ -27,7 +28,11 @@ export function matchesQuery(entry: ModelCatalogEntry, providerName: string, que
  * search the order is kept but sections stay, so recommended matches still come first. Empty
  * sections are dropped. Each model appears once.
  */
-export function modelSections(catalog: ModelCatalogResponse, filter: ModelFilter): readonly ModelSection[] {
+export function modelSections(
+  catalog: ModelCatalogResponse,
+  filter: ModelFilter,
+  t: Translate,
+): readonly ModelSection[] {
   const names = new Map(catalog.providers.map((provider) => [provider.id, provider.name]));
   const visible = catalog.models.filter(
     (entry) =>
@@ -38,9 +43,9 @@ export function modelSections(catalog: ModelCatalogResponse, filter: ModelFilter
   const free = visible.filter((entry) => !entry.recommended && entry.free);
   const rest = visible.filter((entry) => !entry.recommended && !entry.free);
   return [
-    { title: "Consigliati", data: recommended },
-    { title: "Gratis", data: free },
-    { title: "Tutti i modelli", data: rest },
+    { title: t("picker.recommended"), data: recommended },
+    { title: t("picker.free"), data: free },
+    { title: t("picker.allModels"), data: rest },
   ].filter((section) => section.data.length > 0);
 }
 
@@ -53,12 +58,12 @@ export function contextLabel(tokens: number): string | undefined {
   return `${Math.round(tokens / 1_000)}K`;
 }
 
-/** Short Italian labels for the badges under a model's name. */
-export function modelBadges(entry: ModelCatalogEntry): readonly string[] {
+/** Short labels for the badges under a model's name. */
+export function modelBadges(entry: ModelCatalogEntry, t: Translate): readonly string[] {
   const badges: string[] = [];
-  if (entry.free) badges.push("Gratis");
-  if (entry.vision) badges.push("Immagini");
-  if (entry.reasoning) badges.push("Ragionamento");
+  if (entry.free) badges.push(t("picker.badgeFree"));
+  if (entry.vision) badges.push(t("picker.badgeVision"));
+  if (entry.reasoning) badges.push(t("picker.badgeReasoning"));
   const context = contextLabel(entry.contextWindow);
   if (context !== undefined) badges.push(context);
   return badges;

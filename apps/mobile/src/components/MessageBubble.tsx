@@ -3,8 +3,9 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import type { TranscriptEntry } from "@mots/client";
 import { useTheme } from "../context/ThemeContext";
+import { useI18n } from "../i18n";
 import { fonts, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
-import { TOOL_LABELS, toolSummary } from "../tools";
+import { toolLabel, toolSummary } from "../tools";
 import {
   AlertIcon,
   BookmarkIcon,
@@ -61,6 +62,8 @@ type Props = {
 
 function MessageBubbleComponent({ entry, onFork }: Props) {
   const { colors, isDark } = useTheme();
+  const { t, locale } = useI18n();
+  const localeTag = locale === "it" ? "it-IT" : "en-GB";
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const [reasoningExpanded, setReasoningExpanded] = useState(false);
@@ -84,8 +87,8 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
 
   // Tool execution card
   if (entry.role === "tool") {
-    const name = entry.toolResult?.name ?? "strumento";
-    const summary = toolSummary(name, entry.toolResult?.details);
+    const name = entry.toolResult?.name ?? t("bubble.toolFallback");
+    const summary = toolSummary(name, entry.toolResult?.details, t, localeTag);
     const detail = entry.toolResult?.isError === true ? entry.text : summary;
     const isError = entry.toolResult?.isError === true;
 
@@ -105,11 +108,11 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
         </View>
         <View style={styles.toolTitleBlock}>
           <Text style={styles.toolName} numberOfLines={2}>
-            {TOOL_LABELS[name] ?? name}
+            {toolLabel(name, t)}
             {detail !== undefined && detail.length > 0 ? (
               <Text style={styles.toolSummary}>{` · ${detail}`}</Text>
             ) : null}
-            {isError ? <Text style={styles.toolSummary}> · errore</Text> : null}
+            {isError ? <Text style={styles.toolSummary}>{t("bubble.errorBadge")}</Text> : null}
           </Text>
         </View>
       </View>
@@ -149,7 +152,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
       >
         {isScheduled ? (
           <View style={styles.scheduledHeader}>
-            <Text style={styles.scheduledLabel}>Routine</Text>
+            <Text style={styles.scheduledLabel}>{t("bubble.routine")}</Text>
           </View>
         ) : null}
 
@@ -159,7 +162,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
             {entry.toolCalls.map((call) => (
               <View key={call.callId} style={styles.toolChip}>
                 <Text style={styles.toolChipText}>
-                  {TOOL_LABELS[call.name] ?? call.name}
+                  {toolLabel(call.name, t)}
                 </Text>
               </View>
             ))}
@@ -171,7 +174,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
           <View style={styles.reasoningCard}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Dettagli ragionamento"
+              accessibilityLabel={t("bubble.reasoningDetails")}
               onPress={() => setReasoningExpanded(!reasoningExpanded)}
               style={({ pressed }) => [
                 styles.reasoningHeader,
@@ -179,7 +182,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
               ]}
             >
               <View style={styles.reasoningTitleRow}>
-                <Text style={styles.reasoningTitle}>Ragionamento</Text>
+                <Text style={styles.reasoningTitle}>{t("bubble.reasoning")}</Text>
               </View>
               {reasoningExpanded ? (
                 <ChevronUpIcon size={14} color={colors.reasoningText} />
@@ -222,7 +225,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
             <View style={styles.actionIconsRow}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Copia risposta"
+                accessibilityLabel={t("bubble.copyReply")}
                 hitSlop={4}
                 onPress={() => void copyMessage()}
                 style={({ pressed }) => [
@@ -240,7 +243,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
               {entry.canFork && onFork !== undefined ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Dirama da questo messaggio"
+                  accessibilityLabel={t("bubble.branchFromHere")}
                   hitSlop={4}
                   onPress={() => onFork(entry)}
                   style={({ pressed }) => [

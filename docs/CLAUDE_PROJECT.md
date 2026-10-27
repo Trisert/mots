@@ -32,7 +32,7 @@ Paste this text into the project instructions:
 ```text
 You work on Mots, a mobile-first AI companion (Expo + Cloudflare Worker + Durable Object with Pi Durable).
 Reply in Italian. Code, comments and the documents in docs/ are in English; the app's
-user-facing text is in Italian until the localization work lands.
+user-facing text is localized (English default, Italian available in Settings).
 Before proposing changes, read AGENTS.md and docs/ROADMAP.md. Pick the next work from the
 "M-task status" table and the phases in docs/ROADMAP.md: one task per pull request.
 Do not invent the state of the code: if a file is not in the project knowledge, say so and ask

@@ -1,8 +1,7 @@
 // Pure decisions for screen reader status announcements in the chat.
 // No React or React Native imports: the screen owns the refs and the I/O.
 
-export const REPLY_ANNOUNCEMENT = "Mots ha risposto";
-export const THINKING_ANNOUNCEMENT = "Mots sta scrivendo";
+import type { Translate } from "./i18n/translate";
 
 export type TranscriptLike = {
   readonly id: number;
@@ -46,6 +45,7 @@ export function markTranscript(
 export function replyAnnouncement(
   previous: TranscriptMark | undefined,
   next: TranscriptMark,
+  t: Translate,
 ): string | undefined {
   if (previous === undefined) return undefined;
   if (previous.conversationId !== next.conversationId) return undefined;
@@ -55,13 +55,14 @@ export function replyAnnouncement(
   if (previous.lastAssistantId !== undefined && next.lastAssistantId < previous.lastAssistantId) {
     return undefined;
   }
-  return REPLY_ANNOUNCEMENT;
+  return t("announce.reply");
 }
 
 /** Returns the text to announce when a run starts (live turns from inactive to active). */
 export function thinkingAnnouncement(
   previouslyActive: boolean | undefined,
   nowActive: boolean,
+  t: Translate,
 ): string | undefined {
-  return previouslyActive === false && nowActive ? THINKING_ANNOUNCEMENT : undefined;
+  return previouslyActive === false && nowActive ? t("announce.thinking") : undefined;
 }

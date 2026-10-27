@@ -94,7 +94,7 @@ export function StackedCardList({ cards, onCardPress }: Props) {
               <View style={styles.expandedContent}>
                 <View style={styles.pillRow}>
                   <View style={styles.pill}>
-                    <Text style={styles.pillText}>Attivo</Text>
+                    <Text style={styles.pillText}>Active</Text>
                   </View>
                   <View style={styles.pill}>
                     <Text style={styles.pillText}>Durable Object</Text>

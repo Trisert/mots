@@ -1,5 +1,6 @@
 import type { RunErrorCode } from "@mots/client";
 import type { ConnectionStatus } from "@mots/protocol";
+import type { MessageKey, Translate } from "./i18n/translate";
 
 /** Enough of the server agent to read the model it actually configured. */
 export type AgentModelSource = {
@@ -33,14 +34,14 @@ const PROVIDER_LABELS: Readonly<Record<string, string>> = {
   nvidia: "NVIDIA",
 };
 
-const KNOWN_ERRORS: Readonly<Record<string, string>> = {
-  "The session is not connected": "La sessione non è connessa.",
-  "The session connection failed": "La connessione con la sessione non è riuscita.",
-  "The session connection failed.": "La connessione con la sessione non è riuscita.",
-  "A prompt must contain text": "Scrivi un messaggio prima di inviare.",
-  "Server sent a binary protocol frame.": "Il server ha inviato un messaggio non valido.",
-  "Server sent an invalid protocol frame.": "Il server ha inviato un messaggio non valido.",
-  "That model is not available.": "Quel modello non è disponibile su questo server.",
+const KNOWN_ERRORS: Readonly<Record<string, MessageKey>> = {
+  "The session is not connected": "error.notConnected",
+  "The session connection failed": "error.connectionFailed",
+  "The session connection failed.": "error.connectionFailed",
+  "A prompt must contain text": "error.emptyPrompt",
+  "Server sent a binary protocol frame.": "error.invalidFrame",
+  "Server sent an invalid protocol frame.": "error.invalidFrame",
+  "That model is not available.": "error.modelUnavailable",
 };
 
 export function providerLabel(provider: string): string {
@@ -66,25 +67,25 @@ export function presentModel(agent: AgentModelSource | undefined): PresentedMode
   return { provider, modelId, shortName: shortModelName(modelId) };
 }
 
-export function presentError(message: string): string {
+export function presentError(message: string, t: Translate): string {
   const trimmed = message.trim();
-  if (trimmed.length === 0) return "Qualcosa non ha funzionato.";
+  if (trimmed.length === 0) return t("error.generic");
   const known = KNOWN_ERRORS[trimmed];
-  if (known !== undefined) return known;
+  if (known !== undefined) return t(known);
   const length = /^A prompt cannot exceed ([\d,]+) characters$/.exec(trimmed);
   if (length?.[1] !== undefined) {
-    return `Un messaggio non può superare ${length[1]} caratteri.`;
+    return t("error.promptTooLong", { count: length[1] });
   }
   return trimmed;
 }
 
-const RUN_ERRORS: Readonly<Record<RunErrorCode, string>> = {
-  no_response: "Il modello non ha risposto. Controlla i limiti o i crediti del provider e riprova.",
+const RUN_ERRORS: Readonly<Record<RunErrorCode, MessageKey>> = {
+  no_response: "run.noResponse",
 };
 
-/** Italian copy for a run that the client reports by code. */
-export function presentRunError(code: RunErrorCode): string {
-  return RUN_ERRORS[code];
+/** Copy for a run that the client reports by code. */
+export function presentRunError(code: RunErrorCode, t: Translate): string {
+  return t(RUN_ERRORS[code]);
 }
 
 /**
@@ -93,15 +94,16 @@ export function presentRunError(code: RunErrorCode): string {
  */
 export function presentConnection(
   status: ConnectionStatus,
+  t: Translate,
   rawError?: string,
 ): ConnectionPresentation {
-  const error = rawError === undefined ? undefined : presentError(rawError);
+  const error = rawError === undefined ? undefined : presentError(rawError, t);
   switch (status) {
     case "connected":
       return {
         tone: "ok",
-        label: "In linea",
-        title: "In linea",
+        label: t("connection.online"),
+        title: t("connection.online"),
         body: "",
         busy: false,
         canRetry: false,
@@ -109,18 +111,18 @@ export function presentConnection(
     case "failed":
       return {
         tone: "danger",
-        label: "Non in linea",
-        title: "Connessione interrotta",
-        body: error ?? "Il collegamento si è chiuso. Puoi riprovare.",
+        label: t("connection.offline"),
+        title: t("connection.interrupted"),
+        body: error ?? t("connection.closedBody"),
         busy: false,
         canRetry: true,
       };
     default:
       return {
         tone: "wait",
-        label: "Connessione…",
-        title: "Mi collego",
-        body: error ?? "Controllo che il server risponda.",
+        label: t("connection.connecting"),
+        title: t("connection.connectingTitle"),
+        body: error ?? t("connection.checkingBody"),
         busy: true,
         canRetry: true,
       };
