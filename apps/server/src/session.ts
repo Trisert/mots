@@ -23,7 +23,11 @@ import {
   applyTimezone,
   createMotsHarnessOptions,
   createStubModels,
+  dailyPromptKey,
+  dailyPromptLimitFromEnv,
+  DailyPromptLimitError,
   isAllowedAgentModel,
+  nextPromptCount,
   isOfferedModel,
   ModelNotAllowedError,
   modelPolicy,
@@ -339,16 +343,19 @@ export class Session extends DurableObject<Env> {
     } catch (error) {
       reportError("Session command failed", error, { command: command.type });
       if (command.type === "presence.typing") return;
-      const refused = error instanceof ModelNotAllowedError;
       this.#send(socket, {
         type: "command.result",
         command: command.type,
         requestId: command.requestId,
         ok: false,
         error: {
-          code: refused ? COMMAND_ERROR.modelNotAllowed : COMMAND_ERROR.commandFailed,
-          message: refused
-            ? error.message
+          code:
+            error instanceof ModelNotAllowedError || error instanceof DailyPromptLimitError
+              ? error.code
+              : COMMAND_ERROR.commandFailed,
+          message:
+            error instanceof ModelNotAllowedError || error instanceof DailyPromptLimitError
+              ? error.message
             : error instanceof Error
               ? error.message
               : "Command failed",
@@ -483,6 +490,7 @@ export class Session extends DurableObject<Env> {
         const conversation = await this.#requireConversation(
           command.conversationId as ConversationId,
         );
+        await this.#reservePromptSlot();
         await this.#setAlarmNoLaterThan(Date.now() + RECOVERY_ALARM_DELAY_MS);
         const submission = await conversation.submit(
           {
@@ -741,6 +749,24 @@ export class Session extends DurableObject<Env> {
       await this.#replaceAlarm(nextAlarm);
       // waitForTask starts the scheduler, so persist its recovery alarm first.
       for (const taskId of tasksToResume) this.#refreshAlarmWhenTaskSettles(taskId);
+    });
+  }
+
+  /**
+   * Counts one user prompt against today's allowance, or throws before the prompt reaches the
+   * harness. The read and the write share a transaction so two sockets cannot both take the last slot.
+   */
+  #reservePromptSlot(): Promise<void> {
+    const now = Date.now();
+    const limit = dailyPromptLimitFromEnv({
+      MOTS_DAILY_PROMPT_LIMIT: this.env.MOTS_DAILY_PROMPT_LIMIT,
+    });
+    const key = dailyPromptKey(now);
+    return this.ctx.storage.transaction(async (transaction) => {
+      const current = (await transaction.get<number>(key)) ?? 0;
+      const next = nextPromptCount(current, limit);
+      if (next === null) throw new DailyPromptLimitError(limit);
+      await transaction.put(key, next);
     });
   }
 
