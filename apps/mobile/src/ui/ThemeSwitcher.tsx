@@ -23,7 +23,10 @@ export function ThemeSwitcher() {
             onPress={() => setMode(option.id)}
             style={({ pressed }) => [
               styles.chip,
-              { backgroundColor: selected ? colors.card : "transparent" },
+              {
+                backgroundColor: selected ? colors.card : "transparent",
+                borderColor: selected ? colors.textPrimary : "transparent",
+              },
               pressed && styles.pressed,
             ]}
           >
@@ -51,6 +54,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chip: {
+    borderWidth: 1.5,
     flex: 1,
     minHeight: hit - 6,
     borderRadius: radius.pill,

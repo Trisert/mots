@@ -131,7 +131,7 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
           <Button
             label="Ho un codice"
             variant="ghost"
-            accessibilityLabel="Entra in una sessione esistente"
+            accessibilityLabel="Ho un codice: entra in una sessione esistente"
             disabled={busy !== undefined}
             onPress={() => {
               setError(undefined);
