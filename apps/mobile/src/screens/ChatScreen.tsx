@@ -150,7 +150,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const connection = presentConnection(state.status, state.error);
   const model = presentModel(active?.agent);
   const showErrorBanner = state.error !== undefined && (connected || entries.length > 0);
-  const conversationTitle = activeConversationId === 1 ? "Chat principale" : "Diramazione";
+  const conversationTitle = activeConversationId === 1 ? "Chat principale" : "Fork";
 
   // Screen reader status: a polite live region plus AccessibilityInfo on native.
   const [announcement, setAnnouncement] = useState<Announcement | undefined>(undefined);
@@ -289,10 +289,10 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
 
   const fork = useCallback(
     (entry: TranscriptEntry) => {
-      Alert.alert("Nuova diramazione", "Apro una chat che parte da questo messaggio. L'originale resta dov'è.", [
+      Alert.alert("Nuovo fork", "Apro una chat che parte da questo messaggio. L'originale resta dov'è.", [
         { text: "Annulla", style: "cancel" },
         {
-          text: "Dirama",
+          text: "Forka",
           onPress: () => {
             client.forkConversation(entry.conversationId, entry.id);
             setSheetOpen(false);
@@ -385,9 +385,9 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   ) : (
     <View style={styles.empty}>
       <View style={styles.emptyMascot}>
-        <Mascot mood="felice" size={120} shadow />
+        <Mascot mood="felice" size={120} shadow cycles={2} />
       </View>
-      <Text accessibilityRole="header" maxFontSizeMultiplier={1.6} style={styles.greeting}>
+      <Text accessibilityRole="header" style={styles.greeting}>
         Ciao{identity.username.length > 0 ? `, ${identity.username}` : ""}.
       </Text>
       <Text style={styles.lead}>Ricordare, pianificare, o solo parlare.</Text>
@@ -495,6 +495,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
               onScroll={onScroll}
               onContentSizeChange={onContentSizeChange}
               onLayout={onListLayout}
+              accessibilityRole="list"
               showsVerticalScrollIndicator={false}
               scrollEventThrottle={100}
               keyboardShouldPersistTaps="handled"
