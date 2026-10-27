@@ -1,60 +1,70 @@
-# Preview build
+# Mots mobile app
 
-`eas.json` defines one EAS Build profile, `preview`. It produces an internal iOS build (an ad hoc `.ipa` for registered devices) and an Android `.apk`. Run EAS from this directory, after the credentials below exist. The Android build needs only an Expo account:
+The Mots app is an [Expo](https://expo.dev) / React Native client for the Mots server. It talks to one Cloudflare Durable Object per session over a WebSocket. The app is a projection of the session state: the server and the agent hold the truth.
 
-```bash
-npx eas-cli@latest build --platform android --profile preview
-npx eas-cli@latest build --platform ios --profile preview
-```
+Screens:
 
-The first run links an Expo project and can write `extra.eas.projectId` into `app.json`. CI does not call EAS, and this profile does not submit to TestFlight or the App Store.
+- **Onboarding**: create a new space or join one with its code. The server field sits under **Avanzate**.
+- **Chat**: streaming replies, conversation list, fork from any message, model picker, and a connection status that retries on its own.
 
-Android Metro export stays in `package.json` as `export`. From the repo root, `bun run build:mobile` still runs `expo export --platform android`.
+The visual language follows the Mots design system: pastel fills with dark ink, Figtree and JetBrains Mono, and a speech-bubble mascot that holds still when reduced motion is on. The UI copy is Italian.
 
-The preview profile pins Bun `1.4.4`, the same version as CI, so EAS installs this workspace from the root `bun.lock`.
+## Run it
 
-`ios/` and `android/` are prebuild output. This directory's `.gitignore` ignores both, plus `*.mobileprovision`, `*.p12`, `*.p8`, `*.cer`, `*.key`, `*.pem`, `*.jks`, and `credentials.json`. Leave generated native projects and signing files out of git.
-
-## Apple credentials
-
-The bundle id is `com.mots.app` (`app.json`).
-
-Create these on the Apple Developer team that will sign Mots, then store them with EAS (`npx eas-cli@latest credentials` from this directory). EAS can generate the certificate and the ad hoc profile on that run.
-
-Who can create them:
-
-- Individual account: the Account Holder.
-- Organization: the Account Holder or an Admin. An App Manager can, when App Store Connect has **Access to Certificates, Identifiers & Profiles** turned on for that user.
-
-What to create:
-
-1. **Apple Developer Program membership** for that team.
-
-2. **App ID** `com.mots.app`, under Certificates, Identifiers & Profiles. EAS can register it when the Apple user above runs `eas credentials`.
-
-3. **Apple Distribution certificate.** One certificate covers the team. If you export it yourself, upload the `.p12` and its password through `eas credentials`. Keep the file out of the repo.
-
-4. **Ad hoc provisioning profile** for `com.mots.app`, signed by that certificate, listing each iPhone that will install the preview. Register a device with `npx eas-cli@latest device:create` before the build. A phone added later needs a new profile, or `eas build:resign` on an existing build. Keep the `.mobileprovision` out of git.
-
-5. **App Store Connect API key** (Admin), so EAS can create and refresh the certificate and profile without an interactive Apple ID password. This is required for a federated Apple account, which cannot sign in through the CLI.
-   - App Store Connect → Users and Access → Integrations → App Store Connect API.
-   - Download the `.p8` once. Keep the Key ID and the Issuer ID with it.
-   - Upload the key, Key ID, and Issuer ID through `eas credentials` or the EAS project credentials page.
-   - Keep the `.p8` out of git, `eas.json`, and CI.
-
-This preview has no push entitlement. Skip the Apple Push Notification key until a later change adds push.
-
-Prefer EAS-hosted credentials. `credentials.json` is only for a local copy. If a download writes that file, leave it untracked.
-
-## Public env for a device build
-
-A phone cannot reach `http://localhost:8787`. Set `EXPO_PUBLIC_MOTS_API_URL` on the preview build to the Worker URL. When that Worker requires `MOTS_CREATE_TOKEN`, set `EXPO_PUBLIC_MOTS_CREATE_TOKEN` as well. Expo inlines both into the binary. The create token is the app-wide gate, and anyone with the app can read it.
-
-Use EAS environment variables for the preview environment. Leave the values out of `eas.json` and out of git. The `preview` profile sets `"environment": "preview"`, so EAS loads only the variables created for that environment. Create them once from this directory:
+From the repository root, see [README.md](../../README.md#avvio-rapido). In short:
 
 ```bash
-npx eas-cli@latest env:create --environment preview --name EXPO_PUBLIC_MOTS_API_URL --value https://mots.<tuo-sottodominio>.workers.dev --visibility plaintext
-npx eas-cli@latest env:create --environment preview --name EXPO_PUBLIC_MOTS_CREATE_TOKEN --value <the MOTS_CREATE_TOKEN set on the Worker> --visibility plaintext
+bun install
+bun run dev          # Worker on Node, Expo, and the LAN address for your phone
+bun run dev:web      # web preview at http://localhost:8081
 ```
 
-`EXPO_PUBLIC_*` values are compiled into the JavaScript, so they are stored as plain text. Use the same token the Worker checks. A different one makes the app fail with `401` when it creates a space.
+Scan the Expo QR code with Expo Go, or open the web preview. Tests for the pure mobile logic run with `bun test apps/mobile/test`.
+
+## Build an Android app
+
+The `preview` profile in `eas.json` builds an `.apk` for internal distribution. The first build needs only a free Expo account. Run these from `apps/mobile`. On Windows, use `bunx` if `npx` is blocked by the execution policy:
+
+```bash
+bunx eas-cli@latest login
+bunx eas-cli@latest init
+bunx eas-cli@latest env:create --environment preview --name EXPO_PUBLIC_MOTS_API_URL --value https://mots.<tuo-sottodominio>.workers.dev --visibility plaintext
+bunx eas-cli@latest env:create --environment preview --name EXPO_PUBLIC_MOTS_CREATE_TOKEN --value <stesso MOTS_CREATE_TOKEN del Worker> --visibility plaintext
+bunx eas-cli@latest build --platform android --profile preview
+```
+
+EAS prints a link to the APK when the build finishes. Open it on the phone and allow the installation from that source.
+
+The `preview` profile sets `"environment": "preview"`, so EAS loads only the variables created for that environment. The profile pins Bun `1.4.4`, the same version as CI, so EAS installs the workspace from the root `bun.lock`.
+
+The first run can write `extra.eas.projectId` into `app.json`. That is expected.
+
+### Public variables in the build
+
+`EXPO_PUBLIC_*` values are compiled into the JavaScript bundle, so they are plain text and anyone with the app can read them. Keep the values out of `eas.json` and out of git, and create them with `env:create` as above.
+
+- `EXPO_PUBLIC_MOTS_API_URL` is the Worker URL the app uses by default. The onboarding screen can still change it.
+- `EXPO_PUBLIC_MOTS_CREATE_TOKEN` must match the `MOTS_CREATE_TOKEN` secret of the Worker. A different value makes the app fail with `401` when it creates a space. The token is an app-wide gate, not a per-user secret.
+
+## Build for iOS
+
+`eas.json` also has an iOS target for the same profile. It produces an ad hoc `.ipa` for registered devices, and it needs an Apple Developer Program membership. The free route for iPhone is Expo Go.
+
+The bundle id is `com.mots.app` (`app.json`). Set up the credentials on the Apple Developer team that will sign the app, then store them with EAS (`bunx eas-cli@latest credentials` from this directory):
+
+1. **Apple Developer Program membership** for the team.
+2. **App ID** `com.mots.app`, under Certificates, Identifiers & Profiles. EAS can register it during `eas credentials`.
+3. **Apple Distribution certificate**. EAS can generate it. If you export your own `.p12`, upload it with its password through `eas credentials`.
+4. **Ad hoc provisioning profile** for `com.mots.app`, listing each iPhone that will install the build. Register a device with `bunx eas-cli@latest device:create` before the build. A phone added later needs a new profile, or `eas build:resign` on an existing build.
+5. **App Store Connect API key** with the Admin role, so EAS can refresh the certificate and profile without an Apple ID password. Download the `.p8` once, and keep the Key ID and the Issuer ID with it. Upload all three through `eas credentials`.
+
+Keep `.p8`, `.p12`, `.mobileprovision`, `.cer`, `.key`, `.pem` and `credentials.json` out of git. `.gitignore` in this directory already ignores them, along with `/ios` and `/android`, the output of `expo prebuild`. Prefer EAS-hosted credentials. The preview build has no push entitlement yet.
+
+## Scripts
+
+| Script | What it does |
+| --- | --- |
+| `bun run start` (`dev:mobile` from the root) | Starts Expo. |
+| `bun run web` (`dev:web` from the root) | Starts the web preview. |
+| `bun run export` (`build:mobile` from the root) | Android Metro export, `expo export --platform android`. |
+| `bun run typecheck` | Type checks the app. |
