@@ -214,6 +214,8 @@ async function callMcp(
     headers: {
       accept: "application/json, text/event-stream",
       "content-type": "application/json",
+      // Workers send no User-Agent, and some search endpoints refuse requests without one.
+      "user-agent": "mots-agent",
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
@@ -371,11 +373,26 @@ export function createWebSearchTool(
     replay: "safe",
     execute: async (args: WebSearchArguments) => {
       const query = parseQuery(args.query);
-      const results = await searchWeb(key, query, fetchImpl);
-      return {
-        output: [{ type: "text" as const, text: webSearchOutput(query, results) }],
-        details: { query, results: results.length },
-      };
+      try {
+        const results = await searchWeb(key, query, fetchImpl);
+        return {
+          output: [{ type: "text" as const, text: webSearchOutput(query, results) }],
+          details: { query, results: results.length },
+        };
+      } catch (error) {
+        // Returned rather than thrown, so the model sees the reason and can say what failed.
+        const reason = error instanceof Error ? error.message : "unknown error";
+        console.error(`web_search failed: ${reason}`);
+        return {
+          output: [
+            {
+              type: "text" as const,
+              text: `The web search failed: ${reason}. Tell the user the search did not work. Do not say you have no web access.`,
+            },
+          ],
+          details: { query, results: 0 },
+        };
+      }
     },
   };
 }
