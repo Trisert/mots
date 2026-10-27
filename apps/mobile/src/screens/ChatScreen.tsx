@@ -32,6 +32,7 @@ import { conversationStatus } from "../conversation-status";
 import { ChevronDownIcon, MenuIcon, PlusIcon } from "../components/Icon";
 import { MarkdownText } from "../components/MarkdownText";
 import { MessageBubble } from "../components/MessageBubble";
+import { ToolRun } from "../components/ToolRun";
 import { ModelPicker } from "../components/ModelPicker";
 import { SessionSheet } from "../components/SessionSheet";
 import { probeSession, type SessionAccess } from "../api";
@@ -39,6 +40,7 @@ import { useMotsSession } from "../hooks/useMotsSession";
 import { presentConnection, presentError, presentModel, presentRunError, providerLabel } from "../present";
 import { fonts, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TOOL_LABELS } from "../tools";
+import { groupToolRuns, type ChatItem } from "../tool-runs";
 import type { Identity } from "../storage";
 import { Banner } from "../ui/Banner";
 import { Button } from "../ui/Button";
@@ -128,7 +130,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     };
   }, [identity.apiUrl, identity.sessionId, state.status]);
 
-  const listRef = useRef<FlatList<TranscriptEntry>>(null);
+  const listRef = useRef<FlatList<ChatItem>>(null);
   const stickToBottom = useRef(true);
   const contentHeight = useRef(0);
   const viewportHeight = useRef(0);
@@ -137,6 +139,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const active =
     activeConversationId === undefined ? undefined : state.snapshots[activeConversationId];
   const entries = active?.entries ?? [];
+  const items = useMemo(() => groupToolRuns(entries), [entries]);
   const conversations = state.conversations.filter((conversation) => conversation.owner === undefined);
   const liveText = active?.live?.text ?? "";
   const liveActive = active?.live?.active === true;
@@ -147,7 +150,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const connection = presentConnection(state.status, state.error);
   const model = presentModel(active?.agent);
   const showErrorBanner = state.error !== undefined && (connected || entries.length > 0);
-  const conversationTitle = activeConversationId === 1 ? "Chat principale" : "Diramazione";
+  const conversationTitle = activeConversationId === 1 ? "Chat principale" : "Fork";
 
   // Screen reader status: a polite live region plus AccessibilityInfo on native.
   const [announcement, setAnnouncement] = useState<Announcement | undefined>(undefined);
@@ -286,10 +289,10 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
 
   const fork = useCallback(
     (entry: TranscriptEntry) => {
-      Alert.alert("Nuova diramazione", "Apro una chat che parte da questo messaggio. L'originale resta dov'è.", [
+      Alert.alert("Nuovo fork", "Apro una chat che parte da questo messaggio. L'originale resta dov'è.", [
         { text: "Annulla", style: "cancel" },
         {
-          text: "Dirama",
+          text: "Forka",
           onPress: () => {
             client.forkConversation(entry.conversationId, entry.id);
             setSheetOpen(false);
@@ -382,9 +385,9 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   ) : (
     <View style={styles.empty}>
       <View style={styles.emptyMascot}>
-        <Mascot mood="felice" size={120} shadow />
+        <Mascot mood="felice" size={120} shadow cycles={2} />
       </View>
-      <Text accessibilityRole="header" maxFontSizeMultiplier={1.6} style={styles.greeting}>
+      <Text accessibilityRole="header" style={styles.greeting}>
         Ciao{identity.username.length > 0 ? `, ${identity.username}` : ""}.
       </Text>
       <Text style={styles.lead}>Ricordare, pianificare, o solo parlare.</Text>
@@ -474,15 +477,25 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
             </Text>
             <FlatList
               ref={listRef}
-              data={entries}
-              keyExtractor={(entry) => String(entry.id)}
-              renderItem={({ item }) => <MessageBubble entry={item} onFork={fork} />}
+              data={items}
+              keyExtractor={(item) => item.key}
+              renderItem={({ item, index }) =>
+                item.kind === "tools" ? (
+                  <ToolRun
+                    tools={item.tools}
+                    live={index === items.length - 1 && (liveActive || runningTools.length > 0)}
+                  />
+                ) : (
+                  <MessageBubble entry={item.entry} onFork={fork} />
+                )
+              }
               contentContainerStyle={[styles.list, entries.length === 0 && styles.listEmpty]}
               ListEmptyComponent={empty}
               ListFooterComponent={footer}
               onScroll={onScroll}
               onContentSizeChange={onContentSizeChange}
               onLayout={onListLayout}
+              accessibilityRole="list"
               showsVerticalScrollIndicator={false}
               scrollEventThrottle={100}
               keyboardShouldPersistTaps="handled"
