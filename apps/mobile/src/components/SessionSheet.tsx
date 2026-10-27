@@ -4,7 +4,9 @@ import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ROOT_CONVERSATION_ID, type ConversationSummary } from "@mots/protocol";
 import { normalizeBaseUrl } from "../config";
+import { STATUS_LABEL, type ConversationStatus } from "../conversation-status";
 import { useTheme } from "../context/ThemeContext";
+import { announceNow } from "../a11y";
 import { presentModel, type PresentedModel } from "../present";
 import { CheckIcon, ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CloseIcon, PlusIcon } from "./Icon";
 import { FOCUSABLE_SELECTOR, isEnabledElement, tabTrapIndex } from "../focus-trap";
@@ -17,6 +19,8 @@ type Props = {
   readonly visible: boolean;
   readonly conversations: readonly ConversationSummary[];
   readonly activeConversationId: number | undefined;
+  /** What each chat is doing, shown as a dot beside its name. */
+  readonly statusOf: (conversationId: number) => ConversationStatus;
   readonly sessionId: string;
   readonly username?: string;
   readonly apiUrl: string;
@@ -35,7 +39,7 @@ type Section = "share" | "server" | "theme";
 
 function conversationName(conversation: ConversationSummary, index: number): string {
   if (conversation.id === ROOT_CONVERSATION_ID) return "Chat principale";
-  return `Diramazione ${index}`;
+  return `Fork ${index}`;
 }
 
 type SettingRowProps = {
@@ -80,6 +84,7 @@ export function SessionSheet({
   visible,
   conversations,
   activeConversationId,
+  statusOf,
   sessionId,
   username,
   apiUrl,
@@ -175,6 +180,7 @@ export function SessionSheet({
     try {
       await Clipboard.setStringAsync(sessionId);
       setCopied(true);
+      announceNow("Codice copiato");
       setTimeout(() => setCopied(false), 1600);
     } catch {
       setCopied(false);
@@ -195,6 +201,12 @@ export function SessionSheet({
     setOpenSection((current) => (current === section ? undefined : section));
 
   const displayName = username !== undefined && username.length > 0 ? username : "Utente";
+
+  const statusColor = (status: ConversationStatus): string => {
+    if (status === "working") return colors.focus;
+    if (status === "retrying") return colors.danger;
+    return colors.textSecondary;
+  };
 
   return (
     <View style={styles.container} accessibilityViewIsModal>
@@ -251,18 +263,19 @@ export function SessionSheet({
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.block}>
-            <Text style={styles.section}>Chat</Text>
+            <Text accessibilityRole="header" style={styles.section}>Chat</Text>
             {conversations.length === 0 ? (
               <Text style={styles.empty}>Nessuna chat ancora.</Text>
             ) : (
               conversations.map((conversation, index) => {
                 const active = conversation.id === activeConversationId;
                 const name = conversationName(conversation, index);
+                const status = statusOf(conversation.id);
                 return (
                   <Pressable
                     key={conversation.id}
                     accessibilityRole="button"
-                    accessibilityLabel={name}
+                    accessibilityLabel={`${name}, ${STATUS_LABEL[status]}`}
                     accessibilityState={{ selected: active }}
                     onPress={() => {
                       onSelect(conversation.id);
@@ -274,10 +287,13 @@ export function SessionSheet({
                       pressed && styles.rowPressed,
                     ]}
                   >
-                    {active ? <View style={styles.activeBar} /> : null}
                     <Text numberOfLines={1} style={[styles.itemTitle, active && styles.itemTitleActive]}>
                       {name}
                     </Text>
+                    <View
+                      importantForAccessibility="no"
+                      style={[styles.statusDot, { backgroundColor: statusColor(status) }]}
+                    />
                   </Pressable>
                 );
               })
@@ -285,7 +301,7 @@ export function SessionSheet({
           </View>
 
           <View style={styles.block}>
-            <Text style={styles.section}>Impostazioni</Text>
+            <Text accessibilityRole="header" style={styles.section}>Impostazioni</Text>
 
             <SettingRow
               label="Modello"
@@ -533,14 +549,12 @@ function createStyles(colors: ThemeColors) {
     itemActive: {
       backgroundColor: colors.skySoft,
     },
-    activeBar: {
-      position: "absolute",
-      left: 0,
-      top: "20%",
-      height: "60%",
-      width: 3,
-      borderRadius: 2,
-      backgroundColor: colors.textPrimary,
+    // Sits at the row's far end, so the labels keep their alignment with the section headings.
+    statusDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginLeft: "auto",
     },
     rowPressed: {
       backgroundColor: colors.surfaceSoft,

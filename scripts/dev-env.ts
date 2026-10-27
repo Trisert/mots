@@ -71,3 +71,22 @@ export function lanAddress(
     address.startsWith("192.168.") ? 0 : address.startsWith("10.") ? 1 : 2;
   return candidates.sort((a, b) => rank(a) - rank(b))[0];
 }
+
+/**
+ * Where the app sends its requests. A server URL already in `EXPO_PUBLIC_MOTS_API_URL` wins: the
+ * app then uses that server (a deployed Worker, for example) and no Worker starts on this computer.
+ * A bare host is taken as https. Otherwise the app uses this computer's LAN address, so a phone on
+ * the same Wi-Fi reaches the local Worker without typing anything.
+ */
+export function devServerPlan(input: {
+  readonly remoteUrl?: string;
+  readonly lan?: string;
+  readonly port: number;
+}): { readonly apiUrl?: string; readonly localWorker: boolean } {
+  const remote = input.remoteUrl?.trim().replace(/\/+$/, "") ?? "";
+  if (remote.length > 0) {
+    return { apiUrl: /^https?:\/\//i.test(remote) ? remote : `https://${remote}`, localWorker: false };
+  }
+  if (input.lan === undefined) return { localWorker: true };
+  return { apiUrl: `http://${input.lan}:${input.port}`, localWorker: true };
+}

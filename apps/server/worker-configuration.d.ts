@@ -3,6 +3,8 @@ interface __BaseEnv_Env {
   OPENROUTER_API_KEY?: string;
   AI_GATEWAY_API_KEY?: string;
   NVIDIA_API_KEY?: string;
+  /** Optional. Makes web_search use Tavily. Without it, web_search uses Exa and Parallel in rotation. */
+  TAVILY_API_KEY?: string;
   MOTS_PROVIDER?: string;
   MOTS_MODEL?: string;
   /** HMAC key for join codes. At least 16 characters. Rotating it invalidates every code. */

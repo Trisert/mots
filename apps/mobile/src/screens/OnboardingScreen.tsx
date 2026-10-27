@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { createSession, parseJoinTarget } from "../api";
 import { DEFAULT_API_URL, normalizeBaseUrl } from "../config";
@@ -87,7 +87,7 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
   };
 
   return (
-    <ScrollView
+    <KeyboardAwareScrollView
       testID="onboarding-screen"
       style={styles.root}
       contentContainerStyle={[
@@ -95,13 +95,14 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
         { paddingTop: insets.top + spacing.xl, paddingBottom: insets.bottom + spacing.xxl },
       ]}
       keyboardShouldPersistTaps="handled"
+      bottomOffset={spacing.lg}
     >
       <View role="main" style={styles.column}>
         <View style={styles.intro}>
           <View style={styles.mascotPanel}>
             <Mascot mood="felice" size={176} shadow />
           </View>
-          <Text role="heading" aria-level={1} maxFontSizeMultiplier={1.6} style={styles.title}>
+          <Text role="heading" aria-level={1} style={styles.title}>
             Ciao, sono Mots
           </Text>
           <Text style={styles.lead}>
@@ -116,6 +117,8 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
             onChangeText={setUsername}
             placeholder="Come ti chiamo"
             autoCapitalize="words"
+            autoComplete="name"
+            textContentType="name"
             maxLength={40}
             hint="Se lo lasci vuoto, userò Utente."
           />
@@ -130,7 +133,7 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
           <Button
             label="Ho un codice"
             variant="ghost"
-            accessibilityLabel="Entra in una sessione esistente"
+            accessibilityLabel="Ho un codice: entra in una sessione esistente"
             disabled={busy !== undefined}
             onPress={() => {
               setError(undefined);
@@ -224,7 +227,7 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
           </KeyboardAvoidingView>
         </Modal>
       ) : null}
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

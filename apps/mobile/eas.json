@@ -6,12 +6,22 @@
   "build": {
     "preview": {
       "distribution": "internal",
+      "environment": "preview",
       "bun": "1.4.4",
       "android": {
         "buildType": "apk"
       },
       "ios": {
         "simulator": false
+      }
+    },
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "environment": "preview",
+      "bun": "1.4.4",
+      "android": {
+        "buildType": "apk"
       }
     }
   }

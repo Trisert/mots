@@ -3,23 +3,13 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import type { TranscriptEntry } from "@mots/client";
 import { useTheme } from "../context/ThemeContext";
+import { announceNow } from "../a11y";
 import { fonts, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
-import { TOOL_LABELS, toolSummary } from "../tools";
-import {
-  AlertIcon,
-  BookmarkIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  ClockIcon,
-  CopyIcon,
-  ForkIcon,
-  SearchIcon,
-  ToolIcon,
-  TrashIcon,
-} from "./Icon";
+import { TOOL_LABELS } from "../tools";
+import { CheckIcon, ChevronDownIcon, ChevronUpIcon, CopyIcon, ForkIcon } from "./Icon";
 import { MarkdownText } from "./MarkdownText";
 import { MascotAvatar } from "./Mascot";
+import { ToolMarker, ToolRun } from "./ToolRun";
 
 function extractThinkingAndText(raw: string): { thinking?: string; text: string } {
   // Strip user submission ID prefixes if present
@@ -34,24 +24,6 @@ function extractThinkingAndText(raw: string): { thinking?: string; text: string 
   }
 
   return { text: clean };
-}
-
-/** The icon of a tool row: what the tool did, or an alert when it failed. */
-function ToolMarker({ name, isError, color }: { name: string; isError: boolean; color: string }) {
-  const props = { size: 15, color };
-  if (isError) return <AlertIcon {...props} strokeWidth={1.8} />;
-  switch (name) {
-    case "remember":
-      return <BookmarkIcon {...props} />;
-    case "forget":
-      return <TrashIcon {...props} />;
-    case "schedule":
-      return <ClockIcon {...props} />;
-    case "search_history":
-      return <SearchIcon {...props} strokeWidth={1.8} />;
-    default:
-      return <ToolIcon {...props} />;
-  }
 }
 
 type Props = {
@@ -82,38 +54,9 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
     );
   }
 
-  // Tool execution card
+  // Tool results are lines in the chat, grouped by ChatScreen. A lone result is one line.
   if (entry.role === "tool") {
-    const name = entry.toolResult?.name ?? "strumento";
-    const summary = toolSummary(name, entry.toolResult?.details);
-    const detail = entry.toolResult?.isError === true ? entry.text : summary;
-    const isError = entry.toolResult?.isError === true;
-
-    return (
-      <View style={[styles.toolRow, isError && styles.toolRowError]}>
-        <View
-          aria-hidden
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={styles.toolMark}
-        >
-          <ToolMarker
-            name={name}
-            isError={isError}
-            color={isError ? colors.danger : colors.textPrimary}
-          />
-        </View>
-        <View style={styles.toolTitleBlock}>
-          <Text style={styles.toolName} numberOfLines={2}>
-            {TOOL_LABELS[name] ?? name}
-            {detail !== undefined && detail.length > 0 ? (
-              <Text style={styles.toolSummary}>{` · ${detail}`}</Text>
-            ) : null}
-            {isError ? <Text style={styles.toolSummary}> · errore</Text> : null}
-          </Text>
-        </View>
-      </View>
-    );
+    return <ToolRun tools={[entry]} />;
   }
 
   const isUser = entry.role === "user";
@@ -127,6 +70,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
     try {
       await Clipboard.setStringAsync(text);
       setCopied(true);
+      announceNow("Risposta copiata");
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // ignore
@@ -134,7 +78,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
   };
 
   return (
-    <View style={[styles.row, isUser ? styles.rowUser : styles.rowAssistant]}>
+    <View accessibilityRole="listitem" style={[styles.row, isUser ? styles.rowUser : styles.rowAssistant]}>
       {!isUser ? (
         <View style={styles.avatar}>
           <MascotAvatar size={28} />
@@ -153,14 +97,12 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
           </View>
         ) : null}
 
-        {/* Autonomous tool call chips on assistant message */}
         {entry.toolCalls !== undefined && entry.toolCalls.length > 0 ? (
           <View style={styles.toolCalls}>
             {entry.toolCalls.map((call) => (
-              <View key={call.callId} style={styles.toolChip}>
-                <Text style={styles.toolChipText}>
-                  {TOOL_LABELS[call.name] ?? call.name}
-                </Text>
+              <View key={call.callId} style={styles.toolCall}>
+                <ToolMarker name={call.name} isError={false} color={colors.textSecondary} />
+                <Text style={styles.toolCallText}>{TOOL_LABELS[call.name] ?? call.name}</Text>
               </View>
             ))}
           </View>
@@ -172,6 +114,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Dettagli ragionamento"
+              accessibilityState={{ expanded: reasoningExpanded }}
               onPress={() => setReasoningExpanded(!reasoningExpanded)}
               style={({ pressed }) => [
                 styles.reasoningHeader,
@@ -222,7 +165,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
             <View style={styles.actionIconsRow}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Copia risposta"
+                accessibilityLabel={copied ? "Risposta copiata" : "Copia risposta"}
                 hitSlop={4}
                 onPress={() => void copyMessage()}
                 style={({ pressed }) => [
@@ -240,7 +183,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
               {entry.canFork && onFork !== undefined ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Dirama da questo messaggio"
+                  accessibilityLabel="Forka da questo messaggio"
                   hitSlop={4}
                   onPress={() => onFork(entry)}
                   style={({ pressed }) => [
@@ -346,20 +289,18 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       backgroundColor: colors.surfaceSoft,
     },
     toolCalls: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: spacing.xs,
       marginBottom: spacing.sm,
+      gap: 2,
     },
-    toolChip: {
-      borderRadius: radius.pill,
-      backgroundColor: colors.sunk,
-      paddingHorizontal: 10,
-      paddingVertical: 4,
+    toolCall: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+      minHeight: 22,
     },
-    toolChipText: {
+    toolCallText: {
       ...typeScale.caption,
-      color: colors.textPrimary,
+      color: colors.textSecondary,
     },
     reasoningCard: {
       borderRadius: radius.card,
@@ -371,7 +312,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      minHeight: 40,
+      minHeight: 44,
       paddingHorizontal: spacing.md,
     },
     reasoningHeaderPressed: {
@@ -394,42 +335,6 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       ...typeScale.mono,
       color: colors.reasoningText,
       lineHeight: 18,
-    },
-    // A pastel pill: what the tool did, in a few words.
-    toolRow: {
-      alignSelf: "flex-start",
-      maxWidth: "100%",
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: spacing.sm,
-      marginTop: spacing.sm,
-      marginLeft: 28 + spacing.sm,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 6,
-      borderRadius: radius.pill,
-      backgroundColor: colors.mintSoft,
-    },
-    toolRowError: {
-      backgroundColor: colors.card,
-      borderWidth: 1,
-      borderColor: colors.line,
-    },
-    toolMark: {
-      height: 20,
-      justifyContent: "center",
-    },
-    toolTitleBlock: {
-      flexShrink: 1,
-    },
-    toolName: {
-      fontFamily: fonts.medium,
-      color: colors.textPrimary,
-      fontSize: 13,
-      lineHeight: 20,
-    },
-    toolSummary: {
-      fontFamily: fonts.regular,
-      color: colors.textPrimary,
     },
     diagnostics: {
       marginTop: spacing.sm,
