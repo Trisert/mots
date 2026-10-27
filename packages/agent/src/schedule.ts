@@ -299,7 +299,9 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
           );
           const turn = await submission.wait(context);
           delivered = turn.status === "done";
-          ended = true;
+          // A user abort withdraws the input, and that stops the routine. Any other
+          // unanswered turn is a failure, and the routine goes on.
+          ended = turn.status === "done" || turn.reason !== "aborted";
         } else {
           runtime.report(
             new Error(
@@ -346,6 +348,24 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
 });
 
 /**
+ * Like `planNextInstruction`, but a recurrence that cannot be planned stops the
+ * routine instead of failing the commit. A failing commit would keep the active
+ * delivery and block the conversation's `schedule` calls.
+ */
+const planOrStop = (
+  delivery: ScheduleDelivery | undefined,
+  now: number,
+  settled: boolean,
+  nextId: string,
+): ScheduledInstruction | undefined => {
+  try {
+    return planNextInstruction(delivery, now, settled, nextId);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
  * Clear the active delivery and write its next row in that same commit.
  * Pass `settled: true` for a run that finished on its own, including a failed
  * turn, so a routine survives one bad run. Aborted runs pass `settled: false`.
@@ -359,7 +379,10 @@ export async function commitDeliveryOutcome(
 ): Promise<ScheduledInstruction | undefined> {
   const deliveries = await tx.doc(ScheduleDeliveries);
   const delivery = deliveries.active.find((item) => item.scheduleId === input.id);
-  const scheduled = planNextInstruction(delivery, now, settled, nextId);
+  // Clear the active entry first, so no planning failure can leave it behind.
+  // That entry would block every later `schedule` call in the conversation.
+  removeDelivery(deliveries, input.id);
+  const scheduled = planOrStop(delivery, now, settled, nextId);
   if (scheduled !== undefined) {
     await tx.createTask(DeliverScheduledInstruction, scheduled, {
       ownership: { kind: "conversation" },
@@ -367,7 +390,6 @@ export async function commitDeliveryOutcome(
       background: true,
     });
   }
-  removeDelivery(deliveries, input.id);
   return scheduled;
 }
 

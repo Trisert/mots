@@ -231,6 +231,18 @@ describe("commitDeliveryOutcome", () => {
     expect(session.deliveries.active).toEqual([]);
   });
 
+  test("clears the active delivery even when its recurrence cannot be planned", async () => {
+    const now = Date.parse("2026-05-01T00:00:00.000Z");
+    const broken = delivery({
+      recurrence: { cadence: { unit: "day", interval: 0 }, timezone: "UTC" },
+    });
+    const session = harness([broken]);
+    const scheduled = await commitDeliveryOutcome(session.tx, input(), now, true, "schedule:next");
+    expect(scheduled).toBeUndefined();
+    expect(session.created).toEqual([]);
+    expect(session.deliveries.active).toEqual([]);
+  });
+
   test("keeps the routine after a failed run, but not after an abort", async () => {
     const now = Date.parse("2026-05-01T00:00:00.000Z");
     const failed = harness([delivery()]);
