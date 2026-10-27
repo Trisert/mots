@@ -27,6 +27,7 @@ import {
 } from "../announce";
 import { useTheme } from "../context/ThemeContext";
 import { Composer } from "../components/Composer";
+import { conversationStatus } from "../conversation-status";
 import { ChevronDownIcon, MenuIcon, PlusIcon } from "../components/Icon";
 import { MarkdownText } from "../components/MarkdownText";
 import { MessageBubble } from "../components/MessageBubble";
@@ -495,6 +496,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
           visible={sheetOpen}
           conversations={conversations}
           activeConversationId={activeConversationId}
+          statusOf={(conversationId) => conversationStatus(state.snapshots[conversationId])}
           sessionId={identity.sessionId}
           username={identity.username}
           apiUrl={identity.apiUrl}
