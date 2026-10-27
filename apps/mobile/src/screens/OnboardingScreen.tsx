@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { createSession, parseJoinTarget } from "../api";
 import { DEFAULT_API_URL, normalizeBaseUrl } from "../config";
@@ -87,7 +87,7 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
   };
 
   return (
-    <ScrollView
+    <KeyboardAwareScrollView
       testID="onboarding-screen"
       style={styles.root}
       contentContainerStyle={[
@@ -95,6 +95,7 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
         { paddingTop: insets.top + spacing.xl, paddingBottom: insets.bottom + spacing.xxl },
       ]}
       keyboardShouldPersistTaps="handled"
+      bottomOffset={spacing.lg}
     >
       <View role="main" style={styles.column}>
         <View style={styles.intro}>
@@ -224,7 +225,7 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
           </KeyboardAvoidingView>
         </Modal>
       ) : null}
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

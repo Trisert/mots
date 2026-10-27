@@ -532,12 +532,14 @@ function createStyles(colors: ThemeColors) {
     },
     itemActive: {
       backgroundColor: colors.skySoft,
+      paddingLeft: spacing.md,
     },
     activeBar: {
       position: "absolute",
-      left: 0,
-      top: "20%",
-      height: "60%",
+      // Inset from the pill's rounded end: at 0 the bar falls off the curve.
+      left: spacing.xs,
+      top: "25%",
+      height: "50%",
       width: 3,
       borderRadius: 2,
       backgroundColor: colors.textPrimary,
