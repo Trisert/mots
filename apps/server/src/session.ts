@@ -18,6 +18,7 @@ import {
 } from "@earendil-works/pi-durable";
 import { openDurableObjectSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/cloudflare";
 import {
+  applyLocale,
   applyPushTokenCommand,
   addMissingDefaultTools,
   applyTimezone,
@@ -26,6 +27,7 @@ import {
   dailyPromptKey,
   dailyPromptLimitFromEnv,
   DailyPromptLimitError,
+  LocaleDoc,
   isAllowedAgentModel,
   nextPromptCount,
   isOfferedModel,
@@ -561,6 +563,18 @@ export class Session extends DurableObject<Env> {
       case "session.setTimezone": {
         await this.#harness.commit(async (tx) => {
           applyTimezone(await tx.doc(TimezoneDoc), command.timezone);
+        }, BACKGROUND_CONTEXT);
+        this.#send(socket, {
+          type: "command.result",
+          command: command.type,
+          requestId: command.requestId,
+          ok: true,
+        });
+        return;
+      }
+      case "session.setLocale": {
+        await this.#harness.commit(async (tx) => {
+          applyLocale(await tx.doc(LocaleDoc), command.locale);
         }, BACKGROUND_CONTEXT);
         this.#send(socket, {
           type: "command.result",

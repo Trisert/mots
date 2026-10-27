@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Tx } from "@earendil-works/pi-durable";
 import { MAX_PUSH_TOKEN_CHARACTERS, parseClientCommand } from "@mots/protocol";
+import { LocaleDoc } from "../src/locale.ts";
 import { applyPushTokenCommand, PushTokenDoc, useExpoAccessToken } from "../src/push-token.ts";
 import {
   DeliverScheduledInstruction,
@@ -137,6 +138,7 @@ async function runDeliver(options: {
       },
       snapshot: async (token: unknown) => {
         order.push("snapshot");
+        if (token === LocaleDoc) return {};
         if (token !== PushTokenDoc) throw new Error("unexpected document");
         return options.doc;
       },
@@ -193,7 +195,7 @@ describe("push token delivery", () => {
 
     const delivered = await runDeliver({ doc, accessToken: "expo-test-token" });
     expect(delivered.thrown).toBeUndefined();
-    expect(delivered.order).toEqual(["submit", "wait", "snapshot", "push", "commit"]);
+    expect(delivered.order).toEqual(["submit", "wait", "snapshot", "snapshot", "push", "commit"]);
     expect(delivered.submitted[0]).toContain("Send the briefing");
     expect(delivered.outcome).toEqual({
       status: "terminal",
@@ -239,7 +241,7 @@ describe("push token delivery", () => {
       },
     });
     expect(result.thrown).toBeUndefined();
-    expect(result.order).toEqual(["submit", "wait", "snapshot", "push", "commit"]);
+    expect(result.order).toEqual(["submit", "wait", "snapshot", "snapshot", "push", "commit"]);
     expect(result.submitted[0]).toContain("Send the briefing");
     expect(result.outcome).toEqual({
       status: "terminal",

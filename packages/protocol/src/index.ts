@@ -27,6 +27,9 @@ export const MAX_REQUEST_ID_CHARACTERS = 256;
 // Expo push tokens (`ExponentPushToken[...]`, `ExpoPushToken[...]`, or a legacy UUID).
 export const MAX_PUSH_TOKEN_CHARACTERS = 256;
 export const MAX_TIMEZONE_CHARACTERS = 100;
+/** Languages the app can show. The agent replies in the chosen one. */
+export const SESSION_LOCALES = ["en", "it"] as const;
+export type SessionLocale = (typeof SESSION_LOCALES)[number];
 // JSON may escape each prompt code unit as six characters.
 export const MAX_CLIENT_FRAME_CHARACTERS =
   MAX_PROMPT_CHARACTERS * 6 + MAX_REQUEST_ID_CHARACTERS + 1024;
@@ -165,6 +168,12 @@ export type ClientCommand =
       readonly requestId: string;
       /** IANA timezone of the device, e.g. `Europe/Rome`. */
       readonly timezone: string;
+    }
+  | {
+      readonly type: "session.setLocale";
+      readonly requestId: string;
+      /** Language chosen in the app. The agent replies in it and push texts use it. */
+      readonly locale: SessionLocale;
     };
 export type ClientCommandType = Exclude<ClientCommand["type"], "presence.typing">;
 
@@ -289,6 +298,13 @@ const requireTimezone = (value: unknown): string => {
   return value;
 };
 
+const requireLocale = (value: unknown): SessionLocale => {
+  if (typeof value !== "string" || !(SESSION_LOCALES as readonly string[]).includes(value)) {
+    throw new InvalidClientCommand(`locale must be one of ${SESSION_LOCALES.join(", ")}`);
+  }
+  return value as SessionLocale;
+};
+
 const commandTypes = new Set<ClientCommandType>([
   "conversation.open",
   "conversation.create",
@@ -298,6 +314,7 @@ const commandTypes = new Set<ClientCommandType>([
   "pushToken.register",
   "pushToken.clear",
   "session.setTimezone",
+  "session.setLocale",
 ]);
 
 const requireCommandType = (value: unknown): ClientCommandType => {
@@ -484,6 +501,8 @@ export function parseClientCommand(message: string): ClientCommand {
       return { type: value.type, requestId };
     case "session.setTimezone":
       return { type: value.type, requestId, timezone: requireTimezone(value.timezone) };
+    case "session.setLocale":
+      return { type: value.type, requestId, locale: requireLocale(value.locale) };
     default:
       throw new InvalidClientCommand(`Unknown command type: ${value.type}`);
   }

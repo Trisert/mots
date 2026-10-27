@@ -5,13 +5,14 @@ import {
   type TaskInspection,
   type Tx,
 } from "@earendil-works/pi-durable";
-import { formatScheduledInstruction } from "@mots/protocol";
+import { formatScheduledInstruction, type SessionLocale } from "@mots/protocol";
 import {
   PushTokenDoc,
   readStoredPushToken,
   sendReminderPush,
   sendRoutineStoppedPush,
 } from "./push-token.ts";
+import { LocaleDoc, readStoredLocale } from "./locale.ts";
 
 export type ScheduleCadence = {
   readonly unit: "minute" | "hour" | "day" | "week" | "month";
@@ -302,11 +303,19 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
       let delivered = false;
       // True once the turn has settled (done or failed), or the run has thrown.
       let ended = false;
+      // A missing or unreadable language falls back to English. It never blocks the push.
+      const pushLocale = async (): Promise<SessionLocale | undefined> => {
+        try {
+          return readStoredLocale(await runtime.snapshot(LocaleDoc, context));
+        } catch {
+          return undefined;
+        }
+      };
       const notifyStopped = async (): Promise<void> => {
         try {
           const stored = await runtime.snapshot(PushTokenDoc, context);
           const token = readStoredPushToken(stored);
-          if (token !== undefined) await sendRoutineStoppedPush(task.input, token);
+          if (token !== undefined) await sendRoutineStoppedPush(task.input, token, await pushLocale());
         } catch (error) {
           try {
             runtime.report(error);
@@ -362,7 +371,7 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
           try {
             const stored = await runtime.snapshot(PushTokenDoc, context);
             const token = readStoredPushToken(stored);
-            if (token !== undefined) await sendReminderPush(task.input, token);
+            if (token !== undefined) await sendReminderPush(task.input, token, await pushLocale());
           } catch (error) {
             try {
               runtime.report(error);
