@@ -39,7 +39,7 @@ type Section = "share" | "server" | "theme";
 
 function conversationName(conversation: ConversationSummary, index: number): string {
   if (conversation.id === ROOT_CONVERSATION_ID) return "Chat principale";
-  return `Diramazione ${index}`;
+  return `Fork ${index}`;
 }
 
 type SettingRowProps = {

@@ -35,7 +35,6 @@ export type CatalogLoadOptions = {
  * Kilo Gateway (https://kilo.ai) provider configuration.
  * Supported by official extension: https://github.com/Kilo-Org/kilo-pi-provider
  */
-export const KILO_API_BASE = "https://api.kilo.ai";
 export const KILO_GATEWAY_BASE_URL = "https://api.kilo.ai/api/gateway";
 export const KILO_GATEWAY_MODELS_URL = "https://api.kilo.ai/api/gateway/models";
 

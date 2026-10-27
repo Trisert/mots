@@ -243,7 +243,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
               {entry.canFork && onFork !== undefined ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Dirama da questo messaggio"
+                  accessibilityLabel="Forka da questo messaggio"
                   hitSlop={4}
                   onPress={() => onFork(entry)}
                   style={({ pressed }) => [
