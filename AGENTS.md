@@ -102,7 +102,7 @@ Do not "fix" a 503 by editing Worker code. Fix the runtime first.
 - Durable Object storage and the Pi harness are the source of truth. The mobile app is a projection. Idempotency for create and fork is the receipt doc keyed by `requestId` in `apps/server/src/session.ts`. Preserve that when you change commands.
 - Tool handlers that are marked `replay: "safe"` must stay safe to run twice. Schedule creation is guarded by the `app.schedule-intent` doc. Do not create a second task on replay.
 - The app's look comes from the Mots design system (https://claude.ai/artifact/HWoqJFg45sk4wqpKVKuMSW): tokens in `apps/mobile/src/palette.ts` and `theme.ts`, Figtree plus JetBrains Mono, pastels as fills with `inkOnPastel` text only, and the speech-bubble `Mascot` (`apps/mobile/src/components/Mascot.tsx`), which holds still under reduced motion. Change a value there and in the design system together.
-- User-facing copy in the app is Italian. The agent preamble is English. Do not translate the product as a drive-by.
+- All repository content is English: docs, README, code comments, log and error messages, PR and issue text. The agent preamble is English. The app's user-facing copy is still Italian until the i18n work lands (English default, Italian second language, language picker in Settings). Until then, change app copy only as part of that work.
 - `documentRetentionMs: 0` in the harness settings drops idle Pi documents from memory. It does not delete SQLite data. Leave it unless you are changing DO memory behavior on purpose.
 
 ## Gotchas

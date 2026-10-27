@@ -22,14 +22,14 @@ const mobileEnv = join(root, "apps/mobile/.env.local");
 export function setup(): void {
   if (!existsSync(devVars)) {
     copyFileSync(example, devVars);
-    console.log("Creato apps/server/.dev.vars dall'esempio.");
+    console.log("Created apps/server/.dev.vars from the example.");
   }
 
   const random = () => randomBytes(32).toString("base64");
   const { text, filled } = fillSecrets(readFileSync(devVars, "utf8"), random);
   if (filled.length > 0) {
     writeFileSync(devVars, text);
-    console.log(`Generati in apps/server/.dev.vars: ${filled.join(", ")}.`);
+    console.log(`Generated in apps/server/.dev.vars: ${filled.join(", ")}.`);
   }
   try {
     chmodSync(devVars, 0o600);
@@ -42,11 +42,11 @@ export function setup(): void {
   const current = existsSync(mobileEnv) ? readFileSync(mobileEnv, "utf8") : "";
   if (readVar(current, "EXPO_PUBLIC_MOTS_CREATE_TOKEN") !== token) {
     writeFileSync(mobileEnv, setVar(current, "EXPO_PUBLIC_MOTS_CREATE_TOKEN", token));
-    console.log("Copiato il token di creazione in apps/mobile/.env.local.");
+    console.log("Copied the creation token to apps/mobile/.env.local.");
   }
 
   const provider = readVar(text, "MOTS_PROVIDER") ?? "kilo";
-  console.log(`Ambiente pronto. Provider: ${provider}.`);
+  console.log(`Environment ready. Provider: ${provider}.`);
 }
 
 if (import.meta.main) setup();
