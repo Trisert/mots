@@ -167,7 +167,12 @@ describe("planNextInstruction", () => {
     });
   });
 
-  test("does not write when a successor already exists, the run failed, or it does not recur", () => {
+  test("writes the next run after a failed turn, since the run itself settled", () => {
+    const scheduled = planNextInstruction(delivery(), now, true, "schedule:next");
+    expect(scheduled?.runAt).toBe(Date.parse("2026-05-02T00:00:00.000Z"));
+  });
+
+  test("does not write when a successor already exists, the run was aborted, or it does not recur", () => {
     const successor = {
       id: "schedule:model",
       conversationId,
@@ -178,7 +183,9 @@ describe("planNextInstruction", () => {
       planNextInstruction(delivery({ successor, runAt: Number.NaN }), now, true, "schedule:next"),
     ).toBeUndefined();
     expect(planNextInstruction(delivery(), now, false, "schedule:next")).toBeUndefined();
-    expect(planNextInstruction(delivery({ recurrence: undefined }), now, true, "schedule:next")).toBeUndefined();
+    expect(
+      planNextInstruction(delivery({ recurrence: undefined }), now, true, "schedule:next"),
+    ).toBeUndefined();
     expect(planNextInstruction(undefined, now, true, "schedule:next")).toBeUndefined();
   });
 });
@@ -224,12 +231,19 @@ describe("commitDeliveryOutcome", () => {
     expect(session.deliveries.active).toEqual([]);
   });
 
-  test("does not schedule a successor when the delivery failed or was aborted", async () => {
+  test("keeps the routine after a failed run, but not after an abort", async () => {
     const now = Date.parse("2026-05-01T00:00:00.000Z");
-    const session = harness([delivery()]);
-    const scheduled = await commitDeliveryOutcome(session.tx, input(), now, false, "schedule:next");
+    const failed = harness([delivery()]);
+    const next = await commitDeliveryOutcome(failed.tx, input(), now, true, "schedule:next");
+    if (next === undefined) throw new Error("expected a successor after a failed run");
+    expect(next.id).toBe("schedule:next");
+    expect(failed.created).toEqual([next]);
+    expect(failed.deliveries.active).toEqual([]);
+
+    const aborted = harness([delivery()]);
+    const scheduled = await commitDeliveryOutcome(aborted.tx, input(), now, false, "schedule:next");
     expect(scheduled).toBeUndefined();
-    expect(session.created).toEqual([]);
-    expect(session.deliveries.active).toEqual([]);
+    expect(aborted.created).toEqual([]);
+    expect(aborted.deliveries.active).toEqual([]);
   });
 });

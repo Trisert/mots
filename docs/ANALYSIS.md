@@ -90,7 +90,7 @@ Do not add auth by stuffing a shared static bearer into the client. The client b
 
 ## Correctness
 
-**Recurrence is a suggestion to the model.** `DeliverScheduledInstruction` sleeps until `runAt`, submits one user turn whose text asks the model to call `schedule` with `sourceScheduleId`, waits for that turn, and then completes. The next deadline is not written in the `finally` of the deliver phase. If the model forgets the tool call, the tool errors, or the turn fails, the routine ends. `nextRecurrenceRunAt` in `packages/agent/src/schedule.ts` is careful about DST and month length, and nothing in the test suite calls it.
+**Recurrence is owned by the system.** `DeliverScheduledInstruction` sleeps until `runAt`, submits one user turn, and writes the next run in the same commit that clears the active delivery. That holds for a successful turn, a failed turn, and a thrown error, because an uncaught phase error faults the task for good. Only an abort or a missing conversation ends the routine. `nextRecurrenceRunAt` in `packages/agent/src/schedule.ts` handles DST and month length and is covered by `packages/agent/test/recurrence.test.ts`.
 
 **Provider docs drifted from the code.** README and `.dev.vars.example` say the default provider is OpenRouter and the default model is `openai/gpt-6-luna`. `DEFAULT_MODELS` and `createMotsHarnessOptions` default to `kilo` / `reflection/beam-free`. The onboarding copy lists Kilo first. Both stories cannot be true. The code is what runs.
 

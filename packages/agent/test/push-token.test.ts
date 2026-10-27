@@ -294,13 +294,15 @@ describe("push token delivery", () => {
     const doc: { token?: string } = {};
     register(doc, TOKEN, "req-1");
 
+    // A failed turn is not pushed, but the routine still writes its next run.
     const unanswered = await runDeliver({ doc, mode: "unanswered" });
     expect(unanswered.thrown).toBeUndefined();
     expect(unanswered.order).toEqual(["submit", "wait", "commit"]);
     expect(unanswered.requests).toHaveLength(0);
-    expect(unanswered.created).toEqual([]);
+    expectNextRow(unanswered.created);
     expect(unanswered.submitted[0]).toContain("Send the briefing");
 
+    // A missing conversation stops the routine, as before.
     const missing = await runDeliver({ doc, mode: "missing" });
     expect(missing.thrown).toBeUndefined();
     expect(missing.order).toEqual(["commit"]);
@@ -308,11 +310,12 @@ describe("push token delivery", () => {
     expect(missing.created).toEqual([]);
     expect((missing.reports[0] as Error).message).toContain("is missing");
 
+    // A thrown run faults the task, so its next row is written before the throw.
     const failed = await runDeliver({ doc, mode: "throw" });
     expect((failed.thrown as Error).message).toBe("submit failed");
     expect(failed.order).toEqual(["submit", "commit"]);
     expect(failed.requests).toHaveLength(0);
-    expect(failed.created).toEqual([]);
+    expectNextRow(failed.created);
     expect(failed.outcome).toEqual({ status: "running", checkpoint: { phase: "deliver" } });
 
     const aborted = await runDeliver({ doc, phase: "abort" });

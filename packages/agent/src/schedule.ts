@@ -218,17 +218,18 @@ export type ScheduleDelivery = {
 };
 
 /**
- * The next row a successful delivery writes, or `undefined` when this settlement
- * must not create one. A stored successor means an in-flight `sourceScheduleId`
- * call already created the task.
+ * The next row a finished delivery writes, or `undefined` when this settlement
+ * must not create one. `settled` means the run ended on its own, whether the
+ * turn succeeded, failed, or threw. An aborted run passes `false`. A stored
+ * successor means an in-flight `sourceScheduleId` call already created the task.
  */
 export function planNextInstruction(
   delivery: ScheduleDelivery | undefined,
   now: number,
-  delivered: boolean,
+  settled: boolean,
   nextId: string,
 ): ScheduledInstruction | undefined {
-  if (!delivered || delivery === undefined) return undefined;
+  if (!settled || delivery === undefined) return undefined;
   if (delivery.successor !== undefined || delivery.recurrence === undefined) return undefined;
   const recurrence: ScheduleRecurrence = {
     cadence: {
@@ -282,6 +283,8 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
     },
     deliver: async (task, runtime, context) => {
       let delivered = false;
+      // True once the turn has settled (done or failed), or the run has thrown.
+      let ended = false;
       try {
         const conversation = await runtime.conversation(task.input.conversationId, context);
         if (conversation !== undefined) {
@@ -294,8 +297,9 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
             },
             context,
           );
-          const settled = await submission.wait(context);
-          delivered = settled.status === "done";
+          const turn = await submission.wait(context);
+          delivered = turn.status === "done";
+          ended = true;
         } else {
           runtime.report(
             new Error(
@@ -319,12 +323,14 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
           }
         }
         await runtime.commit(async (tx) => {
-          await commitDeliveryOutcome(tx, task.input, runtime.now(), delivered);
+          await commitDeliveryOutcome(tx, task.input, runtime.now(), ended);
           return { status: "terminal", outcome: { status: "completed", result: null } };
         }, context);
       } catch (error) {
+        // An uncaught error faults the task, which is terminal. Write the next row
+        // in this commit first, so one thrown run does not end the routine.
         await runtime.commit(async (tx) => {
-          await commitDeliveryOutcome(tx, task.input, runtime.now(), false);
+          await commitDeliveryOutcome(tx, task.input, runtime.now(), true);
           return { status: "running", checkpoint: { phase: "deliver" } };
         }, context);
         throw error;
@@ -340,19 +346,20 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
 });
 
 /**
- * Clear the active delivery and, when the run succeeded, write its next row
- * in that same commit. Failed and aborted runs pass `delivered: false`.
+ * Clear the active delivery and write its next row in that same commit.
+ * Pass `settled: true` for a run that finished on its own, including a failed
+ * turn, so a routine survives one bad run. Aborted runs pass `settled: false`.
  */
 export async function commitDeliveryOutcome(
   tx: Tx,
   input: ScheduledInstruction,
   now: number,
-  delivered: boolean,
+  settled: boolean,
   nextId = `schedule:${crypto.randomUUID()}`,
 ): Promise<ScheduledInstruction | undefined> {
   const deliveries = await tx.doc(ScheduleDeliveries);
   const delivery = deliveries.active.find((item) => item.scheduleId === input.id);
-  const scheduled = planNextInstruction(delivery, now, delivered, nextId);
+  const scheduled = planNextInstruction(delivery, now, settled, nextId);
   if (scheduled !== undefined) {
     await tx.createTask(DeliverScheduledInstruction, scheduled, {
       ownership: { kind: "conversation" },
