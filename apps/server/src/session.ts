@@ -19,6 +19,7 @@ import {
 import { openDurableObjectSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/cloudflare";
 import {
   applyPushTokenCommand,
+  addMissingDefaultTools,
   applyTimezone,
   createMotsHarnessOptions,
   createStubModels,
@@ -247,6 +248,10 @@ export class Session extends DurableObject<Env> {
           });
         }
       });
+      // A conversation stores its tool list at creation, so tools added since then are missing from it.
+      await harness
+        .commit((tx) => addMissingDefaultTools(tx), BACKGROUND_CONTEXT)
+        .catch((error: unknown) => reportError("Default tool upgrade failed", error));
       await this.#restoreEventStreams();
       await this.#refreshAlarm();
     } catch (error) {
