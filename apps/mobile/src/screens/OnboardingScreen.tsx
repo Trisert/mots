@@ -102,7 +102,7 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
           <View style={styles.mascotPanel}>
             <Mascot mood="felice" size={176} shadow />
           </View>
-          <Text role="heading" aria-level={1} maxFontSizeMultiplier={1.6} style={styles.title}>
+          <Text role="heading" aria-level={1} style={styles.title}>
             Ciao, sono Mots
           </Text>
           <Text style={styles.lead}>
@@ -117,6 +117,8 @@ export function OnboardingScreen({ onReady, initialJoin = false }: Props) {
             onChangeText={setUsername}
             placeholder="Come ti chiamo"
             autoCapitalize="words"
+            autoComplete="name"
+            textContentType="name"
             maxLength={40}
             hint="Se lo lasci vuoto, userò Utente."
           />

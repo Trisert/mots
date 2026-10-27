@@ -60,6 +60,42 @@ The bundle id is `com.mots.app` (`app.json`). Set up the credentials on the Appl
 
 Keep `.p8`, `.p12`, `.mobileprovision`, `.cer`, `.key`, `.pem` and `credentials.json` out of git. `.gitignore` in this directory already ignores them, along with `/ios` and `/android`, the output of `expo prebuild`. Prefer EAS-hosted credentials. The preview build has no push entitlement yet.
 
+## Development build
+
+A development build is a native Android app with `expo-dev-client` inside. You build it once. After that, JavaScript and UI changes reach the emulator through Metro in a few seconds, with no new EAS build. Install it once, then use `bunx expo start` for every change.
+
+Build it (from `apps/mobile`, Android only, uses the `development` profile):
+
+```powershell
+bunx eas-cli@latest build --platform android --profile development
+```
+
+The free plan queues the build, and a full native Android build takes about 13 minutes. When the build finishes, EAS asks whether to install it on an emulator. Answer yes with the emulator open (see below). To install the APK by hand, download it from the link EAS prints and run `adb install -r <file>.apk`.
+
+Then, with the emulator running and the Worker up (`bun run dev` from the repo root, or `bun run dev:server:lan`):
+
+```powershell
+cd apps\mobile
+bunx expo start
+```
+
+Press `a` in the Expo terminal to open the app on the emulator. The app connects to `http://10.0.2.2:8787`, which is the emulator's address for the host machine, so no `EXPO_PUBLIC_MOTS_API_URL` is needed for this flow. `bun run setup` writes the create token to `.env.local`, which Metro reads at startup. Reload the app in the emulator with `r` in the Expo terminal, or shake it and choose Reload.
+
+The `development` profile reuses the `preview` EAS environment. That only matters for a device build that points at a deployed Worker. The local emulator flow reads the environment from your machine at `expo start`.
+
+### Windows: emulator and adb on the PATH
+
+`bunx` replaces `npx`, which PowerShell's execution policy can block. If `adb` or `emulator` is not found, add the Android SDK to the PATH for the current window:
+
+```powershell
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+$env:Path += ";$env:ANDROID_HOME\platform-tools;$env:ANDROID_HOME\emulator"
+adb devices
+emulator -list-avds
+emulator -avd <nome-avd>
+```
+
+To keep the setting, add the same lines to your PowerShell profile (`notepad $PROFILE`), or set `ANDROID_HOME` and the two folders in Windows environment variables. `adb devices` should list the emulator as `device` before you build or press `a`.
 ## Scripts
 
 | Script | What it does |

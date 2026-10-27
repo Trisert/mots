@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type KeyboardTypeOptions,
+  type TextInputProps,
+} from "react-native";
 import { AlertIcon } from "../components/Icon";
 import { useTheme } from "../context/ThemeContext";
 import { fonts, radius, spacing, type as typeScale } from "../theme";
@@ -16,6 +23,9 @@ type Props = {
   readonly autoFocus?: boolean;
   readonly maxLength?: number;
   readonly keyboardType?: KeyboardTypeOptions;
+  /** Identifies what the field holds, so the OS can fill it (WCAG 1.3.5). */
+  readonly autoComplete?: TextInputProps["autoComplete"];
+  readonly textContentType?: TextInputProps["textContentType"];
 };
 
 export function TextField({
@@ -30,6 +40,8 @@ export function TextField({
   autoFocus = false,
   maxLength,
   keyboardType,
+  autoComplete,
+  textContentType,
 }: Props) {
   const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
@@ -48,6 +60,10 @@ export function TextField({
         autoFocus={autoFocus}
         maxLength={maxLength}
         keyboardType={keyboardType}
+        autoComplete={autoComplete}
+        textContentType={textContentType}
+        accessibilityHint={error ?? hint}
+        aria-invalid={error !== undefined}
         selectionColor={colors.textPrimary}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
