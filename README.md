@@ -188,6 +188,46 @@ Genera `MOTS_SESSION_SECRET` e `MOTS_CREATE_TOKEN` con `openssl rand -base64 32`
 
 Il deploy manuale, quando quei secret ci sono e l'app invia il bearer, è `bunx wrangler deploy --env staging`. L'app non punta da sola a staging né a produzione: il default resta `http://localhost:8787` (Android emulator: `http://10.0.2.2:8787`). Per provare `mots-staging`, incolla il suo URL nel campo Server.
 
+### Usare Mots sul telefono
+
+Il telefono non raggiunge `localhost`: gli serve un server che risponde da fuori, cioè il Worker distribuito su Cloudflare. Il codice è pronto; restano passi che richiedono il tuo account Cloudflare, Expo o Apple.
+
+**1. Distribuisci il Worker**, una volta sola, seguendo [Deploy su Cloudflare](#deploy-su-cloudflare). Genera `MOTS_SESSION_SECRET` e `MOTS_CREATE_TOKEN` con `openssl rand -base64 32`. Annota l'URL che stampa Wrangler, del tipo `https://mots.<tuo-sottodominio>.workers.dev`. Il valore di `MOTS_CREATE_TOKEN` deve essere identico in tre posti: il secret del Worker, `apps/server/.dev.vars` e il build del telefono. Se non coincide, l'app riceve `401` e mostra che il permesso di creazione non corrisponde.
+
+**2a. Con Expo Go** (gratis, iPhone o Android). Il computer deve restare acceso con Expo avviato, perché il telefono carica l'app da lì; le sessioni passano dal Worker distribuito.
+
+1. Installa Expo Go dall'App Store o da Google Play.
+2. In `apps/server/.dev.vars` imposta `MOTS_CREATE_TOKEN` allo stesso valore del Worker, poi esegui `bun run setup`. Il comando copia il token in `apps/mobile/.env.local`.
+3. Avvia Expo puntando al Worker distribuito. Senza un Worker locale:
+
+   ```bash
+   EXPO_PUBLIC_MOTS_API_URL=https://mots.<tuo-sottodominio>.workers.dev bun run dev
+   ```
+
+   In PowerShell: `$env:EXPO_PUBLIC_MOTS_API_URL = "https://..."; bun run dev`. Con la variabile impostata, `bun run dev` non avvia Wrangler e non sostituisce l'URL con quello del computer.
+4. Inquadra il QR code con Expo Go, sulla stessa Wi-Fi del computer. Se il telefono è altrove, avvia invece `EXPO_PUBLIC_MOTS_API_URL=... bun run --cwd apps/mobile start --tunnel`. La prima volta Expo può chiedere di installare il tunnel.
+5. Nell'onboarding, il campo Server sta sotto **Avanzate** e deve già contenere l'URL del Worker. Se non c'è, incollalo lì.
+
+**2b. Come app installata su Android**, senza computer acceso. Serve un account Expo gratuito. Da `apps/mobile`:
+
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest init
+npx eas-cli@latest env:create --environment preview --name EXPO_PUBLIC_MOTS_API_URL --value https://mots.<tuo-sottodominio>.workers.dev --visibility plaintext
+npx eas-cli@latest env:create --environment preview --name EXPO_PUBLIC_MOTS_CREATE_TOKEN --value <stesso MOTS_CREATE_TOKEN> --visibility plaintext
+npx eas-cli@latest build --platform android --profile preview
+```
+
+Al termine EAS mostra il link dell'APK. Aprilo dal telefono e consenti l'installazione da quell'origine. Il profilo `preview` imposta `environment: preview`, senza cui EAS non carica quelle due variabili. Dettagli in [apps/mobile/README.md](apps/mobile/README.md).
+
+**2c. iPhone installato** richiede il Programma per sviluppatori Apple a pagamento e la registrazione del dispositivo. Il percorso gratuito è Expo Go del punto 2a.
+
+**Se non si collega:**
+
+- `401` o "il permesso di creazione manca": il token dell'app non coincide con quello del Worker. Correggilo e ricostruisci, o riavvia `bun run dev` dopo `bun run setup`.
+- "Non riesco a raggiungere il server": l'URL è sbagliato, il Worker non è distribuito, oppure nel campo Server c'è ancora `localhost`.
+- `503`: manca un secret sul Worker. Controlla con `bunx wrangler secret list --env=""`.
+
 ## Configurazione
 
 | Variabile | Dove | Descrizione |
