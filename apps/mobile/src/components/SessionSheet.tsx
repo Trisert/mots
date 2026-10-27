@@ -4,6 +4,7 @@ import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ROOT_CONVERSATION_ID, type ConversationSummary } from "@mots/protocol";
 import { normalizeBaseUrl } from "../config";
+import { STATUS_LABEL, type ConversationStatus } from "../conversation-status";
 import { useTheme } from "../context/ThemeContext";
 import { presentModel, type PresentedModel } from "../present";
 import { CheckIcon, ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CloseIcon, PlusIcon } from "./Icon";
@@ -17,6 +18,8 @@ type Props = {
   readonly visible: boolean;
   readonly conversations: readonly ConversationSummary[];
   readonly activeConversationId: number | undefined;
+  /** What each chat is doing, shown as a dot beside its name. */
+  readonly statusOf: (conversationId: number) => ConversationStatus;
   readonly sessionId: string;
   readonly username?: string;
   readonly apiUrl: string;
@@ -80,6 +83,7 @@ export function SessionSheet({
   visible,
   conversations,
   activeConversationId,
+  statusOf,
   sessionId,
   username,
   apiUrl,
@@ -196,6 +200,12 @@ export function SessionSheet({
 
   const displayName = username !== undefined && username.length > 0 ? username : "Utente";
 
+  const statusColor = (status: ConversationStatus): string => {
+    if (status === "working") return colors.focus;
+    if (status === "retrying") return colors.danger;
+    return colors.textSecondary;
+  };
+
   return (
     <View style={styles.container} accessibilityViewIsModal>
       <Pressable
@@ -258,11 +268,12 @@ export function SessionSheet({
               conversations.map((conversation, index) => {
                 const active = conversation.id === activeConversationId;
                 const name = conversationName(conversation, index);
+                const status = statusOf(conversation.id);
                 return (
                   <Pressable
                     key={conversation.id}
                     accessibilityRole="button"
-                    accessibilityLabel={name}
+                    accessibilityLabel={`${name}, ${STATUS_LABEL[status]}`}
                     accessibilityState={{ selected: active }}
                     onPress={() => {
                       onSelect(conversation.id);
@@ -274,10 +285,13 @@ export function SessionSheet({
                       pressed && styles.rowPressed,
                     ]}
                   >
-                    {active ? <View style={styles.activeBar} /> : null}
                     <Text numberOfLines={1} style={[styles.itemTitle, active && styles.itemTitleActive]}>
                       {name}
                     </Text>
+                    <View
+                      importantForAccessibility="no"
+                      style={[styles.statusDot, { backgroundColor: statusColor(status) }]}
+                    />
                   </Pressable>
                 );
               })
@@ -532,17 +546,13 @@ function createStyles(colors: ThemeColors) {
     },
     itemActive: {
       backgroundColor: colors.skySoft,
-      paddingLeft: spacing.md,
     },
-    activeBar: {
-      position: "absolute",
-      // Inset from the pill's rounded end: at 0 the bar falls off the curve.
-      left: spacing.xs,
-      top: "25%",
-      height: "50%",
-      width: 3,
-      borderRadius: 2,
-      backgroundColor: colors.textPrimary,
+    // Sits at the row's far end, so the labels keep their alignment with the section headings.
+    statusDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginLeft: "auto",
     },
     rowPressed: {
       backgroundColor: colors.surfaceSoft,

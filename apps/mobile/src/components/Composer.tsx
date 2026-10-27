@@ -26,6 +26,12 @@ const ACTION_SIZE = 40;
 const INPUT_MIN_HEIGHT = ACTION_SIZE;
 const TARGET_INSET = (hit - ACTION_SIZE) / 2;
 const FIELD_PADDING = 6;
+/**
+ * Corner radius of the field. A capsule (`radius.composer`) curves in at the bottom ends once the
+ * field grows, and the buttons, which sit at the bottom, poke out of it. This radius keeps the
+ * one-line look and holds the buttons inside the corner when the field grows.
+ */
+const FIELD_RADIUS = (ACTION_SIZE + FIELD_PADDING * 2) / 2;
 
 const QUICK_ACTIONS = [
   {
@@ -193,7 +199,7 @@ function createStyles(colors: ThemeColors) {
       flexDirection: "row",
       alignItems: "flex-end",
       gap: spacing.sm,
-      borderRadius: radius.composer,
+      borderRadius: FIELD_RADIUS,
       borderWidth: 1,
       borderColor: colors.fieldBorder,
       backgroundColor: colors.card,
