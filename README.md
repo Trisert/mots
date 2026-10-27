@@ -289,7 +289,7 @@ Il protocollo applicativo vive in `packages/protocol`: comandi client (`conversa
 | `schedule` | Programma un'istruzione nel futuro, con ricorrenza e timezone. |
 | `search_history` | Cerca nelle conversazioni passate tramite subagent. |
 | `fetch_page` | Legge il testo di una pagina web pubblica (solo http/https, niente indirizzi privati, massimo 512 KB letti). |
-| `web_search` | Cerca sul web con Tavily e restituisce fino a 5 risultati con titolo, URL e breve estratto. Di default usa Exa e, se Exa limita le richieste, Parallel, senza chiave. Con `TAVILY_API_KEY` usa Tavily. |
+| `web_search` | Cerca sul web con Tavily e restituisce fino a 5 risultati con titolo, URL e breve estratto. Di default usa Exa e Parallel a turno, senza chiave: se un backend limita o rifiuta, prova l'altro. Con `TAVILY_API_KEY` usa Tavily. |
 
 La persona dell'agente, l'orologio e la memoria vengono iniettati come sezioni del contesto. I messaggi utente possono includere `[Nome]` come attribuzione del parlante.
 

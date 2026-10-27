@@ -278,18 +278,45 @@ async function searchParallel(
   return parseParallelResults(text);
 }
 
-/** Exa first. Parallel answers only when Exa is throttled or refuses; any other error is reported as it is. */
+type KeylessBackend = (
+  query: string,
+  fetchImpl: FetchLike,
+  signal: AbortSignal,
+) => Promise<readonly WebSearchResult[]>;
+
+/** The keyless backends in ring order. Each request starts at the next one, so load spreads across them. */
+const KEYLESS_RING: readonly KeylessBackend[] = [searchExa, searchParallel];
+let keylessStart = 0;
+
+/** Restarts the rotation at the first backend. Tests use it to get a known order. */
+export function resetKeylessRing(): void {
+  keylessStart = 0;
+}
+
+/**
+ * Tries each keyless backend once, starting at the next one in the ring. A throttle or refusal moves on to the next
+ * backend; any other error is reported at once. If every backend fails, the last error is thrown. The pass is bounded
+ * on purpose: retrying forever would hold the agent's turn past the request timeout.
+ */
 async function searchKeyless(
   query: string,
   fetchImpl: FetchLike,
   signal: AbortSignal,
 ): Promise<readonly WebSearchResult[]> {
-  try {
-    return await searchExa(query, fetchImpl, signal);
-  } catch (error) {
-    if (!(error instanceof Error) || !FAILOVER_ERROR.test(error.message)) throw error;
-    return searchParallel(query, fetchImpl, signal);
+  const start = keylessStart;
+  keylessStart = (keylessStart + 1) % KEYLESS_RING.length;
+  let lastError: unknown = new Error("the search service sent an unexpected response");
+  for (let step = 0; step < KEYLESS_RING.length; step += 1) {
+    const backend = KEYLESS_RING[(start + step) % KEYLESS_RING.length];
+    if (backend === undefined) continue;
+    try {
+      return await backend(query, fetchImpl, signal);
+    } catch (error) {
+      if (!(error instanceof Error) || !FAILOVER_ERROR.test(error.message)) throw error;
+      lastError = error;
+    }
   }
+  throw lastError;
 }
 
 /**

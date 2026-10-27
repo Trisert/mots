@@ -42,7 +42,7 @@ Also landed on 2026-10-26, outside the M list:
 - **Model picker from the server.** `GET /api/sessions/:code/models` lists only models the session can switch to, with free, image, reasoning and context badges; the app no longer ships a hard-coded list. Keys stay on the server.
 - **Mots design system in the app.** Pastel, rounded tokens, Figtree, and the animated speech-bubble mascot on onboarding, the empty chat, the thinking state and beside replies. The bottom tab bar from the mockups waits for Routine and Memoria data on the client.
 - **`fetch_page` tool.** Read-only: reads a public http(s) page and returns its title and text. Private, local and non-default-port addresses are refused, and redirects are checked hop by hop.
-- **`web_search` tool.** Exa by default, with Parallel as failover when Exa is throttled; neither needs a key. `TAVILY_API_KEY` switches it to Tavily. Returns up to five results, each with a title, URL and a snippet of at most 600 characters. Result addresses pass the same checks as `fetch_page`.
+- **`web_search` tool.** Exa and Parallel in rotation, each falling over to the other when throttled; neither needs a key. `TAVILY_API_KEY` switches it to Tavily. Returns up to five results, each with a title, URL and a snippet of at most 600 characters. Result addresses pass the same checks as `fetch_page`.
 - **Safe `forget`.** Exact match first; one substring match only for queries of 3+ characters; otherwise nothing is removed and candidates are listed. `remember` reports facts dropped at the 100-fact cap.
 
 ## Competitive landscape (October 2026)

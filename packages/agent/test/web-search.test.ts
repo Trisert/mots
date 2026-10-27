@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import type { FetchLike } from "../src/web.ts";
 import {
   createWebSearchTool,
@@ -6,6 +6,7 @@ import {
   MAX_SEARCH_QUERY_CHARACTERS,
   MAX_SNIPPET_CHARACTERS,
   PARALLEL_MCP_URL,
+  resetKeylessRing,
   searchWeb,
   TAVILY_SEARCH_URL,
   WEB_SEARCH_TOOL_NAME,
@@ -13,6 +14,8 @@ import {
 
 const context = undefined as never;
 const KEY = "tvly-test-key-123";
+
+beforeEach(() => resetKeylessRing());
 
 /** Two readable results and one private address, in Exa's text format. */
 const EXA_TEXT = [
@@ -276,6 +279,27 @@ describe("searchWeb without a key", () => {
     };
     await expect(searchWeb(undefined, "x", fetchByUrl)).rejects.toThrow("HTTP 400");
     expect(calls).toEqual([EXA_MCP_URL]);
+  });
+
+  test("rotates the first backend between requests", async () => {
+    const calls: string[] = [];
+    const fetchOk: FetchLike = async (input) => {
+      calls.push(input);
+      return input === EXA_MCP_URL ? mcpJson(EXA_TEXT) : mcpJson(JSON.stringify({ results: [] }));
+    };
+    await searchWeb(undefined, "uno", fetchOk);
+    await searchWeb(undefined, "due", fetchOk);
+    expect(calls).toEqual([EXA_MCP_URL, PARALLEL_MCP_URL]);
+  });
+
+  test("tries each backend once, then reports the last error without looping", async () => {
+    const calls: string[] = [];
+    const fetchThrottled: FetchLike = async (input) => {
+      calls.push(input);
+      return new Response("busy", { status: 429 });
+    };
+    await expect(searchWeb(undefined, "x", fetchThrottled)).rejects.toThrow("HTTP 429");
+    expect(calls).toEqual([EXA_MCP_URL, PARALLEL_MCP_URL]);
   });
 
   test("rejects an envelope with no text", async () => {
