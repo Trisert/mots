@@ -200,6 +200,7 @@ The manual deploy, once those secrets exist and the app sends the bearer, is `bu
 | `MOTS_CONNECT_LIMIT` | server | Connection attempts per address. Default `60`. |
 | `MOTS_CONNECT_WINDOW_SECONDS` | server | Connection window, in seconds. Default `60`. |
 | `MOTS_MAX_SCHEDULES` | server | Active, unfinished routines. Default `8`, between `1` and `100`. |
+| `TAVILY_API_KEY` | server | Optional. Tavily key for `web_search`. Without it, Exa's public endpoint is used. |
 | `MOTS_MIN_RECURRENCE_SECONDS` | server | Minimum distance for a new recurrence. Default `900`. The floor is `60`. |
 | `MOTS_PROVIDER` | server | LLM provider: `kilo` (default if missing), `openrouter`, `vercel-ai-gateway`, or `nvidia`. An unknown value is an error. |
 | `MOTS_MODEL` | server | Model for the chosen provider. Defaults: `reflection/beam-free` (Kilo and Vercel), `openai/gpt-6-luna` (OpenRouter), `nvidia/nemotron-3.5-lightning-30b-a3b` (NVIDIA). |
@@ -275,6 +276,7 @@ The agent's tools (`remember`, `forget`, `schedule`, `search_history`) require t
 | --- | --- | --- |
 | `GET` | `/api/health` | Health check. |
 | `POST` | `/api/sessions` | Issues a signed code. Requires `Authorization: Bearer <MOTS_CREATE_TOKEN>`. Responds `201` with `{ sessionId, url, socketPath }`. `sessionId` is the full code. It does not create the Durable Object. |
+| `GET` | `/api/sessions/:code/models` | Lists the models this session may use. The app's model picker reads it. Provider keys stay on the server. |
 | `GET` | `/api/sessions/:id` | WebSocket upgrade. `:id` must be the signed code. After verification, the Durable Object name is only the uuid. |
 
 The application protocol lives in `packages/protocol`: client commands (`conversation.open`, `conversation.create`, `conversation.fork`, `prompt.submit`, `conversation.setModel`, `presence.typing`) and server events (snapshot, conversation events, inbox, presence, command results, errors).
@@ -288,6 +290,7 @@ The application protocol lives in `packages/protocol`: client commands (`convers
 | `schedule` | Schedules an instruction in the future, with recurrence and timezone. |
 | `search_history` | Searches past conversations through a subagent. |
 | `fetch_page` | Reads the text of a public web page (http/https only, no private addresses, at most 512 KB read). |
+| `web_search` | Searches the public web and returns a few results. Uses Tavily when `TAVILY_API_KEY` is set. Otherwise it uses Exa's public endpoint, with Parallel as the failover. |
 
 The agent persona, the clock, and memory are injected as context sections. User messages may include `[Name]` to attribute the speaker.
 
