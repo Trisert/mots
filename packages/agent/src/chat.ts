@@ -40,7 +40,7 @@ export async function createMotsHarnessOptions(
 ): Promise<HarnessOptions> {
   useExpoAccessToken(options.env?.EXPO_ACCESS_TOKEN);
   const scheduleTool = createScheduleTool(ensureWakeupAt, scheduleLimitsFromEnv(options.env));
-  // Without TAVILY_API_KEY, web_search answers from Exa, with Parallel as failover. Neither needs a key.
+  // Without TAVILY_API_KEY, web_search answers from Exa and Parallel in rotation. Neither needs a key.
   const webSearch = createWebSearchTool(options.env?.[WEB_SEARCH_API_KEY_ENV]);
   const agentTools = [
     rememberTool,

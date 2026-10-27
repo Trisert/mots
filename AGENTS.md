@@ -41,7 +41,7 @@ Live chat needs `apps/server/.dev.vars` (gitignored). `bun run setup` creates it
 | `OPENROUTER_API_KEY` | OpenRouter |
 | `AI_GATEWAY_API_KEY` | Vercel AI Gateway. The mobile sheet uses this name and `ai-gateway.vercel.sh/v1`. |
 | `NVIDIA_API_KEY` | NVIDIA |
-| `TAVILY_API_KEY` | Optional. Makes `web_search` use Tavily. Without it, `web_search` uses Exa, with Parallel as failover; neither needs a key. |
+| `TAVILY_API_KEY` | Optional. Makes `web_search` use Tavily. Without it, `web_search` uses Exa and Parallel in rotation; neither needs a key. |
 | `EXPO_PUBLIC_MOTS_API_URL` | Optional build-time server URL baked into the app. Not a secret. |
 | `EXPO_PUBLIC_MOTS_CREATE_TOKEN` | Optional app-wide gate, not a per-user secret. Inlined into the bundle. Sent as `Authorization: Bearer` on `POST /api/sessions` when set. Omitted when unset, so a local Worker without the check still creates a session. |
 
