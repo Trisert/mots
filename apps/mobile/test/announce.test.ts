@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { lastAssistantId, markTranscript, replyAnnouncement, thinkingAnnouncement } from "../src/announce.ts";
+import {
+  connectionAnnouncement,
+  lastAssistantId,
+  markTranscript,
+  replyAnnouncement,
+  thinkingAnnouncement,
+} from "../src/announce.ts";
 import { englishTranslate as t } from "../src/i18n/translate.ts";
 
 const user = (id: number) => ({ id, role: "user" });
@@ -77,5 +83,21 @@ describe("thinkingAnnouncement", () => {
     expect(thinkingAnnouncement(true, true, t)).toBeUndefined();
     expect(thinkingAnnouncement(true, false, t)).toBeUndefined();
     expect(thinkingAnnouncement(false, false, t)).toBeUndefined();
+  });
+});
+
+describe("connectionAnnouncement", () => {
+  test("is silent for the first status and for steps that do not change the outcome", () => {
+    expect(connectionAnnouncement(undefined, "connecting", t)).toBeUndefined();
+    expect(connectionAnnouncement("connecting", "connected", t)).toBeUndefined();
+    expect(connectionAnnouncement("failed", "failed", t)).toBeUndefined();
+  });
+
+  test("announces a dropped connection", () => {
+    expect(connectionAnnouncement("connected", "failed", t)).toBe("Connection lost");
+  });
+
+  test("announces a recovery after a drop", () => {
+    expect(connectionAnnouncement("failed", "connected", t)).toBe("Back online");
   });
 });

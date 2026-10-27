@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAvoidingView, useKeyboardState } from "react-native-keyboard-controller";
 import type { TranscriptEntry } from "@mots/client";
 import {
+  connectionAnnouncement,
   lastAssistantId,
   markTranscript,
   replyAnnouncement,
@@ -28,9 +29,11 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { useI18n, type Translate } from "../i18n";
 import { Composer } from "../components/Composer";
+import { conversationStatus } from "../conversation-status";
 import { ChevronDownIcon, MenuIcon, PlusIcon } from "../components/Icon";
 import { MarkdownText } from "../components/MarkdownText";
 import { MessageBubble } from "../components/MessageBubble";
+import { ToolRun } from "../components/ToolRun";
 import { ModelPicker } from "../components/ModelPicker";
 import { SessionSheet } from "../components/SessionSheet";
 import { probeSession, type SessionAccess } from "../api";
@@ -38,6 +41,7 @@ import { useMotsSession } from "../hooks/useMotsSession";
 import { presentConnection, presentError, presentModel, presentRunError, providerLabel } from "../present";
 import { fonts, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { toolLabel } from "../tools";
+import { groupToolRuns, type ChatItem } from "../tool-runs";
 import type { Identity } from "../storage";
 import { Banner } from "../ui/Banner";
 import { Button } from "../ui/Button";
@@ -133,7 +137,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     };
   }, [identity.apiUrl, identity.sessionId, state.status]);
 
-  const listRef = useRef<FlatList<TranscriptEntry>>(null);
+  const listRef = useRef<FlatList<ChatItem>>(null);
   const stickToBottom = useRef(true);
   const contentHeight = useRef(0);
   const viewportHeight = useRef(0);
@@ -142,6 +146,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const active =
     activeConversationId === undefined ? undefined : state.snapshots[activeConversationId];
   const entries = active?.entries ?? [];
+  const items = useMemo(() => groupToolRuns(entries), [entries]);
   const conversations = state.conversations.filter((conversation) => conversation.owner === undefined);
   const liveText = active?.live?.text ?? "";
   const liveActive = active?.live?.active === true;
@@ -173,6 +178,23 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     if (text !== undefined) announce(text);
     // Depends on the count and the last assistant id only; `entries` changes identity on every render.
   }, [activeConversationId, entryCount, latestAssistantId, announce, t]);
+
+  // Connection changes reach screen readers on both platforms. Banners below rely on
+  // accessibilityLiveRegion, which only Android honours, so iOS gets the error text here.
+  const lastStatus = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const text = connectionAnnouncement(lastStatus.current, state.status, t);
+    lastStatus.current = state.status;
+    if (text !== undefined) announce(text);
+  }, [state.status, announce]);
+
+  const lastError = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const previous = lastError.current;
+    lastError.current = state.error;
+    if (Platform.OS !== "ios" || state.error === undefined || state.error === previous) return;
+    announce(presentError(state.error, t));
+  }, [state.error, announce, t]);
 
   const wasLive = useRef<boolean | undefined>(undefined);
   useEffect(() => {
@@ -369,7 +391,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   ) : (
     <View style={styles.empty}>
       <View style={styles.emptyMascot}>
-        <Mascot mood="felice" size={120} shadow />
+        <Mascot mood="felice" size={120} shadow cycles={2} />
       </View>
       <Text accessibilityRole="header" maxFontSizeMultiplier={1.6} style={styles.greeting}>
         {t("chat.greeting", { name: identity.username.length > 0 ? `, ${identity.username}` : "" })}
@@ -461,15 +483,25 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
             </Text>
             <FlatList
               ref={listRef}
-              data={entries}
-              keyExtractor={(entry) => String(entry.id)}
-              renderItem={({ item }) => <MessageBubble entry={item} onFork={fork} />}
+              data={items}
+              keyExtractor={(item) => item.key}
+              renderItem={({ item, index }) =>
+                item.kind === "tools" ? (
+                  <ToolRun
+                    tools={item.tools}
+                    live={index === items.length - 1 && (liveActive || runningTools.length > 0)}
+                  />
+                ) : (
+                  <MessageBubble entry={item.entry} onFork={fork} />
+                )
+              }
               contentContainerStyle={[styles.list, entries.length === 0 && styles.listEmpty]}
               ListEmptyComponent={empty}
               ListFooterComponent={footer}
               onScroll={onScroll}
               onContentSizeChange={onContentSizeChange}
               onLayout={onListLayout}
+              accessibilityRole="list"
               showsVerticalScrollIndicator={false}
               scrollEventThrottle={100}
               keyboardShouldPersistTaps="handled"
@@ -501,6 +533,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
           visible={sheetOpen}
           conversations={conversations}
           activeConversationId={activeConversationId}
+          statusOf={(conversationId) => conversationStatus(state.snapshots[conversationId])}
           sessionId={identity.sessionId}
           username={identity.username}
           apiUrl={identity.apiUrl}

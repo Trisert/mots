@@ -20,6 +20,7 @@ import {
 } from "@expo-google-fonts/jetbrains-mono";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useObserve } from "expo-observe";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
 import { LocaleProvider, useI18n } from "./src/i18n";
 import { ChatScreen } from "./src/screens/ChatScreen";
@@ -69,6 +70,7 @@ function MainApp() {
   const [identity, setIdentity] = useState<Identity | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [openJoin, setOpenJoin] = useState(false);
+  const { markInteractive } = useObserve();
 
   useEffect(() => {
     let alive = true;
@@ -150,7 +152,14 @@ function MainApp() {
     setIdentity(undefined);
   };
 
-  if ((!fontsLoaded && !fontError) || loading) {
+  const showSplash = (!fontsLoaded && !fontError) || loading;
+
+  // Time to Interactive for EAS Observe: the first screen is on display once the splash clears.
+  useEffect(() => {
+    if (!showSplash) markInteractive();
+  }, [showSplash, markInteractive]);
+
+  if (showSplash) {
     return <Splash />;
   }
 

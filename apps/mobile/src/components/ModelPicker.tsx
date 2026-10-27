@@ -182,7 +182,7 @@ export function ModelPicker({ visible, apiUrl, sessionId, agent, onClose, onSele
                   style={[
                     styles.chip,
                     selected
-                      ? { backgroundColor: colors.sky, borderColor: colors.sky }
+                      ? { backgroundColor: colors.sky, borderColor: colors.textPrimary }
                       : { backgroundColor: colors.sunk, borderColor: colors.sunk },
                   ]}
                 >
@@ -350,7 +350,7 @@ function createStyles(colors: ThemeColors) {
       justifyContent: "center",
       paddingHorizontal: spacing.md,
       borderRadius: radius.pill,
-      borderWidth: StyleSheet.hairlineWidth,
+      borderWidth: 1.5,
     },
     chipLabel: {
       ...typeScale.label,

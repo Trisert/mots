@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useTheme } from "../context/ThemeContext";
+import { announceNow } from "../a11y";
 import { useI18n } from "../i18n";
 import { CheckIcon, CopyIcon } from "./Icon";
 import { parseMarkdownBlocks, type InlineRun } from "../markdown";
@@ -87,6 +88,7 @@ function CodeBlockView({
     try {
       await Clipboard.setStringAsync(code);
       setCopied(true);
+      announceNow(t("common.copied"));
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // ignore clipboard errors
@@ -362,12 +364,15 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     },
     codeLanguage: {
       fontFamily: fonts.bold,
-      color: colors.textSecondary,
+      color: colors.codeMuted,
       fontSize: 11,
       fontWeight: "700",
       letterSpacing: 0.6,
     },
     copyButton: {
+      minWidth: 44,
+      minHeight: 32,
+      justifyContent: "center",
       flexDirection: "row",
       alignItems: "center",
       gap: 4,
@@ -386,7 +391,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       fontWeight: "600",
     },
     copiedText: {
-      color: colors.accentGreen,
+      color: colors.onInverse,
     },
     codeScroll: {
       padding: spacing.md,

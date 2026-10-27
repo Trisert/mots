@@ -3,6 +3,8 @@ interface __BaseEnv_Env {
   OPENROUTER_API_KEY?: string;
   AI_GATEWAY_API_KEY?: string;
   NVIDIA_API_KEY?: string;
+  /** Optional. Makes web_search use Tavily. Without it, web_search uses Exa and Parallel in rotation. */
+  TAVILY_API_KEY?: string;
   MOTS_PROVIDER?: string;
   MOTS_MODEL?: string;
   /** HMAC key for join codes. At least 16 characters. Rotating it invalidates every code. */
@@ -17,6 +19,7 @@ interface __BaseEnv_Env {
   MOTS_CONNECT_WINDOW_SECONDS?: string;
   MOTS_MAX_SCHEDULES?: string;
   MOTS_MIN_RECURRENCE_SECONDS?: string;
+  MOTS_DAILY_PROMPT_LIMIT?: string;
   /**
    * Test-only. `stub` replaces the model port with a local reply and skips catalog fetches.
    * Leave unset everywhere except the hermetic Worker smoke.

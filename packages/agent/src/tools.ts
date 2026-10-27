@@ -169,7 +169,7 @@ export function createScheduleTool(
       sourceScheduleId: Type.Optional(
         Type.String({
           description:
-            "When scheduling the next occurrence of a recurring instruction, the schedule ID given in its delivery. Omit delaySeconds, at, and recurrence because the source determines them",
+            "Internal. The schedule ID of a recurring delivery in progress. Mots schedules the next run itself, so do not use this. Omit delaySeconds, at, and recurrence because the source determines them",
         }),
       ),
     }),

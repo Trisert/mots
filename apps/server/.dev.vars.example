@@ -30,6 +30,7 @@ MOTS_CREATE_TOKEN=
 # MOTS_CONNECT_WINDOW_SECONDS=60
 # MOTS_MAX_SCHEDULES=8
 # MOTS_MIN_RECURRENCE_SECONDS=900
+# MOTS_DAILY_PROMPT_LIMIT=100
 
 # kilo (default). If unset, local dev may read ~/.pi/agent/auth.json or send the literal key free.
 # KILO_API_KEY=
@@ -42,6 +43,10 @@ MOTS_CREATE_TOKEN=
 
 # nvidia (https://build.nvidia.com)
 # NVIDIA_API_KEY=
+
+# Optional. Makes the web_search tool use Tavily (https://tavily.com) instead of Exa.
+# Without it web_search uses Exa and Parallel in rotation; neither needs a key.
+# TAVILY_API_KEY=
 
 # Optional Expo access token for reminder pushes (https://expo.dev).
 # When set, a delivered reminder sends it as `Authorization: Bearer <token>`.

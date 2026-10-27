@@ -1,5 +1,12 @@
+export {
+  dailyPromptKey,
+  dailyPromptLimitFromEnv,
+  DailyPromptLimitError,
+  nextPromptCount,
+} from "./daily-limit.ts";
 export { isAllowedAgentModel, ModelNotAllowedError, type ModelCatalog } from "./allowlist.ts";
 export { createMotsHarnessOptions, type MotsHarnessOptions } from "./chat.ts";
+export { addMissingDefaultTools, DEFAULT_TOOL_NAMES } from "./default-tools.ts";
 export { createStubModels } from "./stub-models.ts";
 export {
   isOfferedModel,
@@ -49,6 +56,11 @@ export {
 export { conversationSearchExtension, searchHistoryTool } from "./search.ts";
 export { createScheduleTool, SCHEDULE_TOOL_NAME } from "./tools.ts";
 export { fetchPageTool, FETCH_PAGE_TOOL_NAME, fetchPageText, parseWebUrl } from "./web.ts";
+export {
+  createWebSearchTool,
+  WEB_SEARCH_API_KEY_ENV,
+  WEB_SEARCH_TOOL_NAME,
+} from "./web-search.ts";
 export type {
   ScheduleCadence,
   ScheduledInstruction,

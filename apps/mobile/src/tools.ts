@@ -8,6 +8,7 @@ const TOOL_LABEL_KEYS: Record<string, MessageKey> = {
   schedule: "tool.schedule",
   search_history: "tool.search",
   fetch_page: "tool.page",
+  web_search: "tool.webSearch",
 };
 
 /** The short name of a tool in the transcript, in the app's language. Unknown tools keep their id. */
@@ -60,6 +61,11 @@ export function toolSummary(
       return t("tool.searchDone");
     case "fetch_page":
       return typeof info.url === "string" ? t("tool.pageRead") : undefined;
+    case "web_search":
+      if (typeof info.results !== "number") return undefined;
+      return info.results === 1
+        ? t("tool.webSearchOne")
+        : t("tool.webSearchMany", { count: info.results });
     default:
       return undefined;
   }

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Operating guide for cloud agents working on Mots. The product README is in Italian and is the user-facing overview. This file is the source of truth for how to change the repo. The prioritized audit and the task list live in [docs/ANALYSIS.md](docs/ANALYSIS.md). Which tasks are done, and the product plan, are in [docs/ROADMAP.md](docs/ROADMAP.md). Take one task per pull request.
+Operating guide for cloud agents working on Mots. The product README is the user-facing overview. This file is the source of truth for how to change the repo. The prioritized audit and the task list live in [docs/ANALYSIS.md](docs/ANALYSIS.md). Which tasks are done, and the product plan, are in [docs/ROADMAP.md](docs/ROADMAP.md). Take one task per pull request.
 
 ## What this repo is
 
@@ -41,6 +41,7 @@ Live chat needs `apps/server/.dev.vars` (gitignored). `bun run setup` creates it
 | `OPENROUTER_API_KEY` | OpenRouter |
 | `AI_GATEWAY_API_KEY` | Vercel AI Gateway. The mobile sheet uses this name and `ai-gateway.vercel.sh/v1`. |
 | `NVIDIA_API_KEY` | NVIDIA |
+| `TAVILY_API_KEY` | Optional. Makes `web_search` use Tavily. Without it, `web_search` uses Exa and Parallel in rotation; neither needs a key. |
 | `EXPO_PUBLIC_MOTS_API_URL` | Optional build-time server URL baked into the app. Not a secret. |
 | `EXPO_PUBLIC_MOTS_CREATE_TOKEN` | Optional app-wide gate, not a per-user secret. Inlined into the bundle. Sent as `Authorization: Bearer` on `POST /api/sessions` when set. Omitted when unset, so a local Worker without the check still creates a session. |
 
@@ -116,7 +117,7 @@ Do not "fix" a 503 by editing Worker code. Fix the runtime first.
 - Do not re-open a legacy uuid bypass. A stored bare uuid probes as `401` and the chat offers a new space or a join. The mobile adoption steps are in the README section "Mobile client adoption".
 - Rate limits in `apps/server/src/rate-limit.ts` are per Worker isolate. They use `CF-Connecting-IP` only. Do not add a second Durable Object class for them without a migration plan.
 - `readStoredKiloToken()` in `packages/agent/src/provider.ts` reads `~/.pi/agent/auth.json` when `KILO_API_KEY` is unset. On a laptop that uses the developer's personal token. Do not copy that file into the repo or the cloud VM.
-- Recurring reminders do not reschedule themselves. After delivery, the model is asked to call `schedule` with `sourceScheduleId`. If it does not, the routine stops.
+- Recurring reminders reschedule themselves. `DeliverScheduledInstruction` writes the next run in the same commit that clears the active delivery (`commitDeliveryOutcome`), whether the turn succeeded or failed. A routine stops after `MAX_CONSECUTIVE_FAILURES` (3) failed runs in a row, and the user gets a push. An abort or a missing conversation also stops it. The model is told not to repeat the routine. A `schedule` call with `sourceScheduleId` still works and wins over the system's row.
 - `createMotsModels` fetches the Kilo and Vercel catalogs during Durable Object startup, with no timeout, even when the selected provider is OpenRouter or NVIDIA.
 - `apps/mobile/gitignore` has no leading dot, so Expo's native-folder ignores are not active. The root `.gitignore` does not list `ios/` or `android/`.
 - `mots_apple_trailer.mp4` at the repo root is about 6.7 MB. Flag it if relevant. Do not delete it unless the owner asks.
@@ -133,6 +134,7 @@ Set these as Cursor environment secrets, then have the agent write them into `ap
 - `OPENROUTER_API_KEY`
 - `AI_GATEWAY_API_KEY`
 - `NVIDIA_API_KEY`
+- `TAVILY_API_KEY` (optional; makes `web_search` use Tavily)
 - `MOTS_PROVIDER` and `MOTS_MODEL` if you want a non-default pair
 - `MOTS_CORS_ORIGINS` before a public web client
 - `CLOUDFLARE_API_TOKEN` only if the agent is supposed to deploy. Scope it to this Worker. Do not deploy until the mobile app sends the create-token bearer.

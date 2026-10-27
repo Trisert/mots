@@ -59,9 +59,9 @@ const clip = (value: string, max: number): string => {
   return `${trimmed.slice(0, max - 3)}...`;
 };
 
-const reminderMessage = (reminder: ReminderPush, token: string) => {
+const reminderMessage = (reminder: ReminderPush, token: string, bodyText?: string) => {
   const title = clip(reminder.name ?? "", TITLE_CHARACTERS);
-  const body = clip(reminder.instruction, BODY_CHARACTERS);
+  const body = clip(bodyText ?? reminder.instruction, BODY_CHARACTERS);
   return {
     to: token,
     title: title.length > 0 ? title : "Mots",
@@ -96,6 +96,17 @@ const ticketError = (payload: unknown): string | undefined => {
  * The delivery caller must catch that and still write the next recurrence row.
  */
 export async function sendReminderPush(reminder: ReminderPush, token: string): Promise<void> {
+  await postPush(reminderMessage(reminder, token));
+}
+
+/** Tell the user a routine stopped after repeated failed runs. Throws when the request fails. */
+export async function sendRoutineStoppedPush(reminder: ReminderPush, token: string): Promise<void> {
+  await postPush(
+    reminderMessage(reminder, token, "Stopped after repeated failed runs. Open Mots to restart it."),
+  );
+}
+
+async function postPush(message: ReturnType<typeof reminderMessage>): Promise<void> {
   const headers: Record<string, string> = {
     accept: "application/json",
     "content-type": "application/json",
@@ -104,7 +115,7 @@ export async function sendReminderPush(reminder: ReminderPush, token: string): P
   const response = await globalThis.fetch(EXPO_PUSH_URL, {
     method: "POST",
     headers,
-    body: JSON.stringify(reminderMessage(reminder, token)),
+    body: JSON.stringify(message),
     signal: AbortSignal.timeout(PUSH_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`Expo push failed with status ${response.status}`);

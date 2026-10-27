@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { fillSecrets, lanAddress, readVar, setVar } from "../dev-env.ts";
+import { devServerPlan, fillSecrets, lanAddress, readVar, setVar } from "../dev-env.ts";
 
 const random = () => "r".repeat(44);
 
@@ -61,5 +61,38 @@ describe("lanAddress", () => {
 
   test("ignores public and loopback addresses", () => {
     expect(lanAddress({ eth0: [v4("8.8.8.8")], lo: [v4("127.0.0.1", true)] })).toBeUndefined();
+  });
+});
+
+describe("devServerPlan", () => {
+  test("starts a local Worker and points the app at the LAN address", () => {
+    expect(devServerPlan({ lan: "192.168.1.10", port: 8787 })).toEqual({
+      apiUrl: "http://192.168.1.10:8787",
+      localWorker: true,
+    });
+  });
+
+  test("starts a local Worker without a LAN address and sets no URL", () => {
+    const plan = devServerPlan({ port: 8787 });
+    expect(plan.localWorker).toBe(true);
+    expect(plan.apiUrl).toBeUndefined();
+  });
+
+  test("uses a deployed server from the environment and starts no local Worker", () => {
+    expect(
+      devServerPlan({ remoteUrl: "https://mots.example.workers.dev/", lan: "192.168.1.10", port: 8787 }),
+    ).toEqual({ apiUrl: "https://mots.example.workers.dev", localWorker: false });
+  });
+
+  test("takes a bare host from the environment as https", () => {
+    expect(devServerPlan({ remoteUrl: "  mots.example.workers.dev ", port: 8787 }).apiUrl).toBe(
+      "https://mots.example.workers.dev",
+    );
+  });
+
+  test("ignores an empty variable", () => {
+    const plan = devServerPlan({ remoteUrl: "   ", port: 8787 });
+    expect(plan.localWorker).toBe(true);
+    expect(plan.apiUrl).toBeUndefined();
   });
 });

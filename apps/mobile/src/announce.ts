@@ -66,3 +66,20 @@ export function thinkingAnnouncement(
 ): string | undefined {
   return previouslyActive === false && nowActive ? t("announce.thinking") : undefined;
 }
+
+/**
+ * Returns the text to announce when the connection status changes, or undefined.
+ *
+ * The first status is silent, so a normal start does not talk over the screen. Only a drop and a
+ * recovery after a drop are announced; the connecting steps in between stay quiet.
+ */
+export function connectionAnnouncement(
+  previous: string | undefined,
+  next: string,
+  t: Translate,
+): string | undefined {
+  if (previous === undefined || previous === next) return undefined;
+  if (next === "failed") return t("announce.lost");
+  if (previous === "failed" && next === "connected") return t("announce.reconnected");
+  return undefined;
+}

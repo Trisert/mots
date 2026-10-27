@@ -51,7 +51,7 @@ export function formatScheduledInstruction(scheduled: {
   if (scheduled.recurrence === undefined) return text;
   const { interval, unit } = scheduled.recurrence.cadence;
   const cadence = `${interval} ${unit}${interval === 1 ? "" : "s"}`;
-  return `${text}${RECURRENCE_NOTE_PREFIX} It repeats every ${cadence} in ${scheduled.recurrence.timezone}. After carrying it out, call schedule with this instruction and sourceScheduleId ${JSON.stringify(scheduled.id)}. Omit delaySeconds, at, and recurrence because the next UTC deadline and recurrence policy are derived from the source.`;
+  return `${text}${RECURRENCE_NOTE_PREFIX} It repeats every ${cadence} in ${scheduled.recurrence.timezone}. Mots schedules the next run itself, so do not call schedule to repeat this routine.`;
 }
 
 /** The instruction text of a scheduled delivery input, or `undefined` for ordinary input. */
@@ -71,11 +71,6 @@ export function parseScheduledInstruction(content: string): string | undefined {
 }
 
 /** Extract the routine title if this is an autonomous routine delivery. */
-export function parseScheduledRoutineName(content: string): string | undefined {
-  const match = /^Autonomous routine \[([^\]]+)\] due now:/.exec(content);
-  return match ? match[1] : undefined;
-}
-
 /** Display text of queued user input content: a string or text/image parts. */
 function userInputText(content: unknown): string {
   if (typeof content === "string") return content;
