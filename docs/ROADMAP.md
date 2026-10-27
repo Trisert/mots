@@ -78,13 +78,13 @@ One task per pull request, as `AGENTS.md` asks. Branch from current `main`, run 
 
 - Accounts (passkey, Sign in with Apple or Google). A `User` Durable Object owns personal memory and per-user spend. Sessions stay as shared spaces. Replace the AsyncStorage identity, do not add a second secret next to it.
 - Daily spend cap per user and per session, enforced before each model turn and each scheduled delivery.
-- "Cosa so di te" screen: list, edit, delete facts; export. Structured facts (kind, source, date) and retrieval of relevant facts instead of injecting all of them every turn.
+- "Cosa so di te" ("What I know about you") screen: list, edit, delete facts; export. Structured facts (kind, source, date) and retrieval of relevant facts instead of injecting all of them every turn.
 
 ### Phase 2. Act on the world
 
 - `web_search` and `fetch_page` tools (Cloudflare Browser Rendering is enough; no VM).
 - Connectors over MCP, read-only first: Google Calendar, then Gmail. OAuth tokens encrypted in the `User` object.
-- **Approvals.** A durable `AwaitApproval` task that blocks until the user answers a push with Approva / Rifiuta, and a protocol event for it. Every write tool goes through it.
+- **Approvals.** A durable `AwaitApproval` task that blocks until the user answers a push with "Approva" / "Rifiuta" ("Approve" / "Reject"), and a protocol event for it. Every write tool goes through it.
 - **Cua Spaces** as the "computer" (see below).
 
 ### Phase 3. Proactivity and channels
@@ -123,7 +123,7 @@ App ──WS──▶ Worker ──▶ Session DO (Pi Durable)
 3. **`use_computer(task)`.** Same pattern as `search_history`: a child conversation runs the screenshot → action loop and returns a summary, so screenshots stay out of the main context. It must pick a model whose `input` includes `image` and refuse clearly otherwise.
 4. **Replay.** Computer actions are not safe to run twice. Keep a durable action log per tool task (like `app.schedule-intent`) so a resumed task skips steps it already performed.
 5. **Approvals.** `computer:shell`, `computer:file`, `spaces:teleport_app`, and anything that sends, pays, or deletes always ask; `computer:readonly` never asks. Step and cost caps per task.
-6. **App.** "Collega il tuo computer" settings with the `cloudflared` command; latest screenshot and steps in the chat. Live view (WebCodecs media stream) is a later PR.
+6. **App.** "Collega il tuo computer" ("Connect your computer") settings with the `cloudflared` command; latest screenshot and steps in the chat. Live view (WebCodecs media stream) is a later PR.
 
 Prerequisites: accounts and the spend cap. A token that opens a shell on someone's computer must not live in a session that anyone with the join code can open.
 

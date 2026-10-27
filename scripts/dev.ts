@@ -41,13 +41,13 @@ setup();
 const node = spawnSync("node", ["--version"], { encoding: "utf8" });
 const major = Number(/^v(\d+)/.exec(node.stdout?.trim() ?? "")?.[1]);
 if (node.error !== undefined || !(major >= 22)) {
-  fail("Serve Node.js 22 o successivo nel PATH (https://nodejs.org). Il server non parte con Bun.");
+  fail("Node.js 22 or later must be on the PATH (https://nodejs.org). The server does not start under Bun.");
 }
 
 let server: ChildProcess | undefined;
 let stopping = false;
 if ((await health()) === 200) {
-  console.log(`Uso il server già avviato su http://localhost:${PORT}.`);
+  console.log(`Using the server already running on http://localhost:${PORT}.`);
 } else {
   const wrangler = join(root, "apps/server/node_modules/wrangler/bin/wrangler.js");
   server = spawn("node", [wrangler, "dev", "--ip", "0.0.0.0", "--port", String(PORT)], {
@@ -64,7 +64,7 @@ if ((await health()) === 200) {
   server.stdout?.on("data", (chunk: Buffer) => process.stdout.write(prefix(chunk)));
   server.stderr?.on("data", (chunk: Buffer) => process.stderr.write(prefix(chunk)));
   server.on("exit", (code) => {
-    if (!stopping && code !== 0 && code !== null) fail(`Il server si è fermato (codice ${code}).`);
+    if (!stopping && code !== 0 && code !== null) fail(`The server stopped (exit code ${code}).`);
   });
 
   let status: number | undefined;
@@ -74,7 +74,7 @@ if ((await health()) === 200) {
   }
   if (status !== 200) {
     server.kill();
-    fail(`Il server non risponde su http://localhost:${PORT}/api/health (stato ${status ?? "nessuno"}).`);
+    fail(`The server does not respond on http://localhost:${PORT}/api/health (status ${status ?? "none"}).`);
   }
 }
 
@@ -87,12 +87,12 @@ if (lan !== undefined) {
 }
 
 console.log("");
-console.log(`Server pronto: http://localhost:${PORT}`);
+console.log(`Server ready: http://localhost:${PORT}`);
 if (lan !== undefined) {
-  console.log(`Dal telefono (stessa Wi-Fi): app su http://${lan}:8081, server su http://${lan}:${PORT}`);
-  console.log("Se il telefono non si collega, consenti Node.js nel firewall per le reti private.");
+  console.log(`From the phone (same Wi-Fi): app at http://${lan}:8081, server at http://${lan}:${PORT}`);
+  console.log("If the phone does not connect, allow Node.js through the firewall on private networks.");
 } else {
-  console.log("Nessun indirizzo di rete locale trovato: il telefono non potrà raggiungere il server.");
+  console.log("No local network address found: the phone will not be able to reach the server.");
 }
 console.log("");
 

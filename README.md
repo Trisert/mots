@@ -1,104 +1,104 @@
 # Mots
 
-Mots è un compagno AI mobile-first: ricorda le cose importanti, organizza promemoria, cerca nelle conversazioni passate e resta nella tua tasca. L'obiettivo è un'architettura platform-agnostic con un'app mobile come primo client, costruita sopra [Pi Durable](https://github.com/earendil-works/pi/tree/main/packages/durable) e Cloudflare Durable Objects.
+Mots is a mobile-first AI companion: it remembers what matters, organizes reminders, searches past conversations, and stays in your pocket. The goal is a platform-agnostic architecture with a mobile app as the first client, built on [Pi Durable](https://github.com/earendil-works/pi/tree/main/packages/durable) and Cloudflare Durable Objects.
 
-> **Stato: MVP in sviluppo attivo.** Monorepo funzionante. Typecheck di tutti i workspace, suite `bun run test` (274 test), dry-run del Worker e bundle Android verificati. Il Worker rifiuta sessioni anonime. Account utente, copertura E2E con LLM reale e deploy pubblico restano i prossimi passi.
+> **Status: MVP under active development.** Working monorepo. Typecheck for every workspace, the `bun run test` suite (274 tests), the Worker dry-run, and the Android bundle are verified. The Worker rejects anonymous sessions. User accounts, end-to-end coverage with a real LLM, and a public deploy are the next steps.
 
-## Cosa c'è già
+## What is already here
 
-- **App mobile Expo** con onboarding, creazione/ingresso in una sessione, chat in streaming, lista conversazioni, condivisione del codice, fork da un messaggio e stato di connessione.
-- **Server Cloudflare Worker** con una sessione per Durable Object, storage SQLite, WebSocket hibernabili e alarm.
-- **Agente Mots** basato sull'harness di Pi Durable, con provider LLM configurabile. Se `MOTS_PROVIDER` manca, il codice usa Kilo. OpenRouter, Vercel AI Gateway e NVIDIA si scelgono dall'ambiente.
-- **Memoria durevole** per sessione: preferenze e fatti sopravvivono alle conversazioni.
-- **Promemoria** programmati con tool `schedule`, ricorrenze e risveglio via alarm.
-- **Ricerca nella storia** delle conversazioni tramite subagent.
-- **Client SDK condiviso** con riconnessione automatica, outbox che ritenta i comandi già spediti e non ancora confermati, e stato React compatibile con `useSyncExternalStore`.
+- **Expo mobile app** with onboarding, creating and joining a session, streaming chat, a conversation list, sharing the session code, forking from a message, and connection status.
+- **Cloudflare Worker server** with one session per Durable Object, SQLite storage, hibernating WebSockets, and alarms.
+- **Mots agent** built on the Pi Durable harness, with a configurable LLM provider. If `MOTS_PROVIDER` is missing, the code uses Kilo. OpenRouter, Vercel AI Gateway, and NVIDIA are selected from the environment.
+- **Durable memory** per session: preferences and facts survive across conversations.
+- **Reminders** scheduled with the `schedule` tool, with recurrence and wake-ups through alarms.
+- **History search** across past conversations through a subagent.
+- **Shared client SDK** with automatic reconnection, an outbox that retries commands already sent but not yet acknowledged, and React state compatible with `useSyncExternalStore`.
 
-## Architettura
+## Architecture
 
 ```
 ┌──────────────────────────────┐
-│ App Expo (@mots/mobile)      │
-│ onboarding · chat · sessioni │
+│ Expo app (@mots/mobile)      │
+│ onboarding · chat · sessions │
 └──────────────┬───────────────┘
                │ WebSocket /api/sessions/:id
 ┌──────────────▼───────────────┐
 │ Worker (@mots/server)        │
-│ CORS · health · nuove sessioni│
+│ CORS · health · new sessions │
 └──────────────┬───────────────┘
                │ Durable Object binding SESSIONS
 ┌──────────────▼───────────────┐
-│ Session (1 per sessione)     │
+│ Session (1 per session)      │
 │ SQLite · WebSocket · alarm   │
 │ Pi Durable Harness           │
 │  └─ @mots/agent              │
-│      ├─ provider LLM         │
-│      ├─ memoria              │
-│      ├─ promemoria           │
-│      └─ ricerca storia       │
+│      ├─ LLM provider         │
+│      ├─ memory              │
+│      ├─ reminders           │
+│      └─ history search      │
 └──────────────────────────────┘
         @mots/protocol · @mots/client
 ```
 
-- Una **sessione** è un codice firmato (`uuid` + HMAC). L'uuid è il nome del Durable Object; la firma è ciò che autorizza l'apertura.
-- `POST /api/sessions` emette il codice e non crea il Durable Object. Il DO nasce solo quando un WebSocket presenta un codice valido.
-- Il client apre un WebSocket e riceve snapshot, eventi dell'agente, presenza e conferme dei comandi.
-- Creazione, fork, prompt e `conversation.setModel` restano in outbox dopo un invio riuscito. Un prompt confermato porta `submissionId`.
-- I promemoria usano gli alarm del Durable Object; la memoria usa un documento Pi con scope sessione.
+- A **session** is a signed code (`uuid` + HMAC). The uuid is the Durable Object name; the signature is what authorizes opening it.
+- `POST /api/sessions` issues the code and does not create the Durable Object. The DO is created only when a WebSocket presents a valid code.
+- The client opens a WebSocket and receives snapshots, agent events, presence, and command acknowledgements.
+- Create, fork, prompt, and `conversation.setModel` stay in the outbox after a successful send. A confirmed prompt carries a `submissionId`.
+- Reminders use Durable Object alarms; memory uses a Pi document scoped to the session.
 
-## Struttura del repository
+## Repository layout
 
 ```
 apps/
-  mobile/    App Expo + React Native
+  mobile/    Expo + React Native app
   server/    Cloudflare Worker + Durable Object
 packages/
-  protocol/  Tipi e validazione del protocollo wire
-  client/    MotsClient, reducer di stato, outbox
-  agent/     Harness Pi, provider LLM, tool e sezioni
+  protocol/  Types and validation for the wire protocol
+  client/    MotsClient, state reducer, outbox
+  agent/     Pi harness, LLM providers, tools and sections
 ```
 
-## Requisiti
+## Requirements
 
-- [Bun](https://bun.sh/) 1.4 o successivo per install, typecheck, test ed Expo.
-- [Node.js](https://nodejs.org/) 22 o successivo nel `PATH` per eseguire Wrangler. Wrangler non funziona correttamente se viene avviato dal runtime di Bun: in quel caso `wrangler dev` risponde `503`.
-- Una chiave API per il provider scelto. Il predefinito è Kilo. In alternativa [OpenRouter](https://openrouter.ai/keys), Vercel AI Gateway (`AI_GATEWAY_API_KEY`, host `https://ai-gateway.vercel.sh/v1`) o NVIDIA. Vedi [Provider LLM](#provider-llm).
-- Per il telefono: Expo Go oppure un emulatore Android / simulatore iOS.
-- Un account Cloudflare solo per il deploy del Worker.
+- [Bun](https://bun.sh/) 1.4 or later for install, typecheck, tests, and Expo.
+- [Node.js](https://nodejs.org/) 22 or later on the `PATH` to run Wrangler. Wrangler does not work when launched by the Bun runtime: in that case `wrangler dev` responds `503`.
+- An API key for the chosen provider. The default is Kilo. Alternatives are [OpenRouter](https://openrouter.ai/keys), Vercel AI Gateway (`AI_GATEWAY_API_KEY`, host `https://ai-gateway.vercel.sh/v1`), or NVIDIA. See [LLM providers](#llm-providers).
+- For a phone: Expo Go, or an Android emulator / iOS simulator.
+- A Cloudflare account, only for deploying the Worker.
 
-Il repository usa Bun come package manager e non richiede npm. Gli build nativi (EAS / Xcode / Android Studio) possono richiedere i rispettivi toolchain.
+The repository uses Bun as its package manager and does not require npm. Native builds (EAS / Xcode / Android Studio) may need their own toolchains.
 
-## Avvio rapido
+## Quick start
 
-Due comandi, dalla cartella del repository:
+Two commands, from the repository folder:
 
 ```powershell
 bun install
 bun run dev
 ```
 
-`bun run dev` prepara l'ambiente e avvia tutto in un solo terminale:
+`bun run dev` prepares the environment and starts everything in one terminal:
 
-1. Crea `apps/server/.dev.vars` dall'esempio, se manca, e genera `MOTS_SESSION_SECRET` e `MOTS_CREATE_TOKEN` se sono vuoti o troppo corti. I valori che funzionano già restano com'erano, quindi i codici di ingresso non si invalidano.
-2. Copia lo stesso token in `apps/mobile/.env.local`, che Expo legge da solo. Non serve `set` né `$env:`.
-3. Avvia il server con Node su `0.0.0.0:8787` e aspetta che `/api/health` risponda.
-4. Avvia Expo con il server già impostato sull'indirizzo di rete locale del computer, e stampa gli indirizzi da aprire sul telefono.
+1. Creates `apps/server/.dev.vars` from the example if it is missing, and generates `MOTS_SESSION_SECRET` and `MOTS_CREATE_TOKEN` if they are empty or too short. Values that already work are kept as they are, so join codes stay valid.
+2. Copies the same token into `apps/mobile/.env.local`, which Expo reads on its own. No `set` or `$env:` needed.
+3. Starts the server with Node on `0.0.0.0:8787` and waits for `/api/health` to respond.
+4. Starts Expo with the server already pointing at the computer's LAN address, and prints the addresses to open on the phone.
 
-Con Expo avviato, inquadra il QR code con Expo Go oppure premi `w` per il browser. `bun run dev --web` apre subito l'anteprima web. Dal telefono, sulla stessa Wi‑Fi, puoi anche aprire nel browser l'indirizzo `http://<IP del computer>:8081` stampato all'avvio: l'app web usa da sola il server sullo stesso host. Ctrl+C ferma sia Expo sia il server.
+With Expo running, scan the QR code with Expo Go, or press `w` for the browser. `bun run dev --web` opens the web preview straight away. From the phone, on the same Wi-Fi, you can also open the `http://<computer IP>:8081` address printed at startup in a browser: the web app finds the server on the same host by itself. Ctrl+C stops both Expo and the server.
 
-Se il telefono non si collega, consenti Node.js nel firewall per le reti private. Se la rete isola i dispositivi, come le reti pubbliche o eduroam, usa un emulatore oppure un tunnel HTTPS.
+If the phone does not connect, allow Node.js through the firewall on private networks. If the network isolates devices, as public networks or eduroam do, use an emulator or an HTTPS tunnel.
 
-`bun run setup` esegue solo la preparazione, senza avviare niente. I file `.dev.vars` e `.env.local` sono ignorati da git e non vanno mai committati.
+`bun run setup` only prepares the environment, without starting anything. The `.dev.vars` and `.env.local` files are ignored by git and must never be committed.
 
-### Configurazione manuale
+### Manual setup
 
-Se preferisci preparare l'ambiente a mano:
+If you prefer to prepare the environment by hand:
 
 ```powershell
 Copy-Item apps/server/.dev.vars.example apps/server/.dev.vars
 ```
 
-Apri `apps/server/.dev.vars`. Servono due segreti di almeno 16 caratteri. Generali con `openssl rand -base64 32` (due volte) e non riusare l'esempio vuoto del repository. Se `MOTS_PROVIDER` manca, il codice usa `kilo` e il modello `reflection/beam-free` (`DEFAULT_MODELS` in `packages/agent/src/provider.ts`):
+Open `apps/server/.dev.vars`. Two secrets of at least 16 characters are required. Generate them with `openssl rand -base64 32` (twice), and do not reuse the empty example values from the repository. If `MOTS_PROVIDER` is missing, the code uses `kilo` and the model `reflection/beam-free` (`DEFAULT_MODELS` in `packages/agent/src/provider.ts`):
 
 ```dotenv
 MOTS_SESSION_SECRET=...
@@ -107,9 +107,9 @@ MOTS_CREATE_TOKEN=...
 # MOTS_MODEL=reflection/beam-free
 ```
 
-`MOTS_SESSION_SECRET` firma i codici di ingresso: ruotarlo invalida ogni codice già condiviso. `MOTS_CREATE_TOKEN` è il bearer di `POST /api/sessions`. Senza uno dei due il Worker risponde `503` e non apre sessioni. Senza `KILO_API_KEY` il processo locale può leggere `~/.pi/agent/auth.json`, oppure inviare la chiave letterale `free`.
+`MOTS_SESSION_SECRET` signs the join codes: rotating it invalidates every code already shared. `MOTS_CREATE_TOKEN` is the bearer for `POST /api/sessions`. Without either one the Worker responds `503` and opens no sessions. Without `KILO_API_KEY`, the local process may read `~/.pi/agent/auth.json`, or send the literal key `free`.
 
-Per un altro provider imposta `MOTS_PROVIDER` e la chiave di quel provider. Con `openrouter` il modello predefinito è `openai/gpt-6-luna`:
+For another provider, set `MOTS_PROVIDER` and that provider's key. With `openrouter` the default model is `openai/gpt-6-luna`:
 
 ```dotenv
 MOTS_PROVIDER=openrouter
@@ -123,38 +123,38 @@ AI_GATEWAY_API_KEY=...
 # MOTS_MODEL=reflection/beam-free
 ```
 
-I dettagli dei provider sono in [Provider LLM](#provider-llm).
+Provider details are in [LLM providers](#llm-providers).
 
-Scrivi lo stesso valore di `MOTS_CREATE_TOKEN` in `apps/mobile/.env.local`, altrimenti il server rifiuta la creazione dello spazio con `401`:
+Write the same value of `MOTS_CREATE_TOKEN` into `apps/mobile/.env.local`, otherwise the server rejects space creation with `401`:
 
 ```dotenv
 EXPO_PUBLIC_MOTS_CREATE_TOKEN=...
 ```
 
-Avvia server e app in due terminali:
+Start the server and the app in two terminals:
 
 ```powershell
 bun run dev:server
 bun run dev:mobile
 ```
 
-- Server locale: `http://localhost:8787` (`GET /api/health`).
-- Se `GET /api/health` risponde `503`, controlla che `node --version` funzioni e che Node preceda Bun nel `PATH`: `wrangler dev` deve girare su Node. Un `503` su `POST /api/sessions`, con il dev server già su Node, indica che manca `MOTS_SESSION_SECRET` o `MOTS_CREATE_TOKEN`.
-- Nell'app premi **Crea uno spazio**. Il campo Server è modificabile: è lo stesso valore che l'onboarding salva con l'identità.
-- Android emulator: usa `http://10.0.2.2:8787` (già impostato come default).
+- Local server: `http://localhost:8787` (`GET /api/health`).
+- If `GET /api/health` responds `503`, check that `node --version` works and that Node comes before Bun in the `PATH`: `wrangler dev` must run on Node. A `503` on `POST /api/sessions`, with the dev server already on Node, means `MOTS_SESSION_SECRET` or `MOTS_CREATE_TOKEN` is missing.
+- In the app, press **Create a space**. The Server field is editable: it is the same value that onboarding saves with the identity.
+- Android emulator: use `http://10.0.2.2:8787` (already the default).
 - iOS simulator: `http://localhost:8787`.
-- Telefono fisico sulla stessa rete: avvia `bun run dev:server:lan` (binding `0.0.0.0`), inserisci nell'app l'indirizzo LAN del computer, ad esempio `http://192.168.1.10:8787`, e consenti Node/Expo nel firewall Windows.
-- Se la rete isola i dispositivi (tipico di reti pubbliche come eduroam) o il firewall blocca le porte, usa un tunnel HTTPS/WSS oppure un emulatore Android.
+- Physical phone on the same network: start `bun run dev:server:lan` (binding `0.0.0.0`), enter the computer's LAN address in the app, for example `http://192.168.1.10:8787`, and allow Node/Expo through the Windows firewall.
+- If the network isolates devices (typical of public networks such as eduroam) or the firewall blocks the ports, use an HTTPS/WSS tunnel or an Android emulator.
 
-Per provare l'interfaccia nel browser senza telefono:
+To try the interface in a browser without a phone:
 
 ```powershell
 bun run dev:web
 ```
 
-L'anteprima usa `http://localhost:8787` come server; l'URL resta modificabile dall'onboarding. Su una macchina remota imposta `EXPO_PUBLIC_MOTS_API_URL` con l'URL raggiungibile del server prima di avviare l'anteprima web.
+The preview uses `http://localhost:8787` as the server; the URL stays editable from onboarding. On a remote machine, set `EXPO_PUBLIC_MOTS_API_URL` to the server's reachable URL before starting the web preview.
 
-### Deploy su Cloudflare
+### Deploy to Cloudflare
 
 ```powershell
 cd apps/server
@@ -164,17 +164,17 @@ bunx wrangler secret put KILO_API_KEY --env=""
 bunx wrangler deploy --env=""
 ```
 
-`--env=""` è il Worker di primo livello, `mots`. Senza quel flag Wrangler avvisa, perché nel file c'è anche `staging`, e il comando resterebbe sul Worker `mots`.
+`--env=""` is the top-level Worker, `mots`. Without that flag Wrangler warns, because the file also defines `staging`, and the command would stay on the `mots` Worker.
 
-Il provider predefinito è `kilo`, con modello `reflection/beam-free`. Per OpenRouter, Vercel o NVIDIA metti al posto di `KILO_API_KEY` la variabile `OPENROUTER_API_KEY`, `AI_GATEWAY_API_KEY` o `NVIDIA_API_KEY`, e imposta `MOTS_PROVIDER` con `bunx wrangler secret put MOTS_PROVIDER --env=""`. Se `MOTS_PROVIDER` manca, il codice usa `kilo`. Un valore sconosciuto fa fallire l'avvio della sessione. `MOTS_MODEL` è opzionale. Non fare il deploy finché l'app mobile non invia il bearer di creazione: un client vecchio riceve `401`.
+The default provider is `kilo`, with the model `reflection/beam-free`. For OpenRouter, Vercel, or NVIDIA, put `OPENROUTER_API_KEY`, `AI_GATEWAY_API_KEY`, or `NVIDIA_API_KEY` in place of `KILO_API_KEY`, and set `MOTS_PROVIDER` with `bunx wrangler secret put MOTS_PROVIDER --env=""`. If `MOTS_PROVIDER` is missing, the code uses `kilo`. An unknown value makes session startup fail. `MOTS_MODEL` is optional. Do not deploy until the mobile app sends the creation bearer: an old client gets `401`.
 
-Poi nell'app usa l'URL pubblico del Worker come server. L'URL predefinito dell'app resta quello locale.
+Then, in the app, use the Worker's public URL as the server. The app's default URL stays the local one.
 
 ### Staging
 
-`apps/server/wrangler.jsonc` definisce l'ambiente `staging`. Il Worker si chiama `mots-staging` ed è distinto da `mots`. La CI esegue `wrangler deploy --dry-run --env staging` (`bun run check:server:staging`) accanto al dry-run del Worker predefinito. Quel passo non pubblica nulla.
+`apps/server/wrangler.jsonc` defines the `staging` environment. Its Worker is named `mots-staging` and is separate from `mots`. CI runs `wrangler deploy --dry-run --env staging` (`bun run check:server:staging`) next to the dry-run of the default Worker. That step publishes nothing.
 
-I secret dello staging si impostano con `--env staging`, dal directory `apps/server`. Non finiscono nel git.
+Staging secrets are set with `--env staging`, from the `apps/server` folder. They do not go into git.
 
 ```powershell
 cd apps/server
@@ -184,142 +184,142 @@ bunx wrangler secret put MOTS_CORS_ORIGINS --env staging
 bunx wrangler secret put KILO_API_KEY --env staging
 ```
 
-Genera `MOTS_SESSION_SECRET` e `MOTS_CREATE_TOKEN` con `openssl rand -base64 32` (minimo 16 caratteri). `MOTS_CORS_ORIGINS` è l'elenco di origini browser separate da virgola. Per OpenRouter, Vercel o NVIDIA sostituisci `KILO_API_KEY` con `OPENROUTER_API_KEY`, `AI_GATEWAY_API_KEY` o `NVIDIA_API_KEY`, e se serve imposta `MOTS_PROVIDER` con `bunx wrangler secret put MOTS_PROVIDER --env staging`. Non fare il deploy finché l'app mobile non invia il bearer di creazione: un client vecchio riceve `401`.
+Generate `MOTS_SESSION_SECRET` and `MOTS_CREATE_TOKEN` with `openssl rand -base64 32` (at least 16 characters). `MOTS_CORS_ORIGINS` is the comma-separated list of browser origins. For OpenRouter, Vercel, or NVIDIA, replace `KILO_API_KEY` with `OPENROUTER_API_KEY`, `AI_GATEWAY_API_KEY`, or `NVIDIA_API_KEY`, and if needed set `MOTS_PROVIDER` with `bunx wrangler secret put MOTS_PROVIDER --env staging`. Do not deploy until the mobile app sends the creation bearer: an old client gets `401`.
 
-Il deploy manuale, quando quei secret ci sono e l'app invia il bearer, è `bunx wrangler deploy --env staging`. L'app non punta da sola a staging né a produzione: il default resta `http://localhost:8787` (Android emulator: `http://10.0.2.2:8787`). Per provare `mots-staging`, incolla il suo URL nel campo Server.
+The manual deploy, once those secrets exist and the app sends the bearer, is `bunx wrangler deploy --env staging`. The app does not point at staging or production by itself: the default stays `http://localhost:8787` (Android emulator: `http://10.0.2.2:8787`). To try `mots-staging`, paste its URL into the Server field.
 
-## Configurazione
+## Configuration
 
-| Variabile | Dove | Descrizione |
+| Variable | Where | Description |
 | --- | --- | --- |
-| `MOTS_SESSION_SECRET` | server | Segreto HMAC dei codici di sessione. Minimo 16 caratteri. Obbligatorio. |
-| `MOTS_CREATE_TOKEN` | server | Bearer richiesto da `POST /api/sessions`. Minimo 16 caratteri. Obbligatorio. |
-| `MOTS_CORS_ORIGINS` | server | Origini browser separate da virgola. Vuoto o `*` consente ogni origine. Le app native non inviano `Origin`. |
-| `MOTS_CREATE_LIMIT` | server | Creazioni per indirizzo nella finestra. Default `8`. Valori non validi restano sul default. |
-| `MOTS_CREATE_WINDOW_SECONDS` | server | Finestra delle creazioni, in secondi. Default `600`. |
-| `MOTS_CONNECT_LIMIT` | server | Tentativi di connessione per indirizzo. Default `60`. |
-| `MOTS_CONNECT_WINDOW_SECONDS` | server | Finestra delle connessioni, in secondi. Default `60`. |
-| `MOTS_MAX_SCHEDULES` | server | Routine attive non terminate. Default `8`, tra `1` e `100`. |
-| `MOTS_MIN_RECURRENCE_SECONDS` | server | Distanza minima di una ricorrenza nuova. Default `900`. Il pavimento è `60`. |
-| `MOTS_PROVIDER` | server | Provider LLM: `kilo` (predefinito se assente), `openrouter`, `vercel-ai-gateway` o `nvidia`. Un valore sconosciuto è un errore. |
-| `MOTS_MODEL` | server | Modello del provider scelto. Default: `reflection/beam-free` (Kilo e Vercel), `openai/gpt-6-luna` (OpenRouter), `nvidia/nemotron-3.5-lightning-30b-a3b` (NVIDIA). |
-| `KILO_API_KEY` | server (`apps/server/.dev.vars` o secret Cloudflare) | Chiave del provider `kilo`. Non viene mai inviata al client. |
-| `OPENROUTER_API_KEY` | server (`apps/server/.dev.vars` o secret Cloudflare) | Chiave del provider `openrouter`. Non viene mai inviata al client. |
-| `AI_GATEWAY_API_KEY` | server (`apps/server/.dev.vars` o secret Cloudflare) | Chiave del provider `vercel-ai-gateway`. Non viene mai inviata al client. |
-| `NVIDIA_API_KEY` | server (`apps/server/.dev.vars` o secret Cloudflare) | Chiave del provider `nvidia`. Non viene mai inviata al client. |
-| `EXPO_PUBLIC_MOTS_API_URL` | build mobile | URL server precompilato nell'app. Modificabile anche dall'onboarding. |
+| `MOTS_SESSION_SECRET` | server | HMAC secret for session codes. At least 16 characters. Required. |
+| `MOTS_CREATE_TOKEN` | server | Bearer required by `POST /api/sessions`. At least 16 characters. Required. |
+| `MOTS_CORS_ORIGINS` | server | Comma-separated browser origins. Empty or `*` allows every origin. Native apps do not send `Origin`. |
+| `MOTS_CREATE_LIMIT` | server | Creations per address in the window. Default `8`. Invalid values keep the default. |
+| `MOTS_CREATE_WINDOW_SECONDS` | server | Creation window, in seconds. Default `600`. |
+| `MOTS_CONNECT_LIMIT` | server | Connection attempts per address. Default `60`. |
+| `MOTS_CONNECT_WINDOW_SECONDS` | server | Connection window, in seconds. Default `60`. |
+| `MOTS_MAX_SCHEDULES` | server | Active, unfinished routines. Default `8`, between `1` and `100`. |
+| `MOTS_MIN_RECURRENCE_SECONDS` | server | Minimum distance for a new recurrence. Default `900`. The floor is `60`. |
+| `MOTS_PROVIDER` | server | LLM provider: `kilo` (default if missing), `openrouter`, `vercel-ai-gateway`, or `nvidia`. An unknown value is an error. |
+| `MOTS_MODEL` | server | Model for the chosen provider. Defaults: `reflection/beam-free` (Kilo and Vercel), `openai/gpt-6-luna` (OpenRouter), `nvidia/nemotron-3.5-lightning-30b-a3b` (NVIDIA). |
+| `KILO_API_KEY` | server (`apps/server/.dev.vars` or Cloudflare secret) | Key for the `kilo` provider. Never sent to the client. |
+| `OPENROUTER_API_KEY` | server (`apps/server/.dev.vars` or Cloudflare secret) | Key for the `openrouter` provider. Never sent to the client. |
+| `AI_GATEWAY_API_KEY` | server (`apps/server/.dev.vars` or Cloudflare secret) | Key for the `vercel-ai-gateway` provider. Never sent to the client. |
+| `NVIDIA_API_KEY` | server (`apps/server/.dev.vars` or Cloudflare secret) | Key for the `nvidia` provider. Never sent to the client. |
+| `EXPO_PUBLIC_MOTS_API_URL` | mobile build | Server URL baked into the app. Also editable from onboarding. |
 
-`.dev.vars` è ignorato da git. Non committare mai chiavi API.
+`.dev.vars` is ignored by git. Never commit API keys.
 
-## Provider LLM
+## LLM providers
 
-Il provider non è fissato nel codice: si seleziona con `MOTS_PROVIDER` e il modello con `MOTS_MODEL`. Un esaurimento di quota diventa così una modifica di configurazione, non di codice.
+The provider is not fixed in the code: it is selected with `MOTS_PROVIDER`, and the model with `MOTS_MODEL`. A quota running out becomes a configuration change, not a code change.
 
-| `MOTS_PROVIDER` | Chiave API | Modello predefinito |
+| `MOTS_PROVIDER` | API key | Default model |
 | --- | --- | --- |
-| `kilo` (predefinito se assente) | `KILO_API_KEY` | `reflection/beam-free` |
+| `kilo` (default if missing) | `KILO_API_KEY` | `reflection/beam-free` |
 | `openrouter` | `OPENROUTER_API_KEY` | `openai/gpt-6-luna` |
 | `vercel-ai-gateway` | `AI_GATEWAY_API_KEY` | `reflection/beam-free` |
 | `nvidia` | `NVIDIA_API_KEY` | `nvidia/nemotron-3.5-lightning-30b-a3b` |
 
-`MOTS_MODEL` è opzionale: se non è impostato vale il modello predefinito del provider. La chiave viene letta solo lato server e non viene mai inviata al client.
+`MOTS_MODEL` is optional: if it is not set, the provider's default model applies. The key is read only on the server and is never sent to the client.
 
-### Perché il provider è configurabile
+### Why the provider is configurable
 
-Il free tier di OpenRouter è tornato a essere un vincolo: la quota giornaliera dei modelli gratuiti si è esaurita (HTTP 429 `free-models-per-day`) e il progetto non poteva più fare richieste. Con il provider selezionabile dall'ambiente lo stesso problema si risolve cambiando due variabili, senza toccare il codice.
+The OpenRouter free tier became a constraint again: the daily quota for free models ran out (HTTP 429 `free-models-per-day`) and the project could no longer make requests. With the provider selectable from the environment, the same problem is solved by changing two variables, without touching the code.
 
 ### Vercel AI Gateway
 
-Ogni account Vercel team ha $5/mese di crediti AI Gateway gratuiti sul piano free. Il piano free espone inoltre un insieme di modelli con prezzo `$0` su input e output, che non consumano crediti a prescindere dal saldo.
+Every Vercel team account gets $5/month of free AI Gateway credits on the free plan. The free plan also exposes a set of models priced at `$0` for input and output, which do not consume credits whatever the balance.
 
-Il gateway parla il dialetto OpenAI su `https://ai-gateway.vercel.sh/v1` e pubblica il catalogo modelli su `https://ai-gateway.vercel.sh/v1/models` senza autenticazione. Mots legge quel catalogo a runtime invece di usare uno snapshot locale, quindi un modello gratuito aggiunto in seguito da Vercel funziona senza modifiche al codice.
+The gateway speaks the OpenAI dialect at `https://ai-gateway.vercel.sh/v1` and publishes its model catalog at `https://ai-gateway.vercel.sh/v1/models` without authentication. Mots reads that catalog at runtime instead of using a local snapshot, so a free model Vercel adds later works without code changes.
 
-Modelli gratuiti (prezzo `$0` in input e output) verificati sul catalogo:
+Free models (priced `$0` for input and output) verified in the catalog:
 
-| Modello | Tool calling |
+| Model | Tool calling |
 | --- | --- |
-| `minimax/minimax-m3.1-flash` | sì |
-| `nvidia/nemotron-3.5-lightning-free` | sì |
-| `poolside/laguna-s-2.1-free` | sì |
-| `reflection/beam-free` | sì |
-| `stealth/glyph-cluster` | sì |
+| `minimax/minimax-m3.1-flash` | yes |
+| `nvidia/nemotron-3.5-lightning-free` | yes |
+| `poolside/laguna-s-2.1-free` | yes |
+| `reflection/beam-free` | yes |
+| `stealth/glyph-cluster` | yes |
 | `convaiinnovations/laya` | no |
 | `convaiinnovations/laya-free` | no |
 
-I tool dell'agente (`remember`, `forget`, `schedule`, `search_history`) richiedono il supporto del tool calling: i due modelli `laya` non lo espongono e non sono utilizzabili, e vengono scartati in automatico quando il catalogo viene caricato.
+The agent's tools (`remember`, `forget`, `schedule`, `search_history`) require tool calling support: the two `laya` models do not expose it and cannot be used, and they are dropped automatically when the catalog loads.
 
-`reflection/beam` ha anch'esso prezzo `$0` nel catalogo, ma il prezzo dipende dal provider che serve la richiesta (`varies_by_provider`), quindi non è garantito che sia gratuito: `bun run gateway:models` lo esclude per questo motivo.
+`reflection/beam` also has a `$0` price in the catalog, but the price depends on the provider serving the request (`varies_by_provider`), so it is not guaranteed to be free: `bun run gateway:models` excludes it for that reason.
 
-## Comandi
+## Commands
 
-| Comando | Cosa fa |
+| Command | What it does |
 | --- | --- |
-| `bun install` | Installa tutti i workspace. |
-| `bun run setup` | Crea `.dev.vars` con i segreti e copia il token in `apps/mobile/.env.local`. |
-| `bun run dev` | `setup`, poi server su Node e Expo insieme, con l'indirizzo LAN già impostato. `--web` apre il browser. |
-| `bun run dev:server` | Avvia Wrangler in locale sulla porta 8787. |
-| `bun run dev:server:lan` | Avvia Wrangler su `0.0.0.0:8787` per il telefono. |
-| `bun run dev:mobile` | Avvia Expo. |
-| `bun run dev:web` | Avvia l'anteprima web di Expo. |
-| `bun run typecheck` | Typecheck di tutti i package. |
-| `bun run test` | 274 test: protocollo, client, agent, gate del Worker e funzioni pure del mobile. |
-| `bun run check` | Typecheck + dry-run del Worker. |
-| `bun run check:server` | Solo `wrangler deploy --dry-run --env=""`. Resta sul Worker `mots`. |
-| `bun run check:server:staging` | Dry-run di `wrangler deploy --env staging`. Non pubblica. |
-| `bun run build:mobile` | Export Android con Metro. |
-| `bun run --cwd apps/server deploy` | Deploy del Worker `mots` (`wrangler deploy --env=""`). Non è lo staging. |
+| `bun install` | Installs all workspaces. |
+| `bun run setup` | Creates `.dev.vars` with the secrets and copies the token into `apps/mobile/.env.local`. |
+| `bun run dev` | `setup`, then the server on Node and Expo together, with the LAN address already set. `--web` opens the browser. |
+| `bun run dev:server` | Starts Wrangler locally on port 8787. |
+| `bun run dev:server:lan` | Starts Wrangler on `0.0.0.0:8787` for the phone. |
+| `bun run dev:mobile` | Starts Expo. |
+| `bun run dev:web` | Starts the Expo web preview. |
+| `bun run typecheck` | Typecheck of all packages. |
+| `bun run test` | 274 tests: protocol, client, agent, the Worker gate, and the mobile pure functions. |
+| `bun run check` | Typecheck + Worker dry-run. |
+| `bun run check:server` | Only `wrangler deploy --dry-run --env=""`. Stays on the `mots` Worker. |
+| `bun run check:server:staging` | Dry-run of `wrangler deploy --env staging`. Does not publish. |
+| `bun run build:mobile` | Android export with Metro. |
+| `bun run --cwd apps/server deploy` | Deploys the `mots` Worker (`wrangler deploy --env=""`). Not staging. |
 
 ## API
 
-| Metodo | Percorso | Descrizione |
+| Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/api/health` | Health check. |
-| `POST` | `/api/sessions` | Emette un codice firmato. Richiede `Authorization: Bearer <MOTS_CREATE_TOKEN>`. Risponde `201` con `{ sessionId, url, socketPath }`. `sessionId` è il codice intero. Non crea il Durable Object. |
-| `GET` | `/api/sessions/:id` | Upgrade WebSocket. `:id` deve essere il codice firmato. Il nome del Durable Object è solo l'uuid, dopo la verifica. |
+| `POST` | `/api/sessions` | Issues a signed code. Requires `Authorization: Bearer <MOTS_CREATE_TOKEN>`. Responds `201` with `{ sessionId, url, socketPath }`. `sessionId` is the full code. It does not create the Durable Object. |
+| `GET` | `/api/sessions/:id` | WebSocket upgrade. `:id` must be the signed code. After verification, the Durable Object name is only the uuid. |
 
-Il protocollo applicativo vive in `packages/protocol`: comandi client (`conversation.open`, `conversation.create`, `conversation.fork`, `prompt.submit`, `conversation.setModel`, `presence.typing`) ed eventi server (snapshot, eventi conversazione, inbox, presenza, risultati comandi, errori).
+The application protocol lives in `packages/protocol`: client commands (`conversation.open`, `conversation.create`, `conversation.fork`, `prompt.submit`, `conversation.setModel`, `presence.typing`) and server events (snapshot, conversation events, inbox, presence, command results, errors).
 
-## Tool dell'agente
+## Agent tools
 
-| Tool | Funzione |
+| Tool | Purpose |
 | --- | --- |
-| `remember` | Salva un fatto o una preferenza durevole (max 100, deduplicati). |
-| `forget` | Rimuove le memorie che corrispondono a una frase. |
-| `schedule` | Programma un'istruzione nel futuro, con ricorrenza e timezone. |
-| `search_history` | Cerca nelle conversazioni passate tramite subagent. |
-| `fetch_page` | Legge il testo di una pagina web pubblica (solo http/https, niente indirizzi privati, massimo 512 KB letti). |
+| `remember` | Saves a durable fact or preference (max 100, deduplicated). |
+| `forget` | Removes the memories that match a phrase. |
+| `schedule` | Schedules an instruction in the future, with recurrence and timezone. |
+| `search_history` | Searches past conversations through a subagent. |
+| `fetch_page` | Reads the text of a public web page (http/https only, no private addresses, at most 512 KB read). |
 
-La persona dell'agente, l'orologio e la memoria vengono iniettati come sezioni del contesto. I messaggi utente possono includere `[Nome]` come attribuzione del parlante.
+The agent persona, the clock, and memory are injected as context sections. User messages may include `[Name]` to attribute the speaker.
 
-## Stato e prossimi passi
+## Status and next steps
 
-- [x] Monorepo Bun + TypeScript con workspace.
-- [x] Protocollo, client SDK e reducer condivisi.
-- [x] Worker + Durable Object con SQLite, WebSocket e alarm.
-- [x] Agente con memoria, promemoria e ricerca. Provider predefinito: Kilo. Alternative da ambiente: OpenRouter, Vercel AI Gateway, NVIDIA.
-- [x] App mobile con onboarding, chat, sessioni e fork.
-- [x] Typecheck, dry-run Worker, bundle Android.
-- [x] Suite automatica (`bun run test`, 274 test): protocollo, client, agent, gate del Worker e funzioni pure del mobile.
-- [x] Verifica end-to-end locale: health, creazione sessione, WebSocket e nuova conversazione.
-- [x] Gate di sessione: codice firmato, token di creazione, rate limit per isolate, CORS da ambiente, allowlist di `conversation.setModel`, tetto sul numero di routine e sulla cadenza. Non sono account utente.
-- [ ] Notifiche push per i promemoria.
-- [ ] Markdown, immagini e messaggi vocali.
-- [ ] Build iOS e deploy demo.
+- [x] Bun + TypeScript monorepo with workspaces.
+- [x] Shared protocol, client SDK, and reducer.
+- [x] Worker + Durable Object with SQLite, WebSockets, and alarms.
+- [x] Agent with memory, reminders, and search. Default provider: Kilo. Environment alternatives: OpenRouter, Vercel AI Gateway, NVIDIA.
+- [x] Mobile app with onboarding, chat, sessions, and fork.
+- [x] Typecheck, Worker dry-run, Android bundle.
+- [x] Automated suite (`bun run test`, 274 tests): protocol, client, agent, the Worker gate, and the mobile pure functions.
+- [x] Local end-to-end check: health, session creation, WebSocket, and a new conversation.
+- [x] Session gate: signed code, creation token, per-isolate rate limit, CORS from the environment, `conversation.setModel` allowlist, and caps on the number of routines and their cadence. These are not user accounts.
+- [ ] Push notifications for reminders.
+- [ ] Markdown, images, and voice messages.
+- [ ] iOS build and a demo deploy.
 
-Per seguire l'avanzamento: questa sezione, `git log --oneline` e i comandi di verifica qui sopra.
+To follow progress: this section, `git log --oneline`, and the verification commands above.
 
-## Sicurezza e limiti dell'MVP
+## Security and MVP limits
 
-- Creare una sessione richiede `MOTS_CREATE_TOKEN`. Aprire una sessione richiede il codice firmato con `MOTS_SESSION_SECRET`. Un uuid nudo, o una firma alterata, risponde `401` e non crea il Durable Object.
-- Il codice condiviso resta il modo di entrare: chi lo possiede può connettersi, senza il token di creazione. Va trattato come un segreto.
-- `MOTS_CREATE_TOKEN` dentro un binario pubblico si può estrarre. Ferma i client anonimi su internet, non chi spacchetta l'app. Gli account utente non ci sono ancora.
-- CORS: senza `MOTS_CORS_ORIGINS`, o con `*`, ogni origine è ammessa. Un elenco esplicito rimanda solo quelle origini e risponde `403` alle altre. Una richiesta senza `Origin` (app nativa, curl) passa.
-- I rate limit sono per isolate del Worker, non globali. I default sono 8 creazioni ogni 10 minuti e 60 connessioni al minuto, per `CF-Connecting-IP` (in locale, `local`). Davanti a un hostname pubblico serve anche un rate limit di edge.
-- `conversation.setModel` accetta solo un provider Mots il cui modello è nel catalogo registrato. Il rifiuto è `command.result` con `error.code` `model_not_allowed`.
-- Le routine nuove non possono essere più di `MOTS_MAX_SCHEDULES` (default 8) tra i task di consegna non terminati, e una ricorrenza nuova non può essere più frequente di `MOTS_MIN_RECURRENCE_SECONDS` (default 15 minuti, mai sotto i 60 secondi). Un one-shot resta da 1 secondo. La ricorrenza già creata continua, anche se era al minuto: il successore è ammesso finché il task sorgente è ancora aperto.
-- La chiave API del provider resta lato server.
-- I dati non sono cifrati end-to-end: sono nello storage del Durable Object.
-- Mots non è un servizio pubblico finché i due segreti non sono impostati, l'app invia il bearer, e un rate limit di edge copre il hostname.
+- Creating a session requires `MOTS_CREATE_TOKEN`. Opening a session requires the signed code made with `MOTS_SESSION_SECRET`. A bare uuid, or a tampered signature, responds `401` and does not create the Durable Object.
+- The shared code is still how people get in: whoever has it can connect, without the creation token. Treat it as a secret.
+- `MOTS_CREATE_TOKEN` inside a public binary can be extracted. It stops anonymous clients on the internet, not someone who unpacks the app. There are no user accounts yet.
+- CORS: without `MOTS_CORS_ORIGINS`, or with `*`, every origin is allowed. An explicit list admits only those origins and answers `403` to the others. A request without `Origin` (native app, curl) passes.
+- Rate limits are per Worker isolate, not global. The defaults are 8 creations every 10 minutes and 60 connections per minute, keyed by `CF-Connecting-IP` (locally, `local`). Behind a public hostname, an edge rate limit is needed as well.
+- `conversation.setModel` only accepts a Mots provider whose model is in the registered catalog. The refusal is a `command.result` with `error.code` `model_not_allowed`.
+- New routines cannot exceed `MOTS_MAX_SCHEDULES` (default 8) among unfinished delivery tasks, and a new recurrence cannot be more frequent than `MOTS_MIN_RECURRENCE_SECONDS` (default 15 minutes, never below 60 seconds). A one-shot stays at 1 second. An existing recurrence keeps running, even if it was at one-minute cadence: its successor is allowed while the source task is still open.
+- The provider API key stays on the server.
+- Data is not end-to-end encrypted: it lives in the Durable Object's storage.
+- Mots is not a public service until both secrets are set, the app sends the bearer, and an edge rate limit covers the hostname.
 
 ## Mobile client adoption
 
@@ -329,7 +329,7 @@ The mobile app adopts this gate. `packages/client` does not take a new socket pa
 2. The WebSocket URL stays `/api/sessions/${sessionId}`. `MotsClient` already builds that path. No query parameter and no second header on the socket.
 3. Share and join the full `sessionId`. `parseJoinTarget` already accepts it. Joining does not send the create token.
 4. A bare uuid saved by a current install is rejected with `401`. Send that person through onboarding again. Do not add a legacy bypass.
-5. `conversation.setModel` can now fail with `command.result` `ok: false` and `error.code === "model_not_allowed"`. The protocol shape is unchanged. The reducer stores `event.error.message` on `state.error`, and the chat banner shows the Italian refusal. The header pill stays on `snapshot.agent.model` until the server reports that model.
+5. `conversation.setModel` can now fail with `command.result` `ok: false` and `error.code === "model_not_allowed"`. The protocol shape is unchanged. The reducer stores `event.error.message` on `state.error`, and the chat banner shows the refusal message (in Italian for now). The header pill stays on `snapshot.agent.model` until the server reports that model.
 6. A schedule over the cap, or a new recurrence under the minimum cadence, fails inside the tool. No client frame changes.
 7. Native apps send no `Origin`, so CORS does not affect them. A web preview must use an origin listed in `MOTS_CORS_ORIGINS` once that variable is set. Until it is set, every origin is allowed.
 8. `429` bodies are `{ error: "rate_limited", message }` and include a `Retry-After` header in seconds. `401` is `{ error: "unauthorized", message }`. `503` means a server secret is missing (`session_secret_unconfigured` or `create_token_unconfigured`).
@@ -338,8 +338,8 @@ The mobile app adopts this gate. `packages/client` does not take a new socket pa
 
 `apps/mobile/src/api.ts` `createSession` sends the bearer when `EXPO_PUBLIC_MOTS_CREATE_TOKEN` is set. A plain `GET` of the socket path distinguishes `426` (open the socket), `401` (offer a new space or a join), and `503` / `429` / `403` (the server is not ready). Any other result, including a network failure, still tries the socket. `apps/mobile/src/storage.ts` already accepts the new code shape.
 
-## Licenza
+## License
 
-MIT. Vedi [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
 
-Costruito studiando [pi-durable-cloudflare](https://github.com/earendil-works/pi-durable-cloudflare) e i package [Pi](https://github.com/earendil-works/pi).
+Built by studying [pi-durable-cloudflare](https://github.com/earendil-works/pi-durable-cloudflare) and the [Pi](https://github.com/earendil-works/pi) packages.

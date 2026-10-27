@@ -138,7 +138,7 @@ What works:
 What does not:
 
 - `state.error` is set by the client and **never read** by `apps/mobile`. A rejected command is invisible unless `submitPrompt` throws (the only throw is "a prompt is already pending", and that path uses `Alert`).
-- The empty thread treats every non-connected status the same: a spinner and "Connessione all'agente Mots…". `status === "failed"` only changes the header dot color.
+- The empty thread treats every non-connected status the same: a spinner and "Connessione all'agente Mots…" ("Connecting to the Mots agent…"). `status === "failed"` only changes the header dot color.
 - There is no user-facing retry for a terminal failure.
 - Typing indicators are fire-and-forget (`reportFailure = false`) and are not restored as commands. The server restores the typing bit from the hibernated attachment, which is the right place.
 - Alarm reconciliation errors are logged and swallowed. A failed `#refreshAlarm` can leave a live task without a wakeup until something else touches the object.
