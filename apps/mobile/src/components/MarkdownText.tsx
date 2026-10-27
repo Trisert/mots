@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useTheme } from "../context/ThemeContext";
+import { announceNow } from "../a11y";
 import { CheckIcon, CopyIcon } from "./Icon";
 import { parseMarkdownBlocks, type InlineRun } from "../markdown";
 import { fonts, radius, spacing, type ThemeColors } from "../theme";
@@ -85,6 +86,7 @@ function CodeBlockView({
     try {
       await Clipboard.setStringAsync(code);
       setCopied(true);
+      announceNow("Codice copiato");
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // ignore clipboard errors
@@ -99,7 +101,8 @@ function CodeBlockView({
         <Text style={styles.codeLanguage}>{label}</Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Copia codice"
+          accessibilityLabel={copied ? "Codice copiato" : "Copia codice"}
+          hitSlop={8}
           onPress={() => void copy()}
           style={({ pressed }) => [
             styles.copyButton,
@@ -366,6 +369,9 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       letterSpacing: 0.6,
     },
     copyButton: {
+      minWidth: 44,
+      minHeight: 32,
+      justifyContent: "center",
       flexDirection: "row",
       alignItems: "center",
       gap: 4,

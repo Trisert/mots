@@ -6,6 +6,7 @@ import { ROOT_CONVERSATION_ID, type ConversationSummary } from "@mots/protocol";
 import { normalizeBaseUrl } from "../config";
 import { STATUS_LABEL, type ConversationStatus } from "../conversation-status";
 import { useTheme } from "../context/ThemeContext";
+import { announceNow } from "../a11y";
 import { presentModel, type PresentedModel } from "../present";
 import { CheckIcon, ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CloseIcon, PlusIcon } from "./Icon";
 import { FOCUSABLE_SELECTOR, isEnabledElement, tabTrapIndex } from "../focus-trap";
@@ -179,6 +180,7 @@ export function SessionSheet({
     try {
       await Clipboard.setStringAsync(sessionId);
       setCopied(true);
+      announceNow("Codice copiato");
       setTimeout(() => setCopied(false), 1600);
     } catch {
       setCopied(false);
@@ -261,7 +263,7 @@ export function SessionSheet({
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.block}>
-            <Text style={styles.section}>Chat</Text>
+            <Text accessibilityRole="header" style={styles.section}>Chat</Text>
             {conversations.length === 0 ? (
               <Text style={styles.empty}>Nessuna chat ancora.</Text>
             ) : (
@@ -299,7 +301,7 @@ export function SessionSheet({
           </View>
 
           <View style={styles.block}>
-            <Text style={styles.section}>Impostazioni</Text>
+            <Text accessibilityRole="header" style={styles.section}>Impostazioni</Text>
 
             <SettingRow
               label="Modello"

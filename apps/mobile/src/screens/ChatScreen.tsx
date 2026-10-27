@@ -382,9 +382,9 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   ) : (
     <View style={styles.empty}>
       <View style={styles.emptyMascot}>
-        <Mascot mood="felice" size={120} shadow />
+        <Mascot mood="felice" size={120} shadow cycles={2} />
       </View>
-      <Text accessibilityRole="header" maxFontSizeMultiplier={1.6} style={styles.greeting}>
+      <Text accessibilityRole="header" style={styles.greeting}>
         Ciao{identity.username.length > 0 ? `, ${identity.username}` : ""}.
       </Text>
       <Text style={styles.lead}>Ricordare, pianificare, o solo parlare.</Text>
@@ -483,6 +483,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
               onScroll={onScroll}
               onContentSizeChange={onContentSizeChange}
               onLayout={onListLayout}
+              accessibilityRole="list"
               showsVerticalScrollIndicator={false}
               scrollEventThrottle={100}
               keyboardShouldPersistTaps="handled"

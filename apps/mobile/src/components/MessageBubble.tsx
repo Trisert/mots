@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import type { TranscriptEntry } from "@mots/client";
 import { useTheme } from "../context/ThemeContext";
+import { announceNow } from "../a11y";
 import { fonts, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TOOL_LABELS, toolSummary } from "../tools";
 import {
@@ -127,6 +128,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
     try {
       await Clipboard.setStringAsync(text);
       setCopied(true);
+      announceNow("Risposta copiata");
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // ignore
@@ -134,7 +136,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
   };
 
   return (
-    <View style={[styles.row, isUser ? styles.rowUser : styles.rowAssistant]}>
+    <View accessibilityRole="listitem" style={[styles.row, isUser ? styles.rowUser : styles.rowAssistant]}>
       {!isUser ? (
         <View style={styles.avatar}>
           <MascotAvatar size={28} />
@@ -223,7 +225,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
             <View style={styles.actionIconsRow}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Copia risposta"
+                accessibilityLabel={copied ? "Risposta copiata" : "Copia risposta"}
                 hitSlop={4}
                 onPress={() => void copyMessage()}
                 style={({ pressed }) => [
@@ -372,7 +374,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      minHeight: 40,
+      minHeight: 44,
       paddingHorizontal: spacing.md,
     },
     reasoningHeaderPressed: {
