@@ -41,4 +41,5 @@ export const HTTP_ERROR = {
 export const COMMAND_ERROR = {
   commandFailed: "command_failed",
   modelNotAllowed: "model_not_allowed",
+  dailyLimitReached: "daily_limit_reached",
 } as const;

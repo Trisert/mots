@@ -19,6 +19,7 @@ interface __BaseEnv_Env {
   MOTS_CONNECT_WINDOW_SECONDS?: string;
   MOTS_MAX_SCHEDULES?: string;
   MOTS_MIN_RECURRENCE_SECONDS?: string;
+  MOTS_DAILY_PROMPT_LIMIT?: string;
   /**
    * Test-only. `stub` replaces the model port with a local reply and skips catalog fetches.
    * Leave unset everywhere except the hermetic Worker smoke.

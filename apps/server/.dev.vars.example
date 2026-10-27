@@ -30,6 +30,7 @@ MOTS_CREATE_TOKEN=
 # MOTS_CONNECT_WINDOW_SECONDS=60
 # MOTS_MAX_SCHEDULES=8
 # MOTS_MIN_RECURRENCE_SECONDS=900
+# MOTS_DAILY_PROMPT_LIMIT=100
 
 # kilo (default). If unset, local dev may read ~/.pi/agent/auth.json or send the literal key free.
 # KILO_API_KEY=
