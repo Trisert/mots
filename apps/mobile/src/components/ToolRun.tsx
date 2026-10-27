@@ -113,8 +113,8 @@ export function ToolRun({ tools, live = false }: Props) {
 }
 
 function createStyles(colors: ThemeColors) {
-  // Aligned with the assistant's text, past the avatar.
-  const indent = 28 + spacing.sm;
+  // Lined up with the assistant avatar, as if the bot were speaking.
+  const indent = 0;
   return StyleSheet.create({
     run: {
       marginLeft: indent,
