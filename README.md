@@ -207,7 +207,7 @@ Il deploy manuale, quando quei secret ci sono e l'app invia il bearer, è `bunx 
 | `OPENROUTER_API_KEY` | server (`apps/server/.dev.vars` o secret Cloudflare) | Chiave del provider `openrouter`. Non viene mai inviata al client. |
 | `AI_GATEWAY_API_KEY` | server (`apps/server/.dev.vars` o secret Cloudflare) | Chiave del provider `vercel-ai-gateway`. Non viene mai inviata al client. |
 | `NVIDIA_API_KEY` | server (`apps/server/.dev.vars` o secret Cloudflare) | Chiave del provider `nvidia`. Non viene mai inviata al client. |
-| `TAVILY_API_KEY` | server (`apps/server/.dev.vars` o secret Cloudflare) | Chiave di [Tavily](https://tavily.com) per il tool `web_search`. Facoltativa: senza, `web_search` usa l'endpoint pubblico di Exa, che non richiede chiave. Non viene mai inviata al client. |
+| `TAVILY_API_KEY` | server (`apps/server/.dev.vars` o secret Cloudflare) | Chiave di [Tavily](https://tavily.com) per il tool `web_search`. Facoltativa: senza, `web_search` usa Exa e Parallel, che non richiedono chiave. Non viene mai inviata al client. |
 | `EXPO_PUBLIC_MOTS_API_URL` | build mobile | URL server precompilato nell'app. Modificabile anche dall'onboarding. |
 
 `.dev.vars` è ignorato da git. Non committare mai chiavi API.
@@ -289,7 +289,7 @@ Il protocollo applicativo vive in `packages/protocol`: comandi client (`conversa
 | `schedule` | Programma un'istruzione nel futuro, con ricorrenza e timezone. |
 | `search_history` | Cerca nelle conversazioni passate tramite subagent. |
 | `fetch_page` | Legge il testo di una pagina web pubblica (solo http/https, niente indirizzi privati, massimo 512 KB letti). |
-| `web_search` | Cerca sul web con Tavily e restituisce fino a 5 risultati con titolo, URL e breve estratto. Di default usa l'endpoint pubblico di Exa, senza chiave. Con `TAVILY_API_KEY` usa Tavily. |
+| `web_search` | Cerca sul web con Tavily e restituisce fino a 5 risultati con titolo, URL e breve estratto. Di default usa Exa e, se Exa limita le richieste, Parallel, senza chiave. Con `TAVILY_API_KEY` usa Tavily. |
 
 La persona dell'agente, l'orologio e la memoria vengono iniettati come sezioni del contesto. I messaggi utente possono includere `[Nome]` come attribuzione del parlante.
 

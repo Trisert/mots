@@ -44,7 +44,7 @@ MOTS_CREATE_TOKEN=
 # NVIDIA_API_KEY=
 
 # Optional. Makes the web_search tool use Tavily (https://tavily.com) instead of Exa.
-# Without it web_search uses Exa's public endpoint, which needs no key.
+# Without it web_search uses Exa, with Parallel as failover; neither needs a key.
 # TAVILY_API_KEY=
 
 # Optional Expo access token for reminder pushes (https://expo.dev).

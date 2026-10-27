@@ -5,6 +5,7 @@ import {
   EXA_MCP_URL,
   MAX_SEARCH_QUERY_CHARACTERS,
   MAX_SNIPPET_CHARACTERS,
+  PARALLEL_MCP_URL,
   searchWeb,
   TAVILY_SEARCH_URL,
   WEB_SEARCH_TOOL_NAME,
@@ -217,20 +218,64 @@ describe("searchWeb without a key", () => {
   });
 
   test("reports an Exa tool error, such as a rate limit", async () => {
-    const limited = json({
-      jsonrpc: "2.0",
-      id: 1,
-      result: { isError: true, content: [{ type: "text", text: "rate limit exceeded" }] },
-    });
-    await expect(searchWeb(undefined, "x", recording(limited).fetch)).rejects.toThrow(
-      "rate limit exceeded",
-    );
+    // A fresh Response per call: Exa's body is read before Parallel is tried.
+    const limited: FetchLike = async () =>
+      json({
+        jsonrpc: "2.0",
+        id: 1,
+        result: { isError: true, content: [{ type: "text", text: "rate limit exceeded" }] },
+      });
+    await expect(searchWeb(undefined, "x", limited)).rejects.toThrow("rate limit exceeded");
   });
 
   test("reports an HTTP error from Exa", async () => {
     await expect(
       searchWeb(undefined, "x", recording(new Response("busy", { status: 429 })).fetch),
     ).rejects.toThrow("HTTP 429");
+  });
+
+  test("fails over to Parallel when Exa is rate limited", async () => {
+    const calls: string[] = [];
+    const fetchByUrl: FetchLike = async (input) => {
+      calls.push(input);
+      if (input === EXA_MCP_URL) return new Response("busy", { status: 429 });
+      return mcpJson(
+        JSON.stringify({
+          results: [{ title: "Parallel", url: "https://example.net/p", excerpts: ["Un", "estratto."] }],
+        }),
+      );
+    };
+    const results = await searchWeb(undefined, "x", fetchByUrl);
+    expect(calls).toEqual([EXA_MCP_URL, PARALLEL_MCP_URL]);
+    expect(results).toEqual([{ title: "Parallel", url: "https://example.net/p", snippet: "Un estratto." }]);
+  });
+
+  test("sends Parallel the objective, the query and a session id, with no credentials", async () => {
+    const fake = recording(mcpJson(JSON.stringify({ results: [] })));
+    const throttled = recording(new Response("", { status: 503 }));
+    await searchWeb(undefined, "meteo", async (input, init) => {
+      if (input === EXA_MCP_URL) return throttled.fetch(input, init);
+      return fake.fetch(input, init);
+    });
+    const call = fake.calls[0];
+    expect(call?.url).toBe(PARALLEL_MCP_URL);
+    const body = JSON.parse(String(call?.init?.body)) as {
+      params: { name: string; arguments: Record<string, unknown> };
+    };
+    expect(body.params.name).toBe("web_search");
+    expect(body.params.arguments).toMatchObject({ objective: "meteo", search_queries: ["meteo"] });
+    expect(typeof body.params.arguments.session_id).toBe("string");
+    expect((call?.init?.headers as Record<string, string>).authorization).toBeUndefined();
+  });
+
+  test("does not fail over on an error that is not a throttle or a refusal", async () => {
+    const calls: string[] = [];
+    const fetchByUrl: FetchLike = async (input) => {
+      calls.push(input);
+      return new Response("bad query", { status: 400 });
+    };
+    await expect(searchWeb(undefined, "x", fetchByUrl)).rejects.toThrow("HTTP 400");
+    expect(calls).toEqual([EXA_MCP_URL]);
   });
 
   test("rejects an envelope with no text", async () => {

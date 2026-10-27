@@ -12,6 +12,20 @@ export const TAVILY_SEARCH_URL = "https://api.tavily.com/search";
 /** Exa's public MCP endpoint. It needs no key, and it is the first keyless backend Hermes Agent tries. */
 export const EXA_MCP_URL = "https://mcp.exa.ai/mcp";
 const EXA_SEARCH_TOOL = "web_search_exa";
+/** Parallel's public MCP endpoint, the second keyless backend. It answers when Exa is throttled or refuses. */
+export const PARALLEL_MCP_URL = "https://search.parallel.ai/mcp";
+const PARALLEL_SEARCH_TOOL = "web_search";
+/**
+ * Random per isolate and never persisted. Parallel uses it only to correlate rate limits, as Hermes Agent does.
+ * Created on first use: workerd rejects random values generated in global scope.
+ */
+let parallelSessionId: string | undefined;
+function parallelSession(): string {
+  parallelSessionId ??= crypto.randomUUID();
+  return parallelSessionId;
+}
+/** Errors that mean "try the next keyless backend": a rate limit, or a refusal such as HTTP 401, 402, 403 or 5xx. */
+const FAILOVER_ERROR = /rate.?limit|too many requests|quota exceeded|slow down|\b429\b|HTTP (?:401|402|403|5\d\d)\b/i;
 /** Labels that open each field of an Exa result block. A highlight runs until the next label. */
 const EXA_LABELS = ["Title:", "URL:", "Published:", "Author:", "Highlights:"];
 export const MAX_SEARCH_QUERY_CHARACTERS = 400;
@@ -186,12 +200,15 @@ async function searchTavily(
     .slice(0, SEARCH_RESULT_COUNT);
 }
 
-async function searchExa(
-  query: string,
+/** One JSON-RPC `tools/call` to a keyless MCP endpoint. Returns the first text item of its answer. */
+async function callMcp(
+  url: string,
+  tool: string,
+  args: Record<string, unknown>,
   fetchImpl: FetchLike,
   signal: AbortSignal,
-): Promise<readonly WebSearchResult[]> {
-  const response = await fetchImpl(EXA_MCP_URL, {
+): Promise<string> {
+  const response = await fetchImpl(url, {
     method: "POST",
     signal,
     headers: {
@@ -202,11 +219,77 @@ async function searchExa(
       jsonrpc: "2.0",
       id: 1,
       method: "tools/call",
-      params: { name: EXA_SEARCH_TOOL, arguments: { query, numResults: SEARCH_RESULT_COUNT } },
+      params: { name: tool, arguments: args },
     }),
   });
   if (!response.ok) throw new Error(`the search service answered with HTTP ${response.status}`);
-  return parseExaResults(firstMcpText(await response.text()), SEARCH_RESULT_COUNT);
+  return firstMcpText(await response.text());
+}
+
+async function searchExa(
+  query: string,
+  fetchImpl: FetchLike,
+  signal: AbortSignal,
+): Promise<readonly WebSearchResult[]> {
+  const text = await callMcp(
+    EXA_MCP_URL,
+    EXA_SEARCH_TOOL,
+    { query, numResults: SEARCH_RESULT_COUNT },
+    fetchImpl,
+    signal,
+  );
+  return parseExaResults(text, SEARCH_RESULT_COUNT);
+}
+
+/** Parallel's JSON answer: a `results` list of `{ title, url, excerpts }`. */
+export function parseParallelResults(text: string): WebSearchResult[] {
+  const body = JSON.parse(text) as { results?: unknown } | null;
+  if (!Array.isArray(body?.results)) {
+    throw new Error("the search service sent an unexpected response");
+  }
+  return body.results
+    .flatMap((value) => {
+      const item = (typeof value === "object" && value !== null ? value : {}) as {
+        title?: unknown;
+        url?: unknown;
+        excerpts?: unknown;
+      };
+      const excerpts = Array.isArray(item.excerpts)
+        ? item.excerpts.filter((excerpt): excerpt is string => typeof excerpt === "string").join(" ")
+        : undefined;
+      const result = toResult({ title: item.title, url: item.url, content: excerpts });
+      return result === undefined ? [] : [result];
+    })
+    .slice(0, SEARCH_RESULT_COUNT);
+}
+
+async function searchParallel(
+  query: string,
+  fetchImpl: FetchLike,
+  signal: AbortSignal,
+): Promise<readonly WebSearchResult[]> {
+  const text = await callMcp(
+    PARALLEL_MCP_URL,
+    PARALLEL_SEARCH_TOOL,
+    { objective: query, search_queries: [query], session_id: parallelSession() },
+    fetchImpl,
+    signal,
+  );
+  return parseParallelResults(text);
+}
+
+/** Exa first. Parallel answers only when Exa is throttled or refuses; any other error is reported as it is. */
+async function searchKeyless(
+  query: string,
+  fetchImpl: FetchLike,
+  signal: AbortSignal,
+): Promise<readonly WebSearchResult[]> {
+  try {
+    return await searchExa(query, fetchImpl, signal);
+  } catch (error) {
+    if (!(error instanceof Error) || !FAILOVER_ERROR.test(error.message)) throw error;
+    return searchParallel(query, fetchImpl, signal);
+  }
 }
 
 /**
@@ -221,7 +304,7 @@ export function searchWeb(
   signal: AbortSignal = AbortSignal.timeout(SEARCH_TIMEOUT_MS),
 ): Promise<readonly WebSearchResult[]> {
   return apiKey === undefined
-    ? searchExa(query, fetchImpl, signal)
+    ? searchKeyless(query, fetchImpl, signal)
     : searchTavily(apiKey, query, fetchImpl, signal);
 }
 
@@ -236,8 +319,8 @@ export function webSearchOutput(query: string, results: readonly WebSearchResult
 }
 
 /**
- * The web search tool. A key in TAVILY_API_KEY uses Tavily's authenticated quota. Without one, Exa's public endpoint
- * answers, so the agent can search out of the box.
+ * The web search tool. A key in TAVILY_API_KEY uses Tavily's authenticated quota. Without one, Exa and Parallel
+ * answer, so the agent can search out of the box.
  */
 export function createWebSearchTool(
   apiKey: string | undefined,
