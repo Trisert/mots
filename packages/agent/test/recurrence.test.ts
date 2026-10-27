@@ -154,6 +154,24 @@ describe("nextRecurrenceRunAt", () => {
 describe("planNextInstruction", () => {
   const now = Date.parse("2026-05-01T00:00:00.000Z");
 
+  test("counts consecutive failures and stops at the limit", () => {
+    const first = planNextInstruction(delivery(), now, true, "schedule:next", true);
+    expect(first?.failures).toBe(1);
+
+    const second = planNextInstruction(delivery({ failures: 1 }), now, true, "schedule:next", true);
+    expect(second?.failures).toBe(2);
+
+    // The third consecutive failure stops the routine: no row is written.
+    const stopped = planNextInstruction(delivery({ failures: 2 }), now, true, "schedule:next", true);
+    expect(stopped).toBeUndefined();
+  });
+
+  test("resets the failure count after a run that completes", () => {
+    const healthy = planNextInstruction(delivery({ failures: 2 }), now, true, "schedule:next");
+    expect(healthy).toBeDefined();
+    expect(healthy?.failures).toBeUndefined();
+  });
+
   test("writes the next row from the active delivery when the run succeeded", () => {
     const active = delivery();
     const scheduled = planNextInstruction(active, now, true, "schedule:next");
