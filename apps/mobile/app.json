@@ -7,14 +7,14 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#12110E",
+    "backgroundColor": "#0F1012",
     "plugins": [
       [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#12110E"
+          "backgroundColor": "#0F1012"
         }
       ]
     ],
@@ -25,7 +25,7 @@
     "android": {
       "package": "com.mots.app",
       "adaptiveIcon": {
-        "backgroundColor": "#12110E",
+        "backgroundColor": "#0F1012",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
