@@ -90,7 +90,7 @@ Do not add auth by stuffing a shared static bearer into the client. The client b
 
 ## Correctness
 
-**Recurrence is a suggestion to the model.** `DeliverScheduledInstruction` sleeps until `runAt`, submits one user turn whose text asks the model to call `schedule` with `sourceScheduleId`, waits for that turn, and then completes. The next deadline is not written in the `finally` of the deliver phase. If the model forgets the tool call, the tool errors, or the turn fails, the routine ends. `nextRecurrenceRunAt` in `packages/agent/src/schedule.ts` is careful about DST and month length, and nothing in the test suite calls it.
+**Recurrence is owned by the system.** `DeliverScheduledInstruction` sleeps until `runAt`, submits one user turn, and writes the next run in the same commit that clears the active delivery. That holds for a successful turn, a failed turn, and a thrown error, because an uncaught phase error faults the task for good. Only an abort or a missing conversation ends the routine. `nextRecurrenceRunAt` in `packages/agent/src/schedule.ts` handles DST and month length and is covered by `packages/agent/test/recurrence.test.ts`.
 
 **Provider docs drifted from the code.** README and `.dev.vars.example` say the default provider is OpenRouter and the default model is `openai/gpt-6-luna`. `DEFAULT_MODELS` and `createMotsHarnessOptions` default to `kilo` / `reflection/beam-free`. The onboarding copy lists Kilo first. Both stories cannot be true. The code is what runs.
 
@@ -218,7 +218,7 @@ Each row is one pull request. Do not combine a security task with a UI task. Bra
 
 ### Make the product true
 
-**M7. Durable recurrence.** When a delivery with `recurrence` finishes successfully, create the next `DeliverScheduledInstruction` in the same commit that clears the active delivery, using `nextRecurrenceRunAt`. Keep `sourceScheduleId` working so an in-flight model call does not double-schedule. The prompt text can still tell the model what happened; it must not be the only writer of the next row. Test the transition with a fake runtime or by extracting the "next instruction" decision into a pure function and testing that.
+**M7. Durable recurrence.** Done in `commitDeliveryOutcome`: a finished run, successful or failed, writes its next row, and a routine stops after three failed runs in a row, with a push to the user. An abort or a missing conversation also stops it. The original requirement follows. When a delivery with `recurrence` finishes successfully, create the next `DeliverScheduledInstruction` in the same commit that clears the active delivery, using `nextRecurrenceRunAt`. Keep `sourceScheduleId` working so an in-flight model call does not double-schedule. The prompt text can still tell the model what happened; it must not be the only writer of the next row. Test the transition with a fake runtime or by extracting the "next instruction" decision into a pure function and testing that.
 
 **M8. Docs match the code.** README provider table, test count, and "URL is editable" sentence. `SessionSheet` provider endpoints and the Vercel secret name. No behavior change beyond copy. Italian UI stays Italian.
 

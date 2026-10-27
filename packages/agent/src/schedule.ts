@@ -6,7 +6,12 @@ import {
   type Tx,
 } from "@earendil-works/pi-durable";
 import { formatScheduledInstruction } from "@mots/protocol";
-import { PushTokenDoc, readStoredPushToken, sendReminderPush } from "./push-token.ts";
+import {
+  PushTokenDoc,
+  readStoredPushToken,
+  sendReminderPush,
+  sendRoutineStoppedPush,
+} from "./push-token.ts";
 
 export type ScheduleCadence = {
   readonly unit: "minute" | "hour" | "day" | "week" | "month";
@@ -28,7 +33,12 @@ export type ScheduledInstruction = {
   /** Unix timestamp in milliseconds. */
   readonly runAt: number;
   readonly recurrence?: ScheduleRecurrence;
+  /** Consecutive runs that did not complete. Omitted while the routine is healthy. */
+  readonly failures?: number;
 };
+
+/** A recurring routine stops after this many runs in a row fail. */
+export const MAX_CONSECUTIVE_FAILURES = 3;
 
 type DeliveryState = { phase: "wait" } | { phase: "deliver" };
 
@@ -214,22 +224,28 @@ export type ScheduleDelivery = {
   name?: string;
   runAt: number;
   recurrence?: ScheduleRecurrence;
+  failures?: number;
   successor?: ScheduledInstruction;
 };
 
 /**
- * The next row a successful delivery writes, or `undefined` when this settlement
- * must not create one. A stored successor means an in-flight `sourceScheduleId`
- * call already created the task.
+ * The next row a finished delivery writes, or `undefined` when this settlement
+ * must not create one. `settled` means the run ended on its own, whether the
+ * turn succeeded, failed, or threw. An aborted run passes `false`. `failed`
+ * counts toward `MAX_CONSECUTIVE_FAILURES`. A stored successor means an
+ * in-flight `sourceScheduleId` call already created the task.
  */
 export function planNextInstruction(
   delivery: ScheduleDelivery | undefined,
   now: number,
-  delivered: boolean,
+  settled: boolean,
   nextId: string,
+  failed = false,
 ): ScheduledInstruction | undefined {
-  if (!delivered || delivery === undefined) return undefined;
+  if (!settled || delivery === undefined) return undefined;
   if (delivery.successor !== undefined || delivery.recurrence === undefined) return undefined;
+  const failures = failed ? (delivery.failures ?? 0) + 1 : 0;
+  if (failures >= MAX_CONSECUTIVE_FAILURES) return undefined;
   const recurrence: ScheduleRecurrence = {
     cadence: {
       unit: delivery.recurrence.cadence.unit,
@@ -245,6 +261,7 @@ export function planNextInstruction(
     ...(delivery.name === undefined ? {} : { name: delivery.name }),
     runAt,
     recurrence,
+    ...(failures === 0 ? {} : { failures }),
   };
 }
 
@@ -275,6 +292,7 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
             name: task.input.name,
             runAt: task.input.runAt,
             ...(task.input.recurrence === undefined ? {} : { recurrence: task.input.recurrence }),
+            ...(task.input.failures === undefined ? {} : { failures: task.input.failures }),
           });
         }
         return { status: "running", checkpoint: { phase: "deliver" } };
@@ -282,6 +300,25 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
     },
     deliver: async (task, runtime, context) => {
       let delivered = false;
+      // True once the turn has settled (done or failed), or the run has thrown.
+      let ended = false;
+      const notifyStopped = async (): Promise<void> => {
+        try {
+          const stored = await runtime.snapshot(PushTokenDoc, context);
+          const token = readStoredPushToken(stored);
+          if (token !== undefined) await sendRoutineStoppedPush(task.input, token);
+        } catch (error) {
+          try {
+            runtime.report(error);
+          } catch {
+            // Reporting must not change the outcome either.
+          }
+        }
+      };
+      // The run that brings the failure count to the limit stops the routine.
+      const stopsRoutine =
+        task.input.recurrence !== undefined &&
+        (task.input.failures ?? 0) + 1 >= MAX_CONSECUTIVE_FAILURES;
       try {
         const conversation = await runtime.conversation(task.input.conversationId, context);
         if (conversation !== undefined) {
@@ -294,8 +331,24 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
             },
             context,
           );
-          const settled = await submission.wait(context);
-          delivered = settled.status === "done";
+          const turn = await submission.wait(context);
+          delivered = turn.status === "done";
+          // A user abort withdraws the input, and that stops the routine. Any other
+          // unanswered turn is a failure, and the routine goes on.
+          ended = turn.status === "done" || turn.reason !== "aborted";
+          if (turn.status !== "done") {
+            // The next run is still scheduled, so report the miss instead of
+            // letting a failing routine repeat silently.
+            try {
+              runtime.report(
+                new Error(
+                  `Scheduled instruction ${task.input.id} did not complete (${turn.status}${turn.reason === undefined ? "" : `: ${turn.reason}`})`,
+                ),
+              );
+            } catch {
+              // Reporting must not skip the next row either.
+            }
+          }
         } else {
           runtime.report(
             new Error(
@@ -319,14 +372,18 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
           }
         }
         await runtime.commit(async (tx) => {
-          await commitDeliveryOutcome(tx, task.input, runtime.now(), delivered);
+          await commitDeliveryOutcome(tx, task.input, runtime.now(), ended, undefined, !delivered);
           return { status: "terminal", outcome: { status: "completed", result: null } };
         }, context);
+        if (ended && !delivered && stopsRoutine) await notifyStopped();
       } catch (error) {
+        // An uncaught error faults the task, which is terminal. Write the next row
+        // in this commit first, so one thrown run does not end the routine.
         await runtime.commit(async (tx) => {
-          await commitDeliveryOutcome(tx, task.input, runtime.now(), false);
+          await commitDeliveryOutcome(tx, task.input, runtime.now(), true, undefined, true);
           return { status: "running", checkpoint: { phase: "deliver" } };
         }, context);
+        if (stopsRoutine) await notifyStopped();
         throw error;
       }
     },
@@ -340,19 +397,43 @@ export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, Deli
 });
 
 /**
- * Clear the active delivery and, when the run succeeded, write its next row
- * in that same commit. Failed and aborted runs pass `delivered: false`.
+ * Like `planNextInstruction`, but a recurrence that cannot be planned stops the
+ * routine instead of failing the commit. A failing commit would keep the active
+ * delivery and block the conversation's `schedule` calls.
+ */
+const planOrStop = (
+  delivery: ScheduleDelivery | undefined,
+  now: number,
+  settled: boolean,
+  nextId: string,
+  failed: boolean,
+): ScheduledInstruction | undefined => {
+  try {
+    return planNextInstruction(delivery, now, settled, nextId, failed);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Clear the active delivery and write its next row in that same commit.
+ * Pass `settled: true` for a run that finished on its own, including a failed
+ * turn, so a routine survives one bad run. Aborted runs pass `settled: false`.
  */
 export async function commitDeliveryOutcome(
   tx: Tx,
   input: ScheduledInstruction,
   now: number,
-  delivered: boolean,
+  settled: boolean,
   nextId = `schedule:${crypto.randomUUID()}`,
+  failed = false,
 ): Promise<ScheduledInstruction | undefined> {
   const deliveries = await tx.doc(ScheduleDeliveries);
   const delivery = deliveries.active.find((item) => item.scheduleId === input.id);
-  const scheduled = planNextInstruction(delivery, now, delivered, nextId);
+  // Clear the active entry first, so no planning failure can leave it behind.
+  // That entry would block every later `schedule` call in the conversation.
+  removeDelivery(deliveries, input.id);
+  const scheduled = planOrStop(delivery, now, settled, nextId, failed);
   if (scheduled !== undefined) {
     await tx.createTask(DeliverScheduledInstruction, scheduled, {
       ownership: { kind: "conversation" },
@@ -360,7 +441,6 @@ export async function commitDeliveryOutcome(
       background: true,
     });
   }
-  removeDelivery(deliveries, input.id);
   return scheduled;
 }
 
