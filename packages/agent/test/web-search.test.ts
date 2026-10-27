@@ -307,3 +307,25 @@ describe("searchWeb without a key", () => {
     await expect(searchWeb(undefined, "x", recording(empty).fetch)).rejects.toThrow("no text");
   });
 });
+
+describe("web_search failures", () => {
+  test("returns a failed search as output so the model can report the reason", async () => {
+    const forbidden: FetchLike = async () => new Response("denied", { status: 403 });
+    const tool = createWebSearchTool(undefined, forbidden);
+    const result = await tool.execute({ query: "razzo" }, context, context);
+    const text = result.output?.[0]?.type === "text" ? result.output[0].text : "";
+    expect(text).toContain("HTTP 403");
+    expect(text).toContain("Do not say you have no web access");
+    expect(result.details).toEqual({ query: "razzo", results: 0 });
+  });
+
+  test("identifies itself to the keyless endpoints", async () => {
+    const agents: (string | undefined)[] = [];
+    const forbidden: FetchLike = async (_url, init) => {
+      agents.push((init?.headers as Record<string, string> | undefined)?.["user-agent"]);
+      return new Response("denied", { status: 403 });
+    };
+    await expect(searchWeb(undefined, "x", forbidden)).rejects.toThrow("HTTP 403");
+    expect(agents).toEqual(["mots-agent", "mots-agent"]);
+  });
+});
