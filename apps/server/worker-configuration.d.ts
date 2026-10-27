@@ -3,7 +3,7 @@ interface __BaseEnv_Env {
   OPENROUTER_API_KEY?: string;
   AI_GATEWAY_API_KEY?: string;
   NVIDIA_API_KEY?: string;
-  /** Optional. Authenticates web_search (Tavily) for higher limits. Without it, Tavily's keyless mode is used. */
+  /** Optional. Makes web_search use Tavily. Without it, web_search uses Exa's public endpoint. */
   TAVILY_API_KEY?: string;
   MOTS_PROVIDER?: string;
   MOTS_MODEL?: string;

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { FetchLike } from "../src/web.ts";
 import {
   createWebSearchTool,
+  EXA_MCP_URL,
   MAX_SEARCH_QUERY_CHARACTERS,
   MAX_SNIPPET_CHARACTERS,
   searchWeb,
@@ -12,11 +13,45 @@ import {
 const context = undefined as never;
 const KEY = "tvly-test-key-123";
 
+/** Two readable results and one private address, in Exa's text format. */
+const EXA_TEXT = [
+  "Title: Durable Objects",
+  "URL: https://developers.cloudflare.com/durable-objects/",
+  "Published: 2025-01-01",
+  "Author: Cloudflare",
+  "Highlights:",
+  "Stateful coordination",
+  "for Workers.",
+  "---",
+  "Title: Privato",
+  "URL: http://192.168.1.1/admin",
+  "Highlights:",
+  "no",
+  "---",
+  "Title: Secondo",
+  "URL: https://example.org/b",
+  "Highlights:",
+  "Un altro risultato.",
+].join("\n");
+
 function json(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
     headers: { "content-type": "application/json" },
     ...init,
+  });
+}
+
+/** Exa's JSON-RPC answer as a plain JSON body. */
+function mcpJson(text: string): Response {
+  return json({ jsonrpc: "2.0", id: 1, result: { content: [{ type: "text", text }] } });
+}
+
+/** The same answer framed as a server-sent event, which Exa also uses. */
+function mcpSse(text: string): Response {
+  const envelope = { jsonrpc: "2.0", id: 1, result: { content: [{ type: "text", text }] } };
+  return new Response(`event: message\r\ndata: ${JSON.stringify(envelope)}\r\n\r\n`, {
+    headers: { "content-type": "text/event-stream" },
   });
 }
 
@@ -74,6 +109,14 @@ describe("createWebSearchTool", () => {
     expect(fake.calls[0]?.init?.body).toContain('"query":"durable objects"');
   });
 
+  test("uses Exa when no key is set", async () => {
+    const fake = recording(mcpJson(EXA_TEXT));
+    const tool = createWebSearchTool(undefined, fake.fetch);
+    const result = await tool.execute({ query: "durable objects" }, {} as never, context);
+    expect(fake.calls[0]?.url).toBe(EXA_MCP_URL);
+    expect(JSON.stringify(result)).toContain("1. Durable Objects");
+  });
+
   test("says so when nothing matches", async () => {
     const tool = createWebSearchTool(KEY, recording(json({ results: [] })).fetch);
     const result = await tool.execute({ query: "nulla" }, {} as never, context);
@@ -81,7 +124,7 @@ describe("createWebSearchTool", () => {
   });
 });
 
-describe("searchWeb", () => {
+describe("searchWeb with a key", () => {
   test("posts to Tavily with the key in the Authorization header", async () => {
     const fake = recording(json({ results: [] }));
     await searchWeb(KEY, "pagamenti", fake.fetch);
@@ -95,14 +138,6 @@ describe("searchWeb", () => {
       search_depth: "basic",
       include_answer: false,
     });
-  });
-
-  test("uses Tavily's keyless mode without a key", async () => {
-    const fake = recording(json({ results: [] }));
-    await searchWeb(undefined, "meteo", fake.fetch);
-    const headers = fake.calls[0]?.init?.headers as Record<string, string>;
-    expect(headers["x-tavily-access-mode"]).toBe("keyless");
-    expect(headers.authorization).toBeUndefined();
   });
 
   test("keeps only addresses that fetch_page would read, and clips long snippets", async () => {
@@ -142,5 +177,64 @@ describe("searchWeb", () => {
     await expect(searchWeb(KEY, "test", recording(json(null)).fetch)).rejects.toThrow(
       "unexpected response",
     );
+  });
+});
+
+describe("searchWeb without a key", () => {
+  test("posts a JSON-RPC search to Exa with no credentials", async () => {
+    const fake = recording(mcpJson("No results."));
+    await searchWeb(undefined, "meteo", fake.fetch);
+    const call = fake.calls[0];
+    expect(call?.url).toBe(EXA_MCP_URL);
+    expect(call?.init?.method).toBe("POST");
+    expect((call?.init?.headers as Record<string, string>).authorization).toBeUndefined();
+    expect(JSON.parse(String(call?.init?.body))).toEqual({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "web_search_exa", arguments: { query: "meteo", numResults: 5 } },
+    });
+  });
+
+  test("parses Exa's text blocks and drops addresses fetch_page would refuse", async () => {
+    const results = await searchWeb(undefined, "x", recording(mcpJson(EXA_TEXT)).fetch);
+    expect(results).toEqual([
+      {
+        title: "Durable Objects",
+        url: "https://developers.cloudflare.com/durable-objects/",
+        snippet: "Stateful coordination for Workers.",
+      },
+      { title: "Secondo", url: "https://example.org/b", snippet: "Un altro risultato." },
+    ]);
+  });
+
+  test("reads an SSE answer as well as a JSON one", async () => {
+    const results = await searchWeb(undefined, "x", recording(mcpSse(EXA_TEXT)).fetch);
+    expect(results.map((result) => result.url)).toEqual([
+      "https://developers.cloudflare.com/durable-objects/",
+      "https://example.org/b",
+    ]);
+  });
+
+  test("reports an Exa tool error, such as a rate limit", async () => {
+    const limited = json({
+      jsonrpc: "2.0",
+      id: 1,
+      result: { isError: true, content: [{ type: "text", text: "rate limit exceeded" }] },
+    });
+    await expect(searchWeb(undefined, "x", recording(limited).fetch)).rejects.toThrow(
+      "rate limit exceeded",
+    );
+  });
+
+  test("reports an HTTP error from Exa", async () => {
+    await expect(
+      searchWeb(undefined, "x", recording(new Response("busy", { status: 429 })).fetch),
+    ).rejects.toThrow("HTTP 429");
+  });
+
+  test("rejects an envelope with no text", async () => {
+    const empty = json({ jsonrpc: "2.0", id: 1, result: { content: [] } });
+    await expect(searchWeb(undefined, "x", recording(empty).fetch)).rejects.toThrow("no text");
   });
 });

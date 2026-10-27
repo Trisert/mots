@@ -42,7 +42,7 @@ Also landed on 2026-10-26, outside the M list:
 - **Model picker from the server.** `GET /api/sessions/:code/models` lists only models the session can switch to, with free, image, reasoning and context badges; the app no longer ships a hard-coded list. Keys stay on the server.
 - **Mots design system in the app.** Pastel, rounded tokens, Figtree, and the animated speech-bubble mascot on onboarding, the empty chat, the thinking state and beside replies. The bottom tab bar from the mockups waits for Routine and Memoria data on the client.
 - **`fetch_page` tool.** Read-only: reads a public http(s) page and returns its title and text. Private, local and non-default-port addresses are refused, and redirects are checked hop by hop.
-- **`web_search` tool.** Tavily. `TAVILY_API_KEY` is optional and raises the limits; without it Tavily's keyless mode answers. Returns up to five results, each with a title, URL and a snippet of at most 600 characters. Result addresses pass the same checks as `fetch_page`.
+- **`web_search` tool.** Exa's public endpoint by default, which needs no key. `TAVILY_API_KEY` switches it to Tavily. Returns up to five results, each with a title, URL and a snippet of at most 600 characters. Result addresses pass the same checks as `fetch_page`.
 - **Safe `forget`.** Exact match first; one substring match only for queries of 3+ characters; otherwise nothing is removed and candidates are listed. `remember` reports facts dropped at the 100-fact cap.
 
 ## Competitive landscape (October 2026)
@@ -83,7 +83,7 @@ One task per pull request, as `AGENTS.md` asks. Branch from current `main`, run 
 
 ### Phase 2. Act on the world
 
-- [x] `web_search` (Tavily, optional `TAVILY_API_KEY`) and `fetch_page` tools. No VM.
+- [x] `web_search` (Exa by default, Tavily with `TAVILY_API_KEY`) and `fetch_page` tools. No VM.
 - Connectors over MCP, read-only first: Google Calendar, then Gmail. OAuth tokens encrypted in the `User` object.
 - **Approvals.** A durable `AwaitApproval` task that blocks until the user answers a push with Approva / Rifiuta, and a protocol event for it. Every write tool goes through it.
 - **Cua Spaces** as the "computer" (see below).

@@ -41,7 +41,7 @@ Live chat needs `apps/server/.dev.vars` (gitignored). `bun run setup` creates it
 | `OPENROUTER_API_KEY` | OpenRouter |
 | `AI_GATEWAY_API_KEY` | Vercel AI Gateway. The mobile sheet uses this name and `ai-gateway.vercel.sh/v1`. |
 | `NVIDIA_API_KEY` | NVIDIA |
-| `TAVILY_API_KEY` | Optional. Authenticates `web_search` (Tavily) for higher limits. Without it, `web_search` uses Tavily's keyless mode with lower limits. |
+| `TAVILY_API_KEY` | Optional. Makes `web_search` use Tavily. Without it, `web_search` uses Exa's public endpoint, which needs no key. |
 | `EXPO_PUBLIC_MOTS_API_URL` | Optional build-time server URL baked into the app. Not a secret. |
 | `EXPO_PUBLIC_MOTS_CREATE_TOKEN` | Optional app-wide gate, not a per-user secret. Inlined into the bundle. Sent as `Authorization: Bearer` on `POST /api/sessions` when set. Omitted when unset, so a local Worker without the check still creates a session. |
 
@@ -133,7 +133,7 @@ Set these as Cursor environment secrets, then have the agent write them into `ap
 - `OPENROUTER_API_KEY`
 - `AI_GATEWAY_API_KEY`
 - `NVIDIA_API_KEY`
-- `TAVILY_API_KEY` (optional; higher `web_search` limits)
+- `TAVILY_API_KEY` (optional; makes `web_search` use Tavily)
 - `MOTS_PROVIDER` and `MOTS_MODEL` if you want a non-default pair
 - `MOTS_CORS_ORIGINS` before a public web client
 - `CLOUDFLARE_API_TOKEN` only if the agent is supposed to deploy. Scope it to this Worker. Do not deploy until the mobile app sends the create-token bearer.
