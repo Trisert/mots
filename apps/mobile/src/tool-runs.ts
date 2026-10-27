@@ -1,6 +1,7 @@
 /** Groups the tool activity of a conversation into the rows the chat shows. No React Native import. */
 import type { TranscriptEntry } from "@mots/client";
-import { TOOL_LABELS, toolSummary } from "./tools";
+import type { Translate } from "./i18n/translate";
+import { toolLabel, toolSummary } from "./tools";
 
 /** Up to this many tool calls in a row are listed one by one. More collapse into one line. */
 export const INLINE_TOOL_LIMIT = 5;
@@ -46,24 +47,26 @@ export type ToolLine = {
 };
 
 /** What one tool result says in a single line: its name, and what it did or why it failed. */
-export function toolLine(entry: TranscriptEntry): ToolLine {
+export function toolLine(entry: TranscriptEntry, t: Translate, localeTag = "en-GB"): ToolLine {
   const result = entry.toolResult;
-  const name = result?.name ?? "strumento";
+  const name = result?.name ?? t("bubble.toolFallback");
   const isError = result?.isError === true;
-  const detail = isError ? entry.text : toolSummary(name, result?.details);
+  const detail = isError ? entry.text : toolSummary(name, result?.details, t, localeTag);
   return {
     name,
-    label: TOOL_LABELS[name] ?? name,
+    label: toolLabel(name, t),
     ...(detail === undefined || detail.length === 0 ? {} : { detail }),
     isError,
   };
 }
 
-/** The one line that stands for a long run: "Uso 7 strumenti", with the errors counted. */
-export function collapsedRunTitle(tools: readonly TranscriptEntry[]): string {
+/** The one line that stands for a long run, such as "Used 7 tools", with the errors counted. */
+export function collapsedRunTitle(tools: readonly TranscriptEntry[], t: Translate): string {
   const count = tools.length;
   const errors = tools.filter((entry) => entry.toolResult?.isError === true).length;
-  const base = count === 1 ? "Uso 1 strumento" : `Uso ${count} strumenti`;
+  const base = count === 1 ? t("runs.collapsedOne") : t("runs.collapsedMany", { count });
   if (errors === 0) return base;
-  return errors === 1 ? `${base} · 1 errore` : `${base} · ${errors} errori`;
+  return errors === 1
+    ? t("runs.errorsOne", { title: base })
+    : t("runs.errorsMany", { title: base, count: errors });
 }

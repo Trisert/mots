@@ -4,9 +4,22 @@ import * as Clipboard from "expo-clipboard";
 import type { TranscriptEntry } from "@mots/client";
 import { useTheme } from "../context/ThemeContext";
 import { announceNow } from "../a11y";
+import { useI18n } from "../i18n";
 import { fonts, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
-import { TOOL_LABELS } from "../tools";
-import { CheckIcon, ChevronDownIcon, ChevronUpIcon, CopyIcon, ForkIcon } from "./Icon";
+import { toolLabel, toolSummary } from "../tools";
+import {
+  AlertIcon,
+  BookmarkIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  ClockIcon,
+  CopyIcon,
+  ForkIcon,
+  SearchIcon,
+  ToolIcon,
+  TrashIcon,
+} from "./Icon";
 import { MarkdownText } from "./MarkdownText";
 import { MascotAvatar } from "./Mascot";
 import { ToolMarker, ToolRun } from "./ToolRun";
@@ -33,6 +46,8 @@ type Props = {
 
 function MessageBubbleComponent({ entry, onFork }: Props) {
   const { colors, isDark } = useTheme();
+  const { t, locale } = useI18n();
+  const localeTag = locale === "it" ? "it-IT" : "en-GB";
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const [reasoningExpanded, setReasoningExpanded] = useState(false);
@@ -55,6 +70,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
   }
 
   // Tool results are lines in the chat, grouped by ChatScreen. A lone result is one line.
+  // Tool results are lines in the chat, grouped by ChatScreen. A lone result is one line.
   if (entry.role === "tool") {
     return <ToolRun tools={[entry]} />;
   }
@@ -70,7 +86,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
     try {
       await Clipboard.setStringAsync(text);
       setCopied(true);
-      announceNow("Risposta copiata");
+      announceNow(t("common.copied"));
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // ignore
@@ -93,7 +109,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
       >
         {isScheduled ? (
           <View style={styles.scheduledHeader}>
-            <Text style={styles.scheduledLabel}>Routine</Text>
+            <Text style={styles.scheduledLabel}>{t("bubble.routine")}</Text>
           </View>
         ) : null}
 
@@ -102,7 +118,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
             {entry.toolCalls.map((call) => (
               <View key={call.callId} style={styles.toolCall}>
                 <ToolMarker name={call.name} isError={false} color={colors.textSecondary} />
-                <Text style={styles.toolCallText}>{TOOL_LABELS[call.name] ?? call.name}</Text>
+                <Text style={styles.toolCallText}>{toolLabel(call.name, t)}</Text>
               </View>
             ))}
           </View>
@@ -113,7 +129,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
           <View style={styles.reasoningCard}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Dettagli ragionamento"
+              accessibilityLabel={t("bubble.reasoningDetails")}
               accessibilityState={{ expanded: reasoningExpanded }}
               onPress={() => setReasoningExpanded(!reasoningExpanded)}
               style={({ pressed }) => [
@@ -122,7 +138,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
               ]}
             >
               <View style={styles.reasoningTitleRow}>
-                <Text style={styles.reasoningTitle}>Ragionamento</Text>
+                <Text style={styles.reasoningTitle}>{t("bubble.reasoning")}</Text>
               </View>
               {reasoningExpanded ? (
                 <ChevronUpIcon size={14} color={colors.reasoningText} />
@@ -165,7 +181,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
             <View style={styles.actionIconsRow}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={copied ? "Risposta copiata" : "Copia risposta"}
+                accessibilityLabel={t("bubble.copyReply")}
                 hitSlop={4}
                 onPress={() => void copyMessage()}
                 style={({ pressed }) => [
@@ -183,7 +199,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
               {entry.canFork && onFork !== undefined ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Forka da questo messaggio"
+                  accessibilityLabel={t("bubble.branchFromHere")}
                   hitSlop={4}
                   onPress={() => onFork(entry)}
                   style={({ pressed }) => [

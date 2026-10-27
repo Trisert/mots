@@ -1,8 +1,7 @@
 // Pure decisions for screen reader status announcements in the chat.
 // No React or React Native imports: the screen owns the refs and the I/O.
 
-export const REPLY_ANNOUNCEMENT = "Mots ha risposto";
-export const THINKING_ANNOUNCEMENT = "Mots sta scrivendo";
+import type { Translate } from "./i18n/translate";
 
 export type TranscriptLike = {
   readonly id: number;
@@ -46,6 +45,7 @@ export function markTranscript(
 export function replyAnnouncement(
   previous: TranscriptMark | undefined,
   next: TranscriptMark,
+  t: Translate,
 ): string | undefined {
   if (previous === undefined) return undefined;
   if (previous.conversationId !== next.conversationId) return undefined;
@@ -55,19 +55,17 @@ export function replyAnnouncement(
   if (previous.lastAssistantId !== undefined && next.lastAssistantId < previous.lastAssistantId) {
     return undefined;
   }
-  return REPLY_ANNOUNCEMENT;
+  return t("announce.reply");
 }
 
 /** Returns the text to announce when a run starts (live turns from inactive to active). */
 export function thinkingAnnouncement(
   previouslyActive: boolean | undefined,
   nowActive: boolean,
+  t: Translate,
 ): string | undefined {
-  return previouslyActive === false && nowActive ? THINKING_ANNOUNCEMENT : undefined;
+  return previouslyActive === false && nowActive ? t("announce.thinking") : undefined;
 }
-
-export const LOST_CONNECTION_ANNOUNCEMENT = "Connessione interrotta";
-export const RECONNECTED_ANNOUNCEMENT = "Di nuovo in linea";
 
 /**
  * Returns the text to announce when the connection status changes, or undefined.
@@ -75,9 +73,13 @@ export const RECONNECTED_ANNOUNCEMENT = "Di nuovo in linea";
  * The first status is silent, so a normal start does not talk over the screen. Only a drop and a
  * recovery after a drop are announced; the connecting steps in between stay quiet.
  */
-export function connectionAnnouncement(previous: string | undefined, next: string): string | undefined {
+export function connectionAnnouncement(
+  previous: string | undefined,
+  next: string,
+  t: Translate,
+): string | undefined {
   if (previous === undefined || previous === next) return undefined;
-  if (next === "failed") return LOST_CONNECTION_ANNOUNCEMENT;
-  if (previous === "failed" && next === "connected") return RECONNECTED_ANNOUNCEMENT;
+  if (next === "failed") return t("announce.lost");
+  if (previous === "failed" && next === "connected") return t("announce.reconnected");
   return undefined;
 }

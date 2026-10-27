@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ModelCatalogEntry, ModelCatalogResponse } from "@mots/protocol";
 import { fetchModelCatalog } from "../api";
+import { useI18n } from "../i18n";
 import { useTheme } from "../context/ThemeContext";
 import { modelBadges, modelKey, modelSections } from "../model-picker";
 import { presentModel, providerLabel, type AgentModelSource } from "../present";
@@ -43,6 +44,7 @@ type Load =
  */
 export function ModelPicker({ visible, apiUrl, sessionId, agent, onClose, onSelect }: Props) {
   const { colors } = useTheme();
+  const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [load, setLoad] = useState<Load>({ state: "loading" });
@@ -57,7 +59,7 @@ export function ModelPicker({ visible, apiUrl, sessionId, agent, onClose, onSele
   const reload = useCallback(() => {
     setLoad({ state: "loading" });
     let alive = true;
-    fetchModelCatalog(apiUrl, sessionId)
+    fetchModelCatalog(apiUrl, sessionId, t)
       .then((catalog) => {
         if (alive) setLoad({ state: "ready", catalog });
       })
@@ -65,14 +67,14 @@ export function ModelPicker({ visible, apiUrl, sessionId, agent, onClose, onSele
         if (alive) {
           setLoad({
             state: "failed",
-            message: error instanceof Error ? error.message : "Non riesco a caricare i modelli.",
+            message: error instanceof Error ? error.message : t("picker.loadFailed"),
           });
         }
       });
     return () => {
       alive = false;
     };
-  }, [apiUrl, sessionId]);
+  }, [apiUrl, sessionId, t]);
 
   useEffect(() => {
     if (!visible) return;
@@ -107,8 +109,8 @@ export function ModelPicker({ visible, apiUrl, sessionId, agent, onClose, onSele
 
   const catalog = load.state === "ready" ? load.catalog : undefined;
   const sections = useMemo(
-    () => (catalog === undefined ? [] : modelSections(catalog, { query, provider })),
-    [catalog, provider, query],
+    () => (catalog === undefined ? [] : modelSections(catalog, { query, provider }, t)),
+    [catalog, provider, query, t],
   );
   const names = useMemo(
     () => new Map(catalog?.providers.map((entry) => [entry.id, entry.name]) ?? []),
@@ -121,30 +123,30 @@ export function ModelPicker({ visible, apiUrl, sessionId, agent, onClose, onSele
       <View
         role="dialog"
         aria-modal={true}
-        aria-label="Scegli il modello"
+        aria-label={t("picker.label")}
         style={[styles.screen, { paddingTop: insets.top + spacing.sm }]}
       >
         <View style={styles.header}>
           <Text role="heading" aria-level={1} style={styles.title}>
-            Modello
+            {t("menu.model")}
           </Text>
-          <IconButton label="Chiudi" onPress={onClose}>
+          <IconButton label={t("common.close")} onPress={onClose}>
             <CloseIcon size={20} color={colors.textPrimary} />
           </IconButton>
         </View>
         {live !== undefined ? (
           <Text style={styles.current} numberOfLines={1}>
-            In uso: {nameOf(live.provider)} · {live.modelId}
+            {t("picker.current", { provider: nameOf(live.provider), model: live.modelId })}
           </Text>
         ) : null}
 
         <View style={styles.search}>
           <SearchIcon size={16} color={colors.textSecondary} strokeWidth={1.8} />
           <TextInput
-            accessibilityLabel="Cerca un modello"
+            accessibilityLabel={t("picker.search")}
             value={query}
             onChangeText={setQuery}
-            placeholder="Cerca per nome o provider"
+            placeholder={t("picker.searchPlaceholder")}
             placeholderTextColor={colors.textFaint}
             autoCapitalize="none"
             autoCorrect={false}
@@ -153,7 +155,7 @@ export function ModelPicker({ visible, apiUrl, sessionId, agent, onClose, onSele
           {query.length > 0 ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cancella la ricerca"
+              accessibilityLabel={t("common.clearSearch")}
               onPress={() => setQuery("")}
               style={styles.clear}
             >
@@ -169,7 +171,7 @@ export function ModelPicker({ visible, apiUrl, sessionId, agent, onClose, onSele
             style={styles.chipsScroll}
             contentContainerStyle={styles.chips}
           >
-            {[{ id: undefined, name: "Tutti" }, ...catalog.providers].map((option) => {
+            {[{ id: undefined, name: t("picker.all") }, ...catalog.providers].map((option) => {
               const selected = option.id === provider;
               return (
                 <Pressable
@@ -196,7 +198,7 @@ export function ModelPicker({ visible, apiUrl, sessionId, agent, onClose, onSele
         {refused ? (
           <View style={styles.banner}>
             <Banner
-              message="Il server non ha accettato questo modello. Scegline un altro."
+              message={t("picker.refused")}
               onDismiss={() => setRefused(false)}
             />
           </View>
@@ -205,12 +207,12 @@ export function ModelPicker({ visible, apiUrl, sessionId, agent, onClose, onSele
         {load.state === "loading" ? (
           <View style={styles.center}>
             <ActivityIndicator color={colors.textSecondary} />
-            <Text style={styles.muted}>Carico i modelli disponibili…</Text>
+            <Text style={styles.muted}>{t("picker.loading")}</Text>
           </View>
         ) : load.state === "failed" ? (
           <View style={styles.center}>
             <Text style={styles.muted}>{load.message}</Text>
-            <Button label="Riprova" variant="secondary" onPress={reload} />
+            <Button label={t("common.retry")} variant="secondary" onPress={reload} />
           </View>
         ) : (
           <SectionList
@@ -222,7 +224,7 @@ export function ModelPicker({ visible, apiUrl, sessionId, agent, onClose, onSele
             contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}
             ListEmptyComponent={
               <View style={styles.center}>
-                <Text style={styles.muted}>Nessun modello corrisponde alla ricerca.</Text>
+                <Text style={styles.muted}>{t("picker.noMatch")}</Text>
               </View>
             }
             renderSectionHeader={({ section }) => (
@@ -234,12 +236,12 @@ export function ModelPicker({ visible, apiUrl, sessionId, agent, onClose, onSele
               const key = modelKey(item);
               const active = key === liveKey;
               const waiting = key === pending;
-              const badges = modelBadges(item);
+              const badges = modelBadges(item, t);
               return (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityState={{ selected: active, busy: waiting }}
-                  accessibilityLabel={[item.name, nameOf(item.provider), ...badges, active ? "In uso" : undefined]
+                  accessibilityLabel={[item.name, nameOf(item.provider), ...badges, active ? t("picker.inUse") : undefined]
                     .filter((part) => part !== undefined)
                     .join(". ")}
                   disabled={pending !== undefined}

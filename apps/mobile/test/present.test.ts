@@ -7,6 +7,7 @@ import {
   providerLabel,
   shortModelName,
 } from "../src/present.ts";
+import { englishTranslate as t } from "../src/i18n/translate.ts";
 
 describe("presentModel", () => {
   test("reads the model the server reported", () => {
@@ -45,49 +46,49 @@ describe("providerLabel", () => {
 
 describe("presentError", () => {
   test("translates client connection errors", () => {
-    expect(presentError("The session is not connected")).toBe("La sessione non è connessa.");
-    expect(presentError("The session connection failed.")).toBe(
-      "La connessione con la sessione non è riuscita.",
+    expect(presentError("The session is not connected", t)).toBe("The session is not connected.");
+    expect(presentError("The session connection failed.", t)).toBe(
+      "The connection to the session failed.",
     );
   });
 
   test("translates the prompt length error", () => {
-    expect(presentError("A prompt cannot exceed 100,000 characters")).toBe(
-      "Un messaggio non può superare 100,000 caratteri.",
+    expect(presentError("A prompt cannot exceed 100,000 characters", t)).toBe(
+      "A message cannot exceed 100,000 characters.",
     );
   });
 
   test("passes server text through", () => {
-    expect(presentError("Try again later")).toBe("Try again later");
+    expect(presentError("Try again later", t)).toBe("Try again later");
   });
 
   test("translates a model the server refused", () => {
-    expect(presentError("That model is not available.")).toBe(
-      "Quel modello non è disponibile su questo server.",
+    expect(presentError("That model is not available.", t)).toBe(
+      "That model is not available on this server.",
     );
   });
 });
 
 describe("presentConnection", () => {
   test("keeps a dead socket distinct from a connection in progress", () => {
-    const failed = presentConnection("failed");
-    const connecting = presentConnection("connecting");
+    const failed = presentConnection("failed", t);
+    const connecting = presentConnection("connecting", t);
     expect(failed.busy).toBe(false);
     expect(failed.canRetry).toBe(true);
     expect(failed.title).not.toBe(connecting.title);
-    expect(failed.label).not.toContain("Connessione");
+    expect(failed.label).not.toBe(connecting.label);
     expect(connecting.busy).toBe(true);
-    expect(connecting.label).toBe("Connessione…");
+    expect(connecting.label).toBe("Connecting…");
   });
 
   test("shows a translated error on a terminal failure", () => {
-    expect(presentConnection("failed", "The session connection failed.").body).toBe(
-      "La connessione con la sessione non è riuscita.",
+    expect(presentConnection("failed", t, "The session connection failed.").body).toBe(
+      "The connection to the session failed.",
     );
   });
 
   test("does not offer retry while the session is up", () => {
-    const connected = presentConnection("connected", "The session is not connected");
+    const connected = presentConnection("connected", t, "The session is not connected");
     expect(connected.tone).toBe("ok");
     expect(connected.canRetry).toBe(false);
     expect(connected.busy).toBe(false);
@@ -95,9 +96,9 @@ describe("presentConnection", () => {
 });
 
 describe("presentRunError", () => {
-  test("maps a silent run failure to the Italian copy", () => {
-    expect(presentRunError("no_response")).toBe(
-      "Il modello non ha risposto. Controlla i limiti o i crediti del provider e riprova.",
+  test("maps a silent run failure to its copy", () => {
+    expect(presentRunError("no_response", t)).toBe(
+      "The model did not respond. Check the provider's limits or credits, then try again.",
     );
   });
 });

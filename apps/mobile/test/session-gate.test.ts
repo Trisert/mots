@@ -6,6 +6,7 @@ import {
   readCreateToken,
   sessionCreateHeaders,
 } from "../src/session-gate.ts";
+import { englishTranslate as t } from "../src/i18n/translate.ts";
 
 const JOIN_CODE = `${"a".repeat(8)}-${"b".repeat(4)}-${"c".repeat(4)}-${"d".repeat(4)}-${"e".repeat(12)}_${"A".repeat(43)}`;
 
@@ -35,23 +36,23 @@ describe("sessionCreateHeaders", () => {
 
 describe("presentSessionHttpFailure", () => {
   test("explains a refused create and a refused join differently", () => {
-    const create = presentSessionHttpFailure(401, { error: "unauthorized" }, "create");
-    const open = presentSessionHttpFailure(401, { error: "unauthorized" }, "open");
-    expect(create).toContain("codice");
-    expect(open).toContain("codice intero");
+    const create = presentSessionHttpFailure(401, { error: "unauthorized" }, "create", t);
+    const open = presentSessionHttpFailure(401, { error: "unauthorized" }, "open", t);
+    expect(create).toContain("with a code");
+    expect(open).toContain("full code");
     expect(create).not.toBe(open);
   });
 
   test("includes Retry-After on a rate limit", () => {
-    expect(presentSessionHttpFailure(429, { error: "rate_limited" }, "create", "30")).toBe(
-      "Troppe richieste. Riprova tra 30 secondi.",
+    expect(presentSessionHttpFailure(429, { error: "rate_limited" }, "create", t, "30")).toBe(
+      "Too many requests. Try again in 30 seconds.",
     );
   });
 
   test("names a missing server secret", () => {
     expect(
-      presentSessionHttpFailure(503, { error: "session_secret_unconfigured" }, "open"),
-    ).toBe("Il server non ha la firma delle sessioni.");
+      presentSessionHttpFailure(503, { error: "session_secret_unconfigured" }, "open", t),
+    ).toBe("The server has no session signing secret.");
   });
 });
 
@@ -95,7 +96,7 @@ describe("createSession", () => {
     }) as typeof fetch;
     try {
       await expect(createSession("http://127.0.0.1:8787", "gate-token")).rejects.toThrow(
-        /entrare con un codice/,
+        /join with a code/,
       );
       expect(seen.authorization).toBe("Bearer gate-token");
     } finally {
@@ -127,7 +128,7 @@ describe("probeSession", () => {
     try {
       const result = await probeSession("http://localhost:8787", "bare-uuid");
       expect(result.access).toBe("unauthorized");
-      expect(result.message).toContain("codice intero");
+      expect(result.message).toContain("full code");
     } finally {
       globalThis.fetch = original;
     }

@@ -22,6 +22,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useObserve } from "expo-observe";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
+import { LocaleProvider, useI18n } from "./src/i18n";
 import { ChatScreen } from "./src/screens/ChatScreen";
 import { OnboardingScreen } from "./src/screens/OnboardingScreen";
 import {
@@ -48,6 +49,15 @@ function Splash() {
 
 function MainApp() {
   const { colors, isDark } = useTheme();
+  const { locale } = useI18n();
+
+  useEffect(() => {
+    // The served shell declares the page language; keep it equal to the app language (WCAG 3.1.1).
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      document.documentElement.lang = locale;
+    }
+  }, [locale]);
+
   const [fontsLoaded, fontError] = useFonts({
     Figtree_400Regular,
     Figtree_500Medium,
@@ -65,8 +75,6 @@ function MainApp() {
   useEffect(() => {
     let alive = true;
     if (Platform.OS === "web" && typeof document !== "undefined") {
-      // The UI copy is Italian; the served shell declares lang="en" (WCAG 3.1.1).
-      document.documentElement.lang = "it";
 
       const fontLinkId = "mots-google-fonts";
       if (!document.getElementById(fontLinkId)) {
@@ -184,9 +192,11 @@ function MainApp() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <MainApp />
-      </ThemeProvider>
+      <LocaleProvider>
+        <ThemeProvider>
+          <MainApp />
+        </ThemeProvider>
+      </LocaleProvider>
     </SafeAreaProvider>
   );
 }

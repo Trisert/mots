@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import type { TranscriptEntry } from "@mots/client";
 import { useTheme } from "../context/ThemeContext";
+import { useI18n } from "../i18n";
 import { useReduceMotion } from "../hooks/useReduceMotion";
 import { collapsedRunTitle, INLINE_TOOL_LIMIT, toolLine } from "../tool-runs";
 import { fonts, spacing, type as typeScale, type ThemeColors } from "../theme";
@@ -37,6 +38,8 @@ type Props = {
  */
 export function ToolRun({ tools, live = false }: Props) {
   const { colors } = useTheme();
+  const { t, locale } = useI18n();
+  const localeTag = locale === "it" ? "it-IT" : "en-GB";
   const styles = useMemo(() => createStyles(colors), [colors]);
   const reduceMotion = useReduceMotion();
   const [expanded, setExpanded] = useState(false);
@@ -57,14 +60,14 @@ export function ToolRun({ tools, live = false }: Props) {
   }, [pulse, shimmer]);
 
   const long = tools.length > INLINE_TOOL_LIMIT;
-  const lines = tools.map((entry) => ({ id: entry.id, ...toolLine(entry) }));
-  const title = collapsedRunTitle(tools);
+  const lines = tools.map((entry) => ({ id: entry.id, ...toolLine(entry, t, localeTag) }));
+  const title = collapsedRunTitle(tools, t);
 
   if (long && !expanded) {
     return (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${title}. Mostra i dettagli`}
+        accessibilityLabel={t("runs.open", { title })}
         accessibilityState={{ expanded: false }}
         hitSlop={6}
         onPress={() => setExpanded(true)}
@@ -98,7 +101,7 @@ export function ToolRun({ tools, live = false }: Props) {
       {long ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Nascondi i dettagli"
+          accessibilityLabel={t("runs.hide")}
           accessibilityState={{ expanded: true }}
           hitSlop={6}
           onPress={() => setExpanded(false)}

@@ -27,6 +27,7 @@ import {
   type TranscriptMark,
 } from "../announce";
 import { useTheme } from "../context/ThemeContext";
+import { useI18n, type Translate } from "../i18n";
 import { Composer } from "../components/Composer";
 import { conversationStatus } from "../conversation-status";
 import { ChevronDownIcon, MenuIcon, PlusIcon } from "../components/Icon";
@@ -39,7 +40,7 @@ import { probeSession, type SessionAccess } from "../api";
 import { useMotsSession } from "../hooks/useMotsSession";
 import { presentConnection, presentError, presentModel, presentRunError, providerLabel } from "../present";
 import { fonts, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
-import { TOOL_LABELS } from "../tools";
+import { toolLabel } from "../tools";
 import { groupToolRuns, type ChatItem } from "../tool-runs";
 import type { Identity } from "../storage";
 import { Banner } from "../ui/Banner";
@@ -47,24 +48,26 @@ import { Button } from "../ui/Button";
 import { Mascot } from "../components/Mascot";
 import { IconButton } from "../ui/IconButton";
 
-const SUGGESTIONS = [
-  {
-    title: "Briefing del mattino",
-    hint: "Chiede una routine alle 08:00",
-    prompt:
-      "Pianifica la routine 'Briefing del mattino' ogni giorno alle 08:00, con le priorità del giorno.",
-  },
-  {
-    title: "Un appunto",
-    hint: "Lo tiene in memoria",
-    prompt: "Ricorda che ",
-  },
-  {
-    title: "Sintesi del lunedì",
-    hint: "Chiede un punto settimanale",
-    prompt: "Imposta la routine 'Sintesi del lunedì' alle 09:00 per fare il punto su progetti e scadenze.",
-  },
-];
+/** Starter prompts. The text goes to the model, so it follows the app language. */
+function suggestions(t: Translate) {
+  return [
+    {
+      title: t("chat.sugMorningTitle"),
+      hint: t("chat.sugMorningHint"),
+      prompt: t("chat.sugMorningPrompt"),
+    },
+    {
+      title: t("chat.sugNoteTitle"),
+      hint: t("chat.sugNoteHint"),
+      prompt: t("chat.sugNotePrompt"),
+    },
+    {
+      title: t("chat.sugMondayTitle"),
+      hint: t("chat.sugMondayHint"),
+      prompt: t("chat.sugMondayPrompt"),
+    },
+  ];
+}
 
 type AccessView = SessionAccess | "checking";
 
@@ -82,6 +85,10 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const { width: windowWidth } = useWindowDimensions();
   const isWide = windowWidth >= 768;
   const { colors } = useTheme();
+  const { t } = useI18n();
+  const tRef = useRef(t);
+  tRef.current = t;
+  const suggestionItems = useMemo(() => suggestions(t), [t]);
   const styles = useMemo(() => createStyles(colors), [colors]);
   const keyboardVisible = useKeyboardState((keyboard) => keyboard.isVisible);
   const [access, setAccess] = useState<AccessView>("checking");
@@ -105,7 +112,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     let alive = true;
     setAccess("checking");
     setAccessMessage(undefined);
-    void probeSession(identity.apiUrl, identity.sessionId).then((result) => {
+    void probeSession(identity.apiUrl, identity.sessionId, tRef.current).then((result) => {
       if (!alive) return;
       setAccess(result.access);
       setAccessMessage(result.message);
@@ -118,7 +125,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   useEffect(() => {
     if (state.status !== "failed") return;
     let alive = true;
-    void probeSession(identity.apiUrl, identity.sessionId).then((result) => {
+    void probeSession(identity.apiUrl, identity.sessionId, tRef.current).then((result) => {
       if (!alive) return;
       if (result.access === "unauthorized" || result.access === "unavailable") {
         setAccess(result.access);
@@ -147,10 +154,10 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const typingOthers = (active?.typing ?? []).filter((name) => name !== identity.username);
   const connected = state.status === "connected";
   const canWrite = connected && activeConversationId !== undefined;
-  const connection = presentConnection(state.status, state.error);
+  const connection = presentConnection(state.status, t, state.error);
   const model = presentModel(active?.agent);
   const showErrorBanner = state.error !== undefined && (connected || entries.length > 0);
-  const conversationTitle = activeConversationId === 1 ? "Chat principale" : "Fork";
+  const conversationTitle = activeConversationId === 1 ? t("menu.mainChat") : t("chat.branchTitle");
 
   // Screen reader status: a polite live region plus AccessibilityInfo on native.
   const [announcement, setAnnouncement] = useState<Announcement | undefined>(undefined);
@@ -166,17 +173,17 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const latestAssistantId = lastAssistantId(entries);
   useEffect(() => {
     const next = markTranscript(activeConversationId, entries);
-    const text = replyAnnouncement(transcriptMark.current, next);
+    const text = replyAnnouncement(transcriptMark.current, next, t);
     transcriptMark.current = next;
     if (text !== undefined) announce(text);
     // Depends on the count and the last assistant id only; `entries` changes identity on every render.
-  }, [activeConversationId, entryCount, latestAssistantId, announce]);
+  }, [activeConversationId, entryCount, latestAssistantId, announce, t]);
 
   // Connection changes reach screen readers on both platforms. Banners below rely on
   // accessibilityLiveRegion, which only Android honours, so iOS gets the error text here.
   const lastStatus = useRef<string | undefined>(undefined);
   useEffect(() => {
-    const text = connectionAnnouncement(lastStatus.current, state.status);
+    const text = connectionAnnouncement(lastStatus.current, state.status, t);
     lastStatus.current = state.status;
     if (text !== undefined) announce(text);
   }, [state.status, announce]);
@@ -186,15 +193,15 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     const previous = lastError.current;
     lastError.current = state.error;
     if (Platform.OS !== "ios" || state.error === undefined || state.error === previous) return;
-    announce(presentError(state.error));
-  }, [state.error, announce]);
+    announce(presentError(state.error, t));
+  }, [state.error, announce, t]);
 
   const wasLive = useRef<boolean | undefined>(undefined);
   useEffect(() => {
-    const text = thinkingAnnouncement(wasLive.current, liveActive);
+    const text = thinkingAnnouncement(wasLive.current, liveActive, t);
     wasLive.current = liveActive;
     if (text !== undefined) announce(text);
-  }, [liveActive, announce]);
+  }, [liveActive, announce, t]);
 
   const send = useCallback(async () => {
     if (activeConversationId === undefined) return;
@@ -209,13 +216,13 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
       }
     } catch (error) {
       Alert.alert(
-        "Invio non riuscito",
-        error instanceof Error ? presentError(error.message) : "Riprova tra poco.",
+        t("chat.sendFailed"),
+        error instanceof Error ? presentError(error.message, t) : t("chat.tryShortly"),
       );
     } finally {
       setSending(false);
     }
-  }, [activeConversationId, client, input]);
+  }, [activeConversationId, client, input, t]);
 
   useEffect(() => {
     if (activeConversationId === undefined || !connected) return;
@@ -269,15 +276,15 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
 
   const share = useCallback(() => {
     void Share.share({
-      message: `Entra su Mots\nCodice: ${identity.sessionId}\nServer: ${identity.apiUrl}`,
+      message: t("chat.shareMessage", { code: identity.sessionId, server: identity.apiUrl }),
     });
-  }, [identity.apiUrl, identity.sessionId]);
+  }, [identity.apiUrl, identity.sessionId, t]);
 
   const leave = useCallback(() => {
-    Alert.alert("Uscire da Mots?", "La conversazione resta sul server. Puoi rientrare con lo stesso codice.", [
-      { text: "Annulla", style: "cancel" },
+    Alert.alert(t("chat.leaveTitle"), t("chat.leaveBody"), [
+      { text: t("common.cancel"), style: "cancel" },
       {
-        text: "Esci",
+        text: t("menu.leave"),
         style: "destructive",
         onPress: () => {
           setSheetOpen(false);
@@ -285,14 +292,14 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
         },
       },
     ]);
-  }, [onLeave]);
+  }, [onLeave, t]);
 
   const fork = useCallback(
     (entry: TranscriptEntry) => {
-      Alert.alert("Nuovo fork", "Apro una chat che parte da questo messaggio. L'originale resta dov'è.", [
-        { text: "Annulla", style: "cancel" },
+      Alert.alert(t("chat.forkTitle"), t("chat.forkBody"), [
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Forka",
+          text: t("chat.forkAction"),
           onPress: () => {
             client.forkConversation(entry.conversationId, entry.id);
             setSheetOpen(false);
@@ -300,37 +307,37 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
         },
       ]);
     },
-    [client],
+    [client, t],
   );
 
   // Online, the title is just the model, as in the Claude app. Any other state names itself.
   const titleLabel = connection.tone === "ok" && model !== undefined ? model.shortName : connection.label;
   const pillDescription = model === undefined
-    ? `${connection.label}. Il server non ha ancora indicato il modello.`
-    : `${connection.label}. Modello ${providerLabel(model.provider)}, ${model.modelId}.`;
+    ? t("chat.pillNoModel", { status: connection.label })
+    : t("chat.pillModel", { status: connection.label, provider: providerLabel(model.provider), model: model.modelId });
 
   const footer = (
     <View style={styles.footer}>
       {typingOthers.length > 0 ? (
-        <Text style={styles.meta}>{typingOthers.join(", ")} sta scrivendo</Text>
+        <Text style={styles.meta}>{t("chat.typing", { names: typingOthers.join(", ") })}</Text>
       ) : null}
       {runningTools.map((tool) => (
         <View key={tool.callId} style={styles.progress}>
           <ActivityIndicator size="small" color={colors.textSecondary} />
-          <Text style={styles.meta}>{TOOL_LABELS[tool.name] ?? tool.name} in corso</Text>
+          <Text style={styles.meta}>{t("chat.toolRunning", { tool: toolLabel(tool.name, t) })}</Text>
         </View>
       ))}
       {liveActive ? (
         <View style={styles.live}>
           {liveText.length > 0 ? <MarkdownText text={liveText} /> : <Thinking />}
           {active?.live?.retry !== undefined ? (
-            <Text style={styles.danger}>{presentError(active.live.retry.error)}</Text>
+            <Text style={styles.danger}>{presentError(active.live.retry.error, t)}</Text>
           ) : null}
         </View>
       ) : null}
       {(active?.queued ?? []).map((queued) => (
         <View key={queued.submissionId} style={styles.queued}>
-          <Text style={styles.queuedLabel}>{queued.mode === "steer" ? "In attesa" : "In coda"}</Text>
+          <Text style={styles.queuedLabel}>{queued.mode === "steer" ? t("chat.waiting") : t("chat.queued")}</Text>
           <Text numberOfLines={2} style={styles.queuedText}>
             {queued.text}
           </Text>
@@ -338,7 +345,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
       ))}
       {active?.failure !== undefined ? <Banner message={active.failure.message} /> : null}
       {active?.runError !== undefined ? (
-        <Banner message={presentRunError(active.runError)} />
+        <Banner message={presentRunError(active.runError, t)} />
       ) : null}
     </View>
   );
@@ -348,27 +355,26 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const empty = blocked ? (
     <View testID="session-gate" style={styles.connection}>
       <Text accessibilityRole="header" style={styles.connectionTitle}>
-        {access === "unauthorized" ? "Codice non valido" : "Server non pronto"}
+        {access === "unauthorized" ? t("chat.invalidCode") : t("chat.serverNotReady")}
       </Text>
       <Text style={styles.connectionBody}>
-        {accessMessage ??
-          "Questo codice non apre la sessione. Creane una nuova, oppure entra con il codice intero."}
+        {accessMessage ?? t("chat.codeNotOpen")}
       </Text>
-      <Button label="Crea un nuovo spazio" onPress={() => onRestart("create")} />
+      <Button label={t("chat.newSpace")} onPress={() => onRestart("create")} />
       <Button
-        label="Entra con un codice"
+        label={t("chat.joinWithCode")}
         variant="secondary"
         onPress={() => onRestart("join")}
       />
       {access === "unavailable" ? (
-        <Button label="Riprova" variant="ghost" onPress={() => setProbeEpoch((current) => current + 1)} />
+        <Button label={t("common.retry")} variant="ghost" onPress={() => setProbeEpoch((current) => current + 1)} />
       ) : null}
     </View>
   ) : access === "checking" ? (
     <View testID="connection-state" style={styles.connection}>
       <ActivityIndicator color={colors.textSecondary} />
       <Text accessibilityRole="header" style={styles.connectionTitle}>
-        Controllo il codice
+        {t("chat.checkingCode")}
       </Text>
     </View>
   ) : !connected ? (
@@ -379,7 +385,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
       </Text>
       <Text style={styles.connectionBody}>{connection.body}</Text>
       {connection.canRetry ? (
-        <Button label="Riprova" variant="secondary" onPress={retry} />
+        <Button label={t("common.retry")} variant="secondary" onPress={retry} />
       ) : null}
     </View>
   ) : (
@@ -387,12 +393,12 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
       <View style={styles.emptyMascot}>
         <Mascot mood="felice" size={120} shadow cycles={2} />
       </View>
-      <Text accessibilityRole="header" style={styles.greeting}>
-        Ciao{identity.username.length > 0 ? `, ${identity.username}` : ""}.
+      <Text accessibilityRole="header" maxFontSizeMultiplier={1.6} style={styles.greeting}>
+        {t("chat.greeting", { name: identity.username.length > 0 ? `, ${identity.username}` : "" })}
       </Text>
-      <Text style={styles.lead}>Ricordare, pianificare, o solo parlare.</Text>
+      <Text style={styles.lead}>{t("chat.lead")}</Text>
       <View style={styles.suggestions}>
-        {SUGGESTIONS.map((item) => (
+        {suggestionItems.map((item) => (
           <Pressable
             key={item.title}
             accessibilityRole="button"
@@ -410,9 +416,9 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const composerHint = blocked
     ? accessMessage
     : !connected
-      ? "L'invio resta fermo finché non torna la connessione."
+      ? t("chat.sendPaused")
       : activeConversationId === undefined
-        ? "Aspetto la chat dal server."
+        ? t("chat.waitingChat")
         : undefined;
 
   return (
@@ -422,12 +428,12 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
           {announcement?.text ?? ""}
         </Text>
         <View style={[styles.header, { paddingTop: insets.top }]}>
-          <IconButton label="Menu" onPress={() => setSheetOpen(true)}>
+          <IconButton label={t("menu.label")} onPress={() => setSheetOpen(true)}>
             <MenuIcon size={20} color={colors.textPrimary} />
           </IconButton>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${pillDescription} Cambia modello.`}
+            accessibilityLabel={`${pillDescription} ${t("chat.changeModel")}`}
             onPress={() => setPickerOpen(true)}
             style={({ pressed }) => [styles.headerCenter, pressed && styles.pressed]}
           >
@@ -447,7 +453,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
             <ChevronDownIcon size={14} color={colors.textSecondary} />
           </Pressable>
           <IconButton
-            label="Nuova chat"
+            label={t("menu.newChat")}
             disabled={!connected}
             onPress={() => client.createConversation()}
           >
@@ -462,11 +468,11 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
               {connection.canRetry ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Riprova la connessione"
+                  accessibilityLabel={t("chat.retryConnection")}
                   onPress={retry}
                   style={styles.stripAction}
                 >
-                  <Text style={styles.stripActionLabel}>Riprova</Text>
+                  <Text style={styles.stripActionLabel}>{t("common.retry")}</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -504,12 +510,12 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
           </View>
           <View
             role="form"
-            aria-label="Scrivi a Mots"
+            aria-label={t("composer.formLabel")}
             style={{ paddingBottom: keyboardVisible ? spacing.xs : Math.max(insets.bottom, spacing.sm) }}
           >
             {showErrorBanner && state.error !== undefined ? (
               <View style={styles.bannerWrap}>
-                <Banner message={presentError(state.error)} onDismiss={() => client.clearError()} />
+                <Banner message={presentError(state.error, t)} onDismiss={() => client.clearError()} />
               </View>
             ) : null}
             <Composer
@@ -568,10 +574,11 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
 /** Mots thinking: the sky mascot with its rising dots. Still under reduced motion. */
 function Thinking() {
   const { colors } = useTheme();
+  const { t } = useI18n();
   return (
     <View style={stylesThinking.row}>
       <Mascot mood="pensa" size={44} />
-      <Text style={[stylesThinking.text, { color: colors.textSecondary }]}>Sta scrivendo</Text>
+      <Text style={[stylesThinking.text, { color: colors.textSecondary }]}>{t("chat.thinking")}</Text>
     </View>
   );
 }

@@ -1,4 +1,5 @@
 import type { ConversationSnapshot } from "@mots/client";
+import type { Translate } from "./i18n/translate";
 
 /** What a chat is doing, as shown by the dot beside its name in the menu. */
 export type ConversationStatus = "idle" | "working" | "retrying";
@@ -11,8 +12,6 @@ export function conversationStatus(snapshot: ConversationSnapshot | undefined): 
 }
 
 /** Accessible name for the status, added to the chat's label in the menu. */
-export const STATUS_LABEL: Readonly<Record<ConversationStatus, string>> = {
-  idle: "ferma",
-  working: "in corso",
-  retrying: "nuovo tentativo",
-};
+export function statusLabel(status: ConversationStatus, t: Translate): string {
+  return t(`status.${status}`);
+}

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TranscriptEntry } from "@mots/client";
 import { collapsedRunTitle, groupToolRuns, INLINE_TOOL_LIMIT, toolLine } from "../src/tool-runs.ts";
+import { englishTranslate as t } from "../src/i18n/translate.ts";
 
 function entry(id: number, role: TranscriptEntry["role"], extra: Partial<TranscriptEntry> = {}): TranscriptEntry {
   return { id, conversationId: 1, kind: "test", role, text: "", canFork: false, ...extra };
@@ -41,8 +42,8 @@ describe("groupToolRuns", () => {
 
 describe("toolLine", () => {
   test("uses the Italian label and the failure text when a call failed", () => {
-    expect(toolLine(tool(1, "web_search"))).toMatchObject({ label: "ricerca web", isError: false });
-    expect(toolLine(tool(2, "fetch_page", true))).toMatchObject({ label: "pagina", detail: "timeout", isError: true });
+    expect(toolLine(tool(1, "web_search"), t)).toMatchObject({ label: "web search", isError: false });
+    expect(toolLine(tool(2, "fetch_page", true), t)).toMatchObject({ label: "page", detail: "timeout", isError: true });
   });
 });
 
@@ -50,10 +51,10 @@ describe("collapsedRunTitle", () => {
   test("counts the calls and the errors", () => {
     const runOf = (n: number, errors: number) =>
       Array.from({ length: n }, (_, i) => tool(i + 1, "web_search", i < errors));
-    expect(collapsedRunTitle(runOf(1, 0))).toBe("Uso 1 strumento");
-    expect(collapsedRunTitle(runOf(7, 0))).toBe("Uso 7 strumenti");
-    expect(collapsedRunTitle(runOf(7, 1))).toBe("Uso 7 strumenti · 1 errore");
-    expect(collapsedRunTitle(runOf(7, 2))).toBe("Uso 7 strumenti · 2 errori");
+    expect(collapsedRunTitle(runOf(1, 0), t)).toBe("Used 1 tool");
+    expect(collapsedRunTitle(runOf(7, 0), t)).toBe("Used 7 tools");
+    expect(collapsedRunTitle(runOf(7, 1), t)).toBe("Used 7 tools · 1 error");
+    expect(collapsedRunTitle(runOf(7, 2), t)).toBe("Used 7 tools · 2 errors");
   });
 
   test("collapses only above the inline limit", () => {

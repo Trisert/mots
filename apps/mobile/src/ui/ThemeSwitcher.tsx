@@ -1,24 +1,27 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme, type ThemeMode } from "../context/ThemeContext";
+import { useI18n, type MessageKey } from "../i18n";
 import { hit, radius, spacing, type as typeScale } from "../theme";
 
-const OPTIONS: readonly { readonly id: ThemeMode; readonly label: string }[] = [
-  { id: "dark", label: "Scuro" },
-  { id: "light", label: "Chiaro" },
-  { id: "system", label: "Sistema" },
+const OPTIONS: readonly { readonly id: ThemeMode; readonly label: MessageKey }[] = [
+  { id: "dark", label: "theme.dark" },
+  { id: "light", label: "theme.light" },
+  { id: "system", label: "theme.system" },
 ];
 
 export function ThemeSwitcher() {
   const { mode, setMode, colors } = useTheme();
+  const { t } = useI18n();
   return (
-    <View accessibilityLabel="Tema" style={[styles.row, { borderColor: colors.sunk, backgroundColor: colors.sunk }]}>
+    <View accessibilityLabel={t("menu.theme")} style={[styles.row, { borderColor: colors.sunk, backgroundColor: colors.sunk }]}>
       {OPTIONS.map((option) => {
         const selected = mode === option.id;
+        const label = t(option.label);
         return (
           <Pressable
             key={option.id}
             accessibilityRole="button"
-            accessibilityLabel={`Tema ${option.label}`}
+            accessibilityLabel={t("menu.themeLabel", { name: label })}
             accessibilityState={{ selected }}
             onPress={() => setMode(option.id)}
             style={({ pressed }) => [
@@ -36,7 +39,7 @@ export function ThemeSwitcher() {
                 { color: colors.textPrimary },
               ]}
             >
-              {option.label}
+              {label}
             </Text>
           </Pressable>
         );

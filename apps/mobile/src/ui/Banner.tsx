@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../context/ThemeContext";
+import { useI18n } from "../i18n";
 import { AlertIcon, CloseIcon } from "../components/Icon";
 import { hit, radius, spacing, type as typeScale } from "../theme";
 
@@ -13,6 +14,7 @@ type Props = {
 
 export function Banner({ message, tone = "danger", actionLabel, onAction, onDismiss }: Props) {
   const { colors } = useTheme();
+  const { t } = useI18n();
   // A card on the ground; the alert icon in the danger colour marks a failure, the words explain it.
   const foreground = colors.textPrimary;
 
@@ -37,7 +39,7 @@ export function Banner({ message, tone = "danger", actionLabel, onAction, onDism
           </View>
         ) : null}
         <Text
-          accessibilityLabel={tone === "danger" ? `Errore: ${message}` : undefined}
+          accessibilityLabel={tone === "danger" ? t("banner.errorPrefix", { message }) : undefined}
           style={[styles.message, { color: foreground }]}
         >
           {message}
@@ -57,7 +59,7 @@ export function Banner({ message, tone = "danger", actionLabel, onAction, onDism
         {onDismiss !== undefined ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Chiudi avviso"
+            accessibilityLabel={t("banner.dismiss")}
             onPress={onDismiss}
             hitSlop={8}
             style={({ pressed }) => [styles.dismiss, pressed && styles.pressed]}

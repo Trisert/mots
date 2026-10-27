@@ -1,3 +1,5 @@
+import type { Translate } from "./i18n/translate";
+
 /**
  * The create token is an app-wide gate. Expo inlines `EXPO_PUBLIC_MOTS_CREATE_TOKEN`
  * into the bundle, so it is not a per-user secret. When it is unset, creation
@@ -36,31 +38,30 @@ export function presentSessionHttpFailure(
   status: number,
   body: SessionHttpBody,
   purpose: "create" | "open",
+  t: Translate,
   retryAfter?: string | null,
 ): string {
   const code = body.error;
   if (status === 401 || code === "unauthorized") {
-    return purpose === "create"
-      ? "Non riesco a creare lo spazio. Il permesso di creazione manca o non coincide. Puoi entrare con un codice."
-      : "Questo codice non apre la sessione. Creane una nuova, oppure entra con il codice intero.";
+    return purpose === "create" ? t("session.createUnauthorized") : t("session.openUnauthorized");
   }
   if (status === 429 || code === "rate_limited") {
     const seconds = retryAfter?.trim() ?? "";
     return /^\d+$/.test(seconds)
-      ? `Troppe richieste. Riprova tra ${seconds} secondi.`
-      : "Troppe richieste. Riprova tra poco.";
+      ? t("session.rateLimitedSeconds", { seconds })
+      : t("session.rateLimited");
   }
   if (code === "create_token_unconfigured") {
-    return "Il server non ha un token di creazione.";
+    return t("session.noCreateToken");
   }
   if (code === "session_secret_unconfigured") {
-    return "Il server non ha la firma delle sessioni.";
+    return t("session.noSigningSecret");
   }
   if (status === 403 || code === "origin_not_allowed") {
-    return "Questa origine non può chiamare il server.";
+    return t("session.originForbidden");
   }
   if (status === 503) {
-    return "Il server non è pronto a aprire sessioni.";
+    return t("session.serverNotReady");
   }
-  return `Il server ha risposto con ${status}.`;
+  return t("session.serverStatus", { status });
 }

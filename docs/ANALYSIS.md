@@ -172,7 +172,7 @@ Gaps, in the order a user hits them:
 5. **Model picker is a second source of truth.** Hardcoded lists in `SessionSheet` do not match `DEFAULT_MODELS` or the live catalogs. Selecting a model the provider did not register fails at runtime, and the pill still updates.
 6. **Web accessibility.** `App.tsx` injects `outline: none` on `:focus` and `:focus-visible`. Keyboard users on the web preview lose focus.
 7. **iOS.** `app.json` has a bundle id. `package.json` `export` is Android only. There is no `eas.json`, no privacy manifest, no push entitlement. `apps/mobile/gitignore` is not a `.gitignore`, so a future `expo prebuild` can commit `ios/` and `android/`.
-8. **Copy and layering.** Italian UI strings are hardcoded, including one in the shared client reducer (`Il modello non ha risposto…` in `packages/client/src/session-state.ts`). The client package should not own locale copy.
+8. **Copy and layering.** Italian UI strings were hardcoded, including one in the shared client reducer. The client package should not own locale copy. Status: app copy now lives in `apps/mobile/src/i18n` (English default, Italian second).
 9. **Identity storage.** AsyncStorage holds the session id in the clear under `mots.identity.v1`. Expected for an MVP. Any auth design has to replace this, not add a second secret beside it.
 10. **`@expo-google-fonts/plus-jakarta-sans` is unused.** The app loads Instrument Sans. Dead dependency, not a user-facing bug.
 
