@@ -55,5 +55,14 @@ for (const [name, palette] of Object.entries(palettes)) {
     test("user bubble text reaches 4.5:1 on the bubble", () => {
       expect(contrastRatio(palette.userBubbleText, palette.userBubble)).toBeGreaterThanOrEqual(4.5);
     });
+
+    test("code block language label and copied state reach 4.5:1 on the code header", () => {
+      expect(contrastRatio(palette.codeMuted, palette.codeSurfaceHeader)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(palette.codeText, palette.codeSurfaceHeader)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    test("selected theme chip has a 3:1 outline against the switcher", () => {
+      expect(contrastRatio(palette.textPrimary, palette.sunk)).toBeGreaterThanOrEqual(3);
+    });
   });
 }

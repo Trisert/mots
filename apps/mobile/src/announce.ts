@@ -65,3 +65,19 @@ export function thinkingAnnouncement(
 ): string | undefined {
   return previouslyActive === false && nowActive ? THINKING_ANNOUNCEMENT : undefined;
 }
+
+export const LOST_CONNECTION_ANNOUNCEMENT = "Connessione interrotta";
+export const RECONNECTED_ANNOUNCEMENT = "Di nuovo in linea";
+
+/**
+ * Returns the text to announce when the connection status changes, or undefined.
+ *
+ * The first status is silent, so a normal start does not talk over the screen. Only a drop and a
+ * recovery after a drop are announced; the connecting steps in between stay quiet.
+ */
+export function connectionAnnouncement(previous: string | undefined, next: string): string | undefined {
+  if (previous === undefined || previous === next) return undefined;
+  if (next === "failed") return LOST_CONNECTION_ANNOUNCEMENT;
+  if (previous === "failed" && next === "connected") return RECONNECTED_ANNOUNCEMENT;
+  return undefined;
+}

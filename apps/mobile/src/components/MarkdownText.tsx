@@ -108,7 +108,7 @@ function CodeBlockView({
         >
           {copied ? (
             <>
-              <CheckIcon size={12} color={colors.accentGreen} />
+              <CheckIcon size={12} color={colors.onInverse} />
               <Text style={[styles.copyButtonText, styles.copiedText]}>Copiato!</Text>
             </>
           ) : (
@@ -360,7 +360,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     },
     codeLanguage: {
       fontFamily: fonts.bold,
-      color: colors.textSecondary,
+      color: colors.codeMuted,
       fontSize: 11,
       fontWeight: "700",
       letterSpacing: 0.6,
@@ -384,7 +384,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       fontWeight: "600",
     },
     copiedText: {
-      color: colors.accentGreen,
+      color: colors.onInverse,
     },
     codeScroll: {
       padding: spacing.md,

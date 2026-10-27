@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  connectionAnnouncement,
   lastAssistantId,
   markTranscript,
   replyAnnouncement,
@@ -85,5 +86,21 @@ describe("thinkingAnnouncement", () => {
     expect(thinkingAnnouncement(true, true)).toBeUndefined();
     expect(thinkingAnnouncement(true, false)).toBeUndefined();
     expect(thinkingAnnouncement(false, false)).toBeUndefined();
+  });
+});
+
+describe("connectionAnnouncement", () => {
+  test("is silent for the first status and for steps that do not change the outcome", () => {
+    expect(connectionAnnouncement(undefined, "connecting")).toBeUndefined();
+    expect(connectionAnnouncement("connecting", "connected")).toBeUndefined();
+    expect(connectionAnnouncement("failed", "failed")).toBeUndefined();
+  });
+
+  test("announces a dropped connection", () => {
+    expect(connectionAnnouncement("connected", "failed")).toBe("Connessione interrotta");
+  });
+
+  test("announces a recovery after a drop", () => {
+    expect(connectionAnnouncement("failed", "connected")).toBe("Di nuovo in linea");
   });
 });

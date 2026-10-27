@@ -172,6 +172,7 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Dettagli ragionamento"
+              accessibilityState={{ expanded: reasoningExpanded }}
               onPress={() => setReasoningExpanded(!reasoningExpanded)}
               style={({ pressed }) => [
                 styles.reasoningHeader,

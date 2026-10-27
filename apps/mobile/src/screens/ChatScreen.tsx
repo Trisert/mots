@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAvoidingView, useKeyboardState } from "react-native-keyboard-controller";
 import type { TranscriptEntry } from "@mots/client";
 import {
+  connectionAnnouncement,
   lastAssistantId,
   markTranscript,
   replyAnnouncement,
@@ -166,6 +167,23 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     if (text !== undefined) announce(text);
     // Depends on the count and the last assistant id only; `entries` changes identity on every render.
   }, [activeConversationId, entryCount, latestAssistantId, announce]);
+
+  // Connection changes reach screen readers on both platforms. Banners below rely on
+  // accessibilityLiveRegion, which only Android honours, so iOS gets the error text here.
+  const lastStatus = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const text = connectionAnnouncement(lastStatus.current, state.status);
+    lastStatus.current = state.status;
+    if (text !== undefined) announce(text);
+  }, [state.status, announce]);
+
+  const lastError = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const previous = lastError.current;
+    lastError.current = state.error;
+    if (Platform.OS !== "ios" || state.error === undefined || state.error === previous) return;
+    announce(presentError(state.error));
+  }, [state.error, announce]);
 
   const wasLive = useRef<boolean | undefined>(undefined);
   useEffect(() => {
