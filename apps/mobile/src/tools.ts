@@ -7,6 +7,7 @@ export const TOOL_LABELS: Record<string, string> = {
   schedule: "routine autonoma",
   search_history: "ricerca",
   fetch_page: "pagina",
+  web_search: "ricerca web",
 };
 
 type Details = Readonly<Record<string, unknown>>;
@@ -52,6 +53,12 @@ export function toolSummary(name: string, details: unknown): string | undefined 
       return "Ricerca completata";
     case "fetch_page":
       return typeof info.url === "string" ? "Pagina letta" : undefined;
+    case "web_search":
+      return typeof info.results === "number"
+        ? info.results === 1
+          ? "Ricerca web: 1 risultato"
+          : `Ricerca web: ${info.results} risultati`
+        : undefined;
     default:
       return undefined;
   }
