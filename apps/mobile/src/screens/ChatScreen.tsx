@@ -32,6 +32,7 @@ import { conversationStatus } from "../conversation-status";
 import { ChevronDownIcon, MenuIcon, PlusIcon } from "../components/Icon";
 import { MarkdownText } from "../components/MarkdownText";
 import { MessageBubble } from "../components/MessageBubble";
+import { ToolRun } from "../components/ToolRun";
 import { ModelPicker } from "../components/ModelPicker";
 import { SessionSheet } from "../components/SessionSheet";
 import { probeSession, type SessionAccess } from "../api";
@@ -39,6 +40,7 @@ import { useMotsSession } from "../hooks/useMotsSession";
 import { presentConnection, presentError, presentModel, presentRunError, providerLabel } from "../present";
 import { fonts, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { TOOL_LABELS } from "../tools";
+import { groupToolRuns, type ChatItem } from "../tool-runs";
 import type { Identity } from "../storage";
 import { Banner } from "../ui/Banner";
 import { Button } from "../ui/Button";
@@ -128,7 +130,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     };
   }, [identity.apiUrl, identity.sessionId, state.status]);
 
-  const listRef = useRef<FlatList<TranscriptEntry>>(null);
+  const listRef = useRef<FlatList<ChatItem>>(null);
   const stickToBottom = useRef(true);
   const contentHeight = useRef(0);
   const viewportHeight = useRef(0);
@@ -137,6 +139,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const active =
     activeConversationId === undefined ? undefined : state.snapshots[activeConversationId];
   const entries = active?.entries ?? [];
+  const items = useMemo(() => groupToolRuns(entries), [entries]);
   const conversations = state.conversations.filter((conversation) => conversation.owner === undefined);
   const liveText = active?.live?.text ?? "";
   const liveActive = active?.live?.active === true;
@@ -474,9 +477,18 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
             </Text>
             <FlatList
               ref={listRef}
-              data={entries}
-              keyExtractor={(entry) => String(entry.id)}
-              renderItem={({ item }) => <MessageBubble entry={item} onFork={fork} />}
+              data={items}
+              keyExtractor={(item) => item.key}
+              renderItem={({ item, index }) =>
+                item.kind === "tools" ? (
+                  <ToolRun
+                    tools={item.tools}
+                    live={index === items.length - 1 && (liveActive || runningTools.length > 0)}
+                  />
+                ) : (
+                  <MessageBubble entry={item.entry} onFork={fork} />
+                )
+              }
               contentContainerStyle={[styles.list, entries.length === 0 && styles.listEmpty]}
               ListEmptyComponent={empty}
               ListFooterComponent={footer}
