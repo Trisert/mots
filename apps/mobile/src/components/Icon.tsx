@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
 import { useTheme } from "../context/ThemeContext";
 
@@ -306,32 +306,6 @@ export function ForkIcon({
   );
 }
 
-/** Document with folded corner */
-export function DocumentIcon({
-  size = 16,
-  color,
-  strokeWidth = 1.8,
-}: IconProps) {
-  const { colors } = useTheme();
-  const iconColor = color ?? colors.accentCoral;
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M14 2H6C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2Z"
-        stroke={iconColor}
-        strokeWidth={strokeWidth}
-        strokeLinejoin="round"
-      />
-      <Path
-        d="M14 2V8H20"
-        stroke={iconColor}
-        strokeWidth={strokeWidth}
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
 /** Circled exclamation mark: an error or a failed step */
 export function AlertIcon({ size = 16, color, strokeWidth = 2 }: IconProps) {
   const { colors } = useTheme();
@@ -414,96 +388,3 @@ export function BotAvatarIcon({
     </View>
   );
 }
-
-/** Status bar signal bars icon */
-export function SignalIcon({ size = 16, color }: IconProps) {
-  const { colors } = useTheme();
-  const iconColor = color ?? colors.textPrimary;
-  return (
-    <View
-      style={{
-        width: size,
-        height: 11,
-        flexDirection: "row",
-        alignItems: "flex-end",
-        gap: 2,
-      }}
-    >
-      <View style={{ width: 2.5, height: 3.5, backgroundColor: iconColor, borderRadius: 0.8 }} />
-      <View style={{ width: 2.5, height: 6, backgroundColor: iconColor, borderRadius: 0.8 }} />
-      <View style={{ width: 2.5, height: 8.5, backgroundColor: iconColor, borderRadius: 0.8 }} />
-      <View style={{ width: 2.5, height: 11, backgroundColor: iconColor, borderRadius: 0.8 }} />
-    </View>
-  );
-}
-
-/** Status bar wifi icon */
-export function WifiIcon({ size = 15, color }: IconProps) {
-  const { colors } = useTheme();
-  const iconColor = color ?? colors.textPrimary;
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path d="M12 19a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" fill={iconColor} />
-      <Path
-        d="M8.5 14c1.9-1.9 5.1-1.9 7 0"
-        stroke={iconColor}
-        strokeWidth="2.2"
-        strokeLinecap="round"
-      />
-      <Path
-        d="M5 10.5c3.9-3.9 10.1-3.9 14 0"
-        stroke={iconColor}
-        strokeWidth="2.2"
-        strokeLinecap="round"
-      />
-    </Svg>
-  );
-}
-
-/** Status bar battery pill icon */
-export function BatteryIcon({ size = 22, color }: IconProps) {
-  const { colors } = useTheme();
-  const iconColor = color ?? colors.textPrimary;
-  const width = size;
-  const height = size * 0.52;
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center" }}>
-      <View
-        style={{
-          width,
-          height,
-          borderRadius: 3.5,
-          borderWidth: 1.5,
-          borderColor: iconColor,
-          padding: 1.5,
-          justifyContent: "center",
-        }}
-      >
-        <View
-          style={{
-            width: "72%",
-            height: "100%",
-            borderRadius: 1.5,
-            backgroundColor: iconColor,
-          }}
-        />
-      </View>
-      <View
-        style={{
-          width: 1.5,
-          height: height * 0.44,
-          backgroundColor: iconColor,
-          borderTopRightRadius: 1,
-          borderBottomRightRadius: 1,
-        }}
-      />
-    </View>
-  );
-}
-
-export const iconStyles = StyleSheet.create({
-  centered: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});

@@ -71,11 +71,6 @@ export function parseScheduledInstruction(content: string): string | undefined {
 }
 
 /** Extract the routine title if this is an autonomous routine delivery. */
-export function parseScheduledRoutineName(content: string): string | undefined {
-  const match = /^Autonomous routine \[([^\]]+)\] due now:/.exec(content);
-  return match ? match[1] : undefined;
-}
-
 /** Display text of queued user input content: a string or text/image parts. */
 function userInputText(content: unknown): string {
   if (typeof content === "string") return content;
