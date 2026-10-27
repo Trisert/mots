@@ -18,6 +18,8 @@ type Props = {
   readonly label?: string;
   /** The soft ground shadow under a large mascot. */
   readonly shadow?: boolean;
+  /** Loop count. Left out, the animation runs until it unmounts. */
+  readonly cycles?: number;
 };
 
 const VIEW = 176;
@@ -30,11 +32,11 @@ const EYES = {
   pensa: { x: 66, y: 65, w: 54, h: 18, eyes: [[76, 74, 6, 7], [110, 74, 6, 7]] },
 } as const;
 
-function loop(animation: Animated.CompositeAnimation): Animated.CompositeAnimation {
-  return Animated.loop(animation);
+function loop(animation: Animated.CompositeAnimation, iterations: number): Animated.CompositeAnimation {
+  return Animated.loop(animation, { iterations });
 }
 
-export function Mascot({ mood = "felice", size = 168, label, shadow = false }: Props) {
+export function Mascot({ mood = "felice", size = 168, label, shadow = false, cycles }: Props) {
   const { colors } = useTheme();
   const reduceMotion = useReduceMotion();
   const body = useRef(new Animated.Value(0)).current;
@@ -47,6 +49,7 @@ export function Mascot({ mood = "felice", size = 168, label, shadow = false }: P
     dots.setValue(0);
     if (reduceMotion) return;
     const period = mood === "felice" ? 2400 : mood === "calmo" ? 4000 : 3000;
+    const iterations = cycles ?? -1;
     const running = [
       loop(
         Animated.timing(body, {
@@ -55,15 +58,16 @@ export function Mascot({ mood = "felice", size = 168, label, shadow = false }: P
           easing: mood === "felice" ? Easing.linear : Easing.inOut(Easing.sin),
           useNativeDriver: useNative,
         }),
+        iterations,
       ),
-      loop(Animated.timing(blink, { toValue: 1, duration: 4000, easing: Easing.linear, useNativeDriver: useNative })),
-      loop(Animated.timing(dots, { toValue: 1, duration: 1200, easing: Easing.linear, useNativeDriver: useNative })),
+      loop(Animated.timing(blink, { toValue: 1, duration: 4000, easing: Easing.linear, useNativeDriver: useNative }), iterations),
+      loop(Animated.timing(dots, { toValue: 1, duration: 1200, easing: Easing.linear, useNativeDriver: useNative }), iterations),
     ];
     for (const animation of running) animation.start();
     return () => {
       for (const animation of running) animation.stop();
     };
-  }, [blink, body, dots, mood, reduceMotion]);
+  }, [blink, body, cycles, dots, mood, reduceMotion]);
 
   const scale = size / VIEW;
   const fill = mood === "felice" ? colors.blush : mood === "calmo" ? colors.mint : colors.sky;
