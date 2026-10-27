@@ -6,6 +6,7 @@ import {
   section,
   type HarnessOptions,
 } from "@earendil-works/pi-durable";
+import { localeSection } from "./locale.ts";
 import { forgetTool, memorySection, rememberTool } from "./memory.ts";
 import {
   createMotsModels,
@@ -59,7 +60,7 @@ export async function createMotsHarnessOptions(
         "preamble",
         () =>
           "You are Mots, an autonomous personal companion living in the user's pocket. " +
-          "You help people think, plan, remember, and run automated routines. Reply in the user's language. " +
+          "You help people think, plan, remember, and run automated routines. " +
           "Be concise by default and go deeper when the user asks. " +
           "You have durable memory, autonomous routines (scheduled cronjobs where you execute tasks and report back), and search across past conversations: " +
           "use remember for lasting facts and preferences, forget when asked to remove one, " +
@@ -73,6 +74,7 @@ export async function createMotsHarnessOptions(
         { tag: false },
       ),
       clockSection,
+      localeSection,
       memorySection,
     ],
   });

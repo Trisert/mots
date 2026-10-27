@@ -375,6 +375,22 @@ describe("session timezone", () => {
   });
 });
 
+describe("session locale", () => {
+  test("accepts a supported language", () => {
+    expect(
+      parseClientCommand(JSON.stringify({ type: "session.setLocale", requestId: "req-loc-1", locale: "it" })),
+    ).toEqual({ type: "session.setLocale", requestId: "req-loc-1", locale: "it" });
+  });
+
+  test("rejects languages the app does not ship", () => {
+    for (const locale of ["", "fr", "IT", "en-US", 42, null]) {
+      expect(() =>
+        parseClientCommand(JSON.stringify({ type: "session.setLocale", requestId: "req-loc-2", locale })),
+      ).toThrow(InvalidClientCommand);
+    }
+  });
+});
+
 describe("parseModelCatalog", () => {
   const valid = {
     providers: [{ id: "kilo", name: "Kilo" }],

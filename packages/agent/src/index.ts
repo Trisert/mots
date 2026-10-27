@@ -47,6 +47,7 @@ export {
 export { applyPushTokenCommand, PushTokenDoc } from "./push-token.ts";
 export { scheduledDeadline } from "./schedule.ts";
 export { applyTimezone, clockText, TimezoneDoc } from "./timezone.ts";
+export { applyLocale, LocaleDoc, localeText, readStoredLocale } from "./locale.ts";
 export {
   forgetTool,
   memorySection,

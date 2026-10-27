@@ -4,6 +4,7 @@ import {
   ROOT_CONVERSATION_ID,
   type ClientCommand,
   type ServerEvent,
+  type SessionLocale,
 } from "@mots/protocol";
 import { CommandOutbox, type RetriableCommand } from "./command-outbox.ts";
 import {
@@ -36,6 +37,8 @@ export interface MotsClientOptions {
   readonly initialConversationId?: number;
   /** IANA timezone of the device. Sent after every snapshot so reminders use local time. */
   readonly timezone?: string;
+  /** App language. Sent after every snapshot so the agent replies in it. */
+  readonly locale?: SessionLocale;
   readonly socketFactory?: SocketFactory;
 }
 
@@ -82,9 +85,11 @@ export class MotsClient {
   #terminal = false;
   #reconnectAttempt = 0;
   #reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  #locale: SessionLocale | undefined;
 
   constructor(options: MotsClientOptions) {
     this.#options = options;
+    this.#locale = options.locale;
     this.#socketFactory = options.socketFactory ?? defaultSocketFactory;
     this.#desiredConversationId = options.initialConversationId;
   }
@@ -226,6 +231,12 @@ export class MotsClient {
     });
   }
 
+  /** Change the app language. Sent now when connected, otherwise after the next snapshot. */
+  setLocale(locale: SessionLocale): void {
+    this.#locale = locale;
+    this.#sendLocale();
+  }
+
   clearError(): void {
     if (this.#state.error === undefined) return;
     this.#dispatch({ type: "clear-error" });
@@ -288,6 +299,7 @@ export class MotsClient {
           false,
         );
       }
+      this.#sendLocale();
       this.#outbox.replay((command) => this.#transmit(command));
     }
 
@@ -333,6 +345,14 @@ export class MotsClient {
       this.#reconnectTimer = undefined;
       this.connect();
     }, delay + Math.floor(Math.random() * 250));
+  }
+
+  #sendLocale(): void {
+    if (this.#locale === undefined) return;
+    this.#send(
+      { type: "session.setLocale", requestId: newRequestId(), locale: this.#locale },
+      false,
+    );
   }
 
   #send(command: ClientCommand, reportFailure = true): boolean {

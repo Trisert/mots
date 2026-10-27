@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { MotsClient } from "@mots/client";
+import { useI18n } from "../i18n";
 
 /** The device's IANA timezone, or undefined when the runtime does not report one. */
 const deviceTimezone = (): string | undefined => {
@@ -20,10 +21,12 @@ export type MotsSessionOptions = {
 };
 
 export function useMotsSession(options: MotsSessionOptions) {
+  const { locale } = useI18n();
   // A terminal close sets a private flag on MotsClient and later connect() calls do nothing.
   // A new client is the reset available without changing the client package.
   const [epoch, setEpoch] = useState(0);
   const retry = useCallback(() => setEpoch((current) => current + 1), []);
+  // A language change goes through setLocale, so the socket stays up.
   const client = useMemo(
     () =>
       new MotsClient({
@@ -31,9 +34,14 @@ export function useMotsSession(options: MotsSessionOptions) {
         sessionId: options.sessionId,
         username: options.username,
         timezone: deviceTimezone(),
+        locale,
       }),
     [epoch, options.baseUrl, options.enabled, options.sessionId, options.username],
   );
+
+  useEffect(() => {
+    client.setLocale(locale);
+  }, [client, locale]);
 
   const subscribe = useMemo(
     () => (listener: () => void) => client.subscribe(listener),

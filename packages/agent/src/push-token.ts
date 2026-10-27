@@ -1,5 +1,6 @@
 import { defineDoc } from "@earendil-works/pi-durable";
-import type { ClientCommand } from "@mots/protocol";
+import type { ClientCommand, SessionLocale } from "@mots/protocol";
+import { pushCopyFor } from "./locale.ts";
 
 /** One Expo push token for the session. A later register replaces it. */
 export const PushTokenDoc = defineDoc<{ token?: string }>({
@@ -59,13 +60,18 @@ const clip = (value: string, max: number): string => {
   return `${trimmed.slice(0, max - 3)}...`;
 };
 
-const reminderMessage = (reminder: ReminderPush, token: string, bodyText?: string) => {
+const reminderMessage = (
+  reminder: ReminderPush,
+  token: string,
+  locale: SessionLocale | undefined,
+  bodyText?: string,
+) => {
   const title = clip(reminder.name ?? "", TITLE_CHARACTERS);
   const body = clip(bodyText ?? reminder.instruction, BODY_CHARACTERS);
   return {
     to: token,
     title: title.length > 0 ? title : "Mots",
-    body: body.length > 0 ? body : "A scheduled reminder is ready.",
+    body: body.length > 0 ? body : pushCopyFor(locale).fallbackBody,
     sound: "default" as const,
     priority: "high" as const,
     data: {
@@ -95,14 +101,22 @@ const ticketError = (payload: unknown): string | undefined => {
  * POST one reminder to Expo. Throws when the request fails.
  * The delivery caller must catch that and still write the next recurrence row.
  */
-export async function sendReminderPush(reminder: ReminderPush, token: string): Promise<void> {
-  await postPush(reminderMessage(reminder, token));
+export async function sendReminderPush(
+  reminder: ReminderPush,
+  token: string,
+  locale?: SessionLocale,
+): Promise<void> {
+  await postPush(reminderMessage(reminder, token, locale));
 }
 
 /** Tell the user a routine stopped after repeated failed runs. Throws when the request fails. */
-export async function sendRoutineStoppedPush(reminder: ReminderPush, token: string): Promise<void> {
+export async function sendRoutineStoppedPush(
+  reminder: ReminderPush,
+  token: string,
+  locale?: SessionLocale,
+): Promise<void> {
   await postPush(
-    reminderMessage(reminder, token, "Stopped after repeated failed runs. Open Mots to restart it."),
+    reminderMessage(reminder, token, locale, pushCopyFor(locale).routineStopped),
   );
 }
 
