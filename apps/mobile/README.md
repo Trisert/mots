@@ -103,7 +103,7 @@ The app asks for notification permission on first connect and sends its Expo pus
 Expo sends Android pushes through Firebase Cloud Messaging, so the native build needs a Firebase project. One time, by the owner:
 
 1. In the Firebase console, create a project and add an Android app with the package name `com.mots.app`.
-2. Download `google-services.json` and set `"googleServicesFile": "./google-services.json"` under `android` in `app.json`. Keep the file out of the repository if it is a private copy for your own build.
+2. Download `google-services.json` into `apps/mobile` and set `"googleServicesFile": "./google-services.json"` under `android` in `app.json`. The file holds public client settings, not secrets, so it is committed with the app.
 3. In the Firebase project settings, create a service account key for FCM (HTTP v1). Upload it to Expo with `bunx eas-cli@latest credentials` (Android, Google Service Account), so Expo's push service can send through FCM.
 4. Build the `development` profile again. The token is only issued by a build that contains step 2.
 

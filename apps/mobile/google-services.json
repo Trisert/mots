@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "996986686552",
+    "project_id": "mots-d3e93",
+    "storage_bucket": "mots-d3e93.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:996986686552:android:66f4f5977ed744c2d28e2d",
+        "android_client_info": {
+          "package_name": "com.mots.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBl2p6scl1p-MIMkEsCeRkxuQz8IB1rkO8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
