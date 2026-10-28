@@ -72,8 +72,10 @@ function register(doc: { token?: string }, token: string, requestId: string): vo
   applyPushTokenCommand(doc, command);
 }
 
-function clear(doc: { token?: string }, requestId: string): void {
-  const command = parseClientCommand(JSON.stringify({ type: "pushToken.clear", requestId }));
+function clear(doc: { token?: string }, requestId: string, token: string): void {
+  const command = parseClientCommand(
+    JSON.stringify({ type: "pushToken.clear", requestId, token }),
+  );
   if (command.type !== "pushToken.clear") throw new Error(command.type);
   applyPushTokenCommand(doc, command);
 }
@@ -231,7 +233,7 @@ describe("push token delivery", () => {
     });
     expect(JSON.stringify(request.body)).not.toContain("expo-test-token");
 
-    clear(doc, "req-3");
+    clear(doc, "req-3", replacement);
     expect(doc).toEqual({});
     expect(Object.hasOwn(doc, "token")).toBe(false);
 
@@ -241,6 +243,41 @@ describe("push token delivery", () => {
     expect(afterClear.requests).toHaveLength(0);
     expect(afterClear.submitted[0]).toContain("Send the briefing");
     expectNextRow(afterClear.created);
+  });
+
+  test("two devices leaving in either order never erase the other device's token", () => {
+    const first = "ExponentPushToken[device-aaaaaaaaaaaaaaaaaaaaa]";
+    const second = "ExponentPushToken[device-bbbbbbbbbbbbbbbbbbbbb]";
+
+    // The first device leaves after the second one registered: its clear is stale.
+    const staleDoc: { token?: string } = {};
+    register(staleDoc, first, "req-1");
+    register(staleDoc, second, "req-2");
+    clear(staleDoc, "req-3", first);
+    expect(staleDoc).toEqual({ token: second });
+
+    // The second device leaves first, then the first device's clear arrives.
+    const orderedDoc: { token?: string } = {};
+    register(orderedDoc, first, "req-4");
+    register(orderedDoc, second, "req-5");
+    clear(orderedDoc, "req-6", second);
+    expect(orderedDoc).toEqual({});
+    clear(orderedDoc, "req-7", first);
+    expect(orderedDoc).toEqual({});
+  });
+
+  test("a clear with a token that does not match leaves the stored token alone", () => {
+    const doc: { token?: string } = {};
+    register(doc, TOKEN, "req-1");
+    clear(doc, "req-2", "ExponentPushToken[someone-else-xxxxxxxxxxxxx]");
+    expect(doc).toEqual({ token: TOKEN });
+  });
+
+  test("a clear with the matching token removes the stored token", () => {
+    const doc: { token?: string } = {};
+    register(doc, TOKEN, "req-1");
+    clear(doc, "req-2", TOKEN);
+    expect(Object.hasOwn(doc, "token")).toBe(false);
   });
 
   test("a push error still submits the reminder and writes the next recurrence", async () => {

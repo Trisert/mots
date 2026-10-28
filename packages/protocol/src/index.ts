@@ -162,6 +162,8 @@ export type ClientCommand =
   | {
       readonly type: "pushToken.clear";
       readonly requestId: string;
+      /** The token being removed. The server clears only a stored token that matches it. */
+      readonly token: string;
     }
   | {
       readonly type: "session.setTimezone";
@@ -498,7 +500,7 @@ export function parseClientCommand(message: string): ClientCommand {
     case "pushToken.register":
       return { type: value.type, requestId, token: requirePushToken(value.token) };
     case "pushToken.clear":
-      return { type: value.type, requestId };
+      return { type: value.type, requestId, token: requirePushToken(value.token) };
     case "session.setTimezone":
       return { type: value.type, requestId, timezone: requireTimezone(value.timezone) };
     case "session.setLocale":
