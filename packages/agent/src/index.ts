@@ -3,6 +3,7 @@ export {
   dailyPromptLimitFromEnv,
   DailyPromptLimitError,
   nextPromptCount,
+  releasedPromptCount,
 } from "./daily-limit.ts";
 export { isAllowedAgentModel, ModelNotAllowedError, type ModelCatalog } from "./allowlist.ts";
 export { createMotsHarnessOptions, type MotsHarnessOptions } from "./chat.ts";

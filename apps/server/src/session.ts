@@ -30,6 +30,7 @@ import {
   LocaleDoc,
   isAllowedAgentModel,
   nextPromptCount,
+  releasedPromptCount,
   isOfferedModel,
   ModelNotAllowedError,
   modelPolicy,
@@ -480,24 +481,44 @@ export class Session extends DurableObject<Env> {
       }
       case "prompt.submit": {
         this.#setTyping(socket, false);
-        const conversation = await this.#requireConversation(
-          command.conversationId as ConversationId,
-        );
-        await this.#reservePromptSlot();
-        await this.#setAlarmNoLaterThan(Date.now() + RECOVERY_ALARM_DELAY_MS);
-        const submission = await conversation.submit(
-          {
-            type: "input",
-            content: attributedPrompt(
-              connectionState(socket)?.username ?? "Guest",
-              command.content,
-            ),
-            requestId: command.requestId,
-            // Queue behind a running turn instead of rejecting; the inbox places it after the current answer.
-            whenBusy: "followUp",
-          },
-          BACKGROUND_CONTEXT,
-        );
+        const conversationId = command.conversationId as ConversationId;
+        const conversation = await this.#requireConversation(conversationId);
+        const alreadyAdmitted =
+          (await this.#harness.commit(
+            (tx) => tx.submissionByRequest(conversationId, command.requestId),
+            BACKGROUND_CONTEXT,
+          )) !== undefined;
+        const submitPrompt = () =>
+          conversation.submit(
+            {
+              type: "input",
+              content: attributedPrompt(
+                connectionState(socket)?.username ?? "Guest",
+                command.content,
+              ),
+              requestId: command.requestId,
+              // Queue behind a running turn instead of rejecting; the inbox places it after the current answer.
+              whenBusy: "followUp",
+            },
+            BACKGROUND_CONTEXT,
+          );
+        let submission: Awaited<ReturnType<typeof conversation.submit>>;
+        if (alreadyAdmitted) {
+          submission = await submitPrompt();
+        } else {
+          const slot = await this.#reservePromptSlot();
+          try {
+            await this.#setAlarmNoLaterThan(Date.now() + RECOVERY_ALARM_DELAY_MS);
+            submission = await submitPrompt();
+          } catch (error) {
+            try {
+              await this.#releasePromptSlot(slot);
+            } catch (releaseError) {
+              reportError("Session prompt slot release failed", releaseError);
+            }
+            throw error;
+          }
+        }
         this.#send(socket, {
           type: "command.result",
           command: command.type,
@@ -771,17 +792,25 @@ export class Session extends DurableObject<Env> {
    * Counts one user prompt against today's allowance, or throws before the prompt reaches the
    * harness. The read and the write share a transaction so two sockets cannot both take the last slot.
    */
-  #reservePromptSlot(): Promise<void> {
+  async #reservePromptSlot(): Promise<string> {
     const now = Date.now();
     const limit = dailyPromptLimitFromEnv({
       MOTS_DAILY_PROMPT_LIMIT: this.env.MOTS_DAILY_PROMPT_LIMIT,
     });
     const key = dailyPromptKey(now);
-    return this.ctx.storage.transaction(async (transaction) => {
+    await this.ctx.storage.transaction(async (transaction) => {
       const current = (await transaction.get<number>(key)) ?? 0;
       const next = nextPromptCount(current, limit);
       if (next === null) throw new DailyPromptLimitError(limit);
       await transaction.put(key, next);
+    });
+    return key;
+  }
+
+  #releasePromptSlot(key: string): Promise<void> {
+    return this.ctx.storage.transaction(async (transaction) => {
+      const current = (await transaction.get<number>(key)) ?? 0;
+      await transaction.put(key, releasedPromptCount(current));
     });
   }
 
