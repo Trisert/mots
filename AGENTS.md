@@ -55,7 +55,7 @@ Run from the repo root unless noted.
 | --- | --- |
 | `bun install --frozen-lockfile` | Install workspace dependencies. |
 | `bun run typecheck` | `tsc` in every workspace. |
-| `bun run test` | Bun tests for protocol, client, agent, the Worker gate, and mobile pure functions. The suite is 274 tests. |
+| `bun run test` | Bun tests for protocol, client, agent, the Worker gate, and mobile pure functions. The suite is 353 tests. |
 | `bun run check:server` | `wrangler deploy --dry-run --env=""` for the top-level Worker `mots`. |
 | `bun run check:server:staging` | `wrangler deploy --dry-run --env staging` for `mots-staging`. Does not publish. |
 | `bun run check` | Typecheck, then the top-level Worker dry-run. This is the gate for a PR. |
@@ -119,8 +119,7 @@ Do not "fix" a 503 by editing Worker code. Fix the runtime first.
 - Rate limits in `apps/server/src/rate-limit.ts` are per Worker isolate. They use `CF-Connecting-IP` only. Do not add a second Durable Object class for them without a migration plan.
 - `readStoredKiloToken()` in `packages/agent/src/provider.ts` reads `~/.pi/agent/auth.json` when `KILO_API_KEY` is unset. On a laptop that uses the developer's personal token. Do not copy that file into the repo or the cloud VM.
 - Recurring reminders reschedule themselves. `DeliverScheduledInstruction` writes the next run in the same commit that clears the active delivery (`commitDeliveryOutcome`), whether the turn succeeded or failed. A routine stops after `MAX_CONSECUTIVE_FAILURES` (3) failed runs in a row, and the user gets a push. An abort or a missing conversation also stops it. The model is told not to repeat the routine. A `schedule` call with `sourceScheduleId` still works and wins over the system's row.
-- `createMotsModels` fetches the Kilo and Vercel catalogs during Durable Object startup, with no timeout, even when the selected provider is OpenRouter or NVIDIA.
-- `apps/mobile/gitignore` has no leading dot, so Expo's native-folder ignores are not active. The root `.gitignore` does not list `ios/` or `android/`.
+- `createMotsModels` fetches the live Kilo catalog only for Kilo sessions; other sessions use `KILO_FALLBACK_MODELS`. It fetches the Vercel catalog only when Vercel is selected or `AI_GATEWAY_API_KEY` is set. Live catalogs load in parallel, use per-isolate caches, and abort after `CATALOG_TIMEOUT_MS` (4 seconds).
 - `mots_apple_trailer.mp4` at the repo root is about 6.7 MB. Flag it if relevant. Do not delete it unless the owner asks.
 - Do not deploy (`wrangler deploy`) unless the task explicitly asks for a deploy. Dry-run is the default check.
 
