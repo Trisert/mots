@@ -223,8 +223,8 @@ export class MotsClient {
           };
     return new Promise((resolve) => {
       this.#branchPrompts.set(command.requestId, (branchId) => {
-        onBranch?.(branchId);
         try {
+          onBranch?.(branchId);
           resolve(this.submitPrompt(branchId, content));
         } catch {
           resolve(false);

@@ -264,6 +264,8 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
         setEditing(undefined);
         if (editing.branchId !== undefined) {
           accepted = await client.submitPrompt(editing.branchId, text);
+          // Keep the edit so a retry sends to the same branch and the saved draft is still restored.
+          if (!accepted) setEditing(editing);
         } else {
           let createdBranchId: number | undefined;
           accepted = await client.editPrompt(
