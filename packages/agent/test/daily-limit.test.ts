@@ -7,6 +7,7 @@ import {
   DailyPromptLimitError,
   DEFAULT_DAILY_PROMPT_LIMIT,
   nextPromptCount,
+  releasedPromptCount,
   utcDay,
 } from "../src/daily-limit.ts";
 
@@ -36,6 +37,17 @@ describe("nextPromptCount", () => {
   test("treats a corrupt stored count as zero", () => {
     expect(nextPromptCount(-3, 2)).toBe(1);
     expect(nextPromptCount(Number.NaN, 2)).toBe(1);
+  });
+});
+
+describe("releasedPromptCount", () => {
+  test("decrements a valid count and clamps invalid counts to zero", () => {
+    expect(releasedPromptCount(3)).toBe(2);
+    expect(releasedPromptCount(1)).toBe(0);
+    expect(releasedPromptCount(0)).toBe(0);
+    expect(releasedPromptCount(-2)).toBe(0);
+    expect(releasedPromptCount(Number.NaN)).toBe(0);
+    expect(releasedPromptCount(1.5)).toBe(0);
   });
 });
 

@@ -48,3 +48,7 @@ export function nextPromptCount(current: number, limit: number): number | null {
   const count = Number.isSafeInteger(current) && current > 0 ? current : 0;
   return count < limit ? count + 1 : null;
 }
+
+export function releasedPromptCount(current: number): number {
+  return Number.isSafeInteger(current) && current > 0 ? current - 1 : 0;
+}
