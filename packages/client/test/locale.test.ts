@@ -73,3 +73,49 @@ describe("MotsClient locale", () => {
     }
   });
 });
+
+describe("MotsClient push token", () => {
+  const registrations = (socket: SnapshotSocket) =>
+    socket.sent
+      .map((text) => JSON.parse(text) as { type: string; token?: string })
+      .filter((command) => command.type === "pushToken.register");
+
+  test("registers the push token after the snapshot and again on a later change", () => {
+    const socket = new SnapshotSocket();
+    const client = new MotsClient({
+      baseUrl: "https://mots.example",
+      sessionId: "session-1",
+      username: "Luca",
+      socketFactory: () => socket,
+    });
+    try {
+      client.setPushToken("ExponentPushToken[first]");
+      client.connect();
+      socket.connect();
+      client.setPushToken("ExponentPushToken[second]");
+      expect(registrations(socket).map((command) => command.token)).toEqual([
+        "ExponentPushToken[first]",
+        "ExponentPushToken[second]",
+      ]);
+    } finally {
+      client.dispose();
+    }
+  });
+
+  test("sends nothing before a token is known", () => {
+    const socket = new SnapshotSocket();
+    const client = new MotsClient({
+      baseUrl: "https://mots.example",
+      sessionId: "session-1",
+      username: "Luca",
+      socketFactory: () => socket,
+    });
+    try {
+      client.connect();
+      socket.connect();
+      expect(registrations(socket)).toEqual([]);
+    } finally {
+      client.dispose();
+    }
+  });
+});

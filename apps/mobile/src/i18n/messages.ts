@@ -218,6 +218,7 @@ const en = {
   "announce.thinking": "Mots is typing",
   "announce.lost": "Connection lost",
   "announce.reconnected": "Back online",
+  "push.channel": "Reminders",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -427,5 +428,6 @@ export const messages: Readonly<Record<"en" | "it", Readonly<Record<MessageKey, 
     "announce.thinking": "Mots sta scrivendo",
     "announce.lost": "Connessione interrotta",
     "announce.reconnected": "Di nuovo in linea",
+    "push.channel": "Promemoria",
   },
 };

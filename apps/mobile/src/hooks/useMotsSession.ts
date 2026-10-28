@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { MotsClient } from "@mots/client";
 import { useI18n } from "../i18n";
+import { usePushRegistration } from "./usePushRegistration";
 
 /** The device's IANA timezone, or undefined when the runtime does not report one. */
 const deviceTimezone = (): string | undefined => {
@@ -21,7 +22,7 @@ export type MotsSessionOptions = {
 };
 
 export function useMotsSession(options: MotsSessionOptions) {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   // A terminal close sets a private flag on MotsClient and later connect() calls do nothing.
   // A new client is the reset available without changing the client package.
   const [epoch, setEpoch] = useState(0);
@@ -42,6 +43,8 @@ export function useMotsSession(options: MotsSessionOptions) {
   useEffect(() => {
     client.setLocale(locale);
   }, [client, locale]);
+
+  usePushRegistration(client, options.enabled !== false, t("push.channel"));
 
   const subscribe = useMemo(
     () => (listener: () => void) => client.subscribe(listener),
