@@ -30,17 +30,28 @@ const PRIVATE_IPV4 = [
   /^192\.168\./,
   /^172\.(1[6-9]|2\d|3[01])\./,
   /^0\./,
+  /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./,
 ];
 
-/** Literal addresses and local names that a Worker must never fetch on the user's behalf. */
+/**
+ * Literal addresses and local names that a Worker must never fetch on the user's behalf. A literal-address check
+ * cannot stop DNS rebinding; a public name that resolves to a private address is a known limit in Workers.
+ */
 export function isPrivateHost(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (host === "localhost" || host.endsWith(".localhost")) return true;
   if (host.endsWith(".local") || host.endsWith(".internal")) return true;
-  if (host === "::1" || host === "::" || host.startsWith("fc") || host.startsWith("fd")) {
-    return true;
+  if (host.includes(":")) {
+    if (
+      host.startsWith("::") ||
+      host.startsWith("fc") ||
+      host.startsWith("fd") ||
+      /^fe[89ab][0-9a-f]:/.test(host) ||
+      host.startsWith("64:ff9b:")
+    ) {
+      return true;
+    }
   }
-  if (host.startsWith("fe80:")) return true;
   return PRIVATE_IPV4.some((pattern) => pattern.test(host));
 }
 
