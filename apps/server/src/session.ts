@@ -49,6 +49,7 @@ import {
   queuedInputs,
   type ServerEvent,
 } from "@mots/protocol";
+import { commandFailure } from "./command-error.ts";
 import { normalizeUsername } from "./identity.ts";
 import { KeyedSerialQueue } from "./serial.ts";
 
@@ -345,23 +346,13 @@ export class Session extends DurableObject<Env> {
     } catch (error) {
       reportError("Session command failed", error, { command: command.type });
       if (command.type === "presence.typing") return;
+      const failure = commandFailure(error);
       this.#send(socket, {
         type: "command.result",
         command: command.type,
         requestId: command.requestId,
         ok: false,
-        error: {
-          code:
-            error instanceof ModelNotAllowedError || error instanceof DailyPromptLimitError
-              ? error.code
-              : COMMAND_ERROR.commandFailed,
-          message:
-            error instanceof ModelNotAllowedError || error instanceof DailyPromptLimitError
-              ? error.message
-            : error instanceof Error
-              ? error.message
-              : "Command failed",
-        },
+        error: failure,
       });
     }
   }
