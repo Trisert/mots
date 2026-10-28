@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test";
 import type { Tx } from "@earendil-works/pi-durable";
 import { MAX_PUSH_TOKEN_CHARACTERS, parseClientCommand } from "@mots/protocol";
 import { LocaleDoc } from "../src/locale.ts";
-import { applyPushTokenCommand, PushTokenDoc, useExpoAccessToken } from "../src/push-token.ts";
+import { applyPushTokenCommand, PushTokenDoc } from "../src/push-token.ts";
 import {
-  DeliverScheduledInstruction,
+  createDeliverScheduledInstruction,
   type ScheduleDelivery,
   type ScheduledInstruction,
 } from "../src/schedule.ts";
@@ -111,6 +111,7 @@ async function runDeliver(options: {
   const input = scheduled(options.instructionText);
   const created: ScheduledInstruction[] = [];
   const deliveries = { active: [delivery(input)] };
+  const deliverTask = createDeliverScheduledInstruction({ expoAccessToken: options.accessToken });
   const tx = {
     doc: async () => deliveries,
     createTask: async (_task: unknown, next: ScheduledInstruction) => {
@@ -121,7 +122,6 @@ async function runDeliver(options: {
   const mode = options.mode ?? "done";
   const previous = globalThis.fetch;
   try {
-    useExpoAccessToken(options.accessToken);
     globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
       order.push("push");
       requests.push(capture(url, init));
@@ -167,20 +167,15 @@ async function runDeliver(options: {
     const context = undefined as never;
     try {
       if ((options.phase ?? "deliver") === "abort") {
-        await DeliverScheduledInstruction.definition.abort(task, runtime as never, context);
+        await deliverTask.definition.abort(task, runtime as never, context);
       } else {
-        await DeliverScheduledInstruction.definition.phases.deliver(
-          task,
-          runtime as never,
-          context,
-        );
+        await deliverTask.definition.phases.deliver(task, runtime as never, context);
       }
     } catch (error) {
       thrown = error;
     }
   } finally {
     globalThis.fetch = previous;
-    useExpoAccessToken(undefined);
   }
   return { order, requests, reports, submitted, outcome, thrown, created };
 }

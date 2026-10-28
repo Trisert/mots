@@ -14,10 +14,9 @@ import {
   type MotsEnvironment,
   type MotsProviderId,
 } from "./provider.ts";
-import { useExpoAccessToken } from "./push-token.ts";
 import { fetchPageTool } from "./web.ts";
 import { createWebSearchTool, WEB_SEARCH_API_KEY_ENV } from "./web-search.ts";
-import { DeliverScheduledInstruction } from "./schedule.ts";
+import { createDeliverScheduledInstruction } from "./schedule.ts";
 import { scheduleLimitsFromEnv } from "./schedule-limits.ts";
 import { conversationSearchExtension, searchHistoryTool } from "./search.ts";
 import { clockSection } from "./timezone.ts";
@@ -39,7 +38,6 @@ export async function createMotsHarnessOptions(
   ensureWakeupAt: (timestamp: number) => Promise<void>,
   options: MotsHarnessOptions = {},
 ): Promise<HarnessOptions> {
-  useExpoAccessToken(options.env?.EXPO_ACCESS_TOKEN);
   const scheduleTool = createScheduleTool(ensureWakeupAt, scheduleLimitsFromEnv(options.env));
   // Without TAVILY_API_KEY, web_search answers from Exa and Parallel in rotation. Neither needs a key.
   const webSearch = createWebSearchTool(options.env?.[WEB_SEARCH_API_KEY_ENV]);
@@ -53,7 +51,9 @@ export async function createMotsHarnessOptions(
   ];
   const motsExtension = defineExtension({
     name: "mots",
-    tasks: [DeliverScheduledInstruction],
+    tasks: [
+      createDeliverScheduledInstruction({ expoAccessToken: options.env?.EXPO_ACCESS_TOKEN }),
+    ],
     tools: agentTools,
     sections: [
       section(
