@@ -160,6 +160,29 @@ describe("fake LLM smoke", () => {
       expect(conversationId).toBeGreaterThan(0);
       if (conversationId === undefined) return;
 
+      const missingConversationRequestId = "set-model-missing-conversation";
+      ws.send(
+        JSON.stringify({
+          type: "conversation.setModel",
+          requestId: missingConversationRequestId,
+          conversationId: 999,
+          provider: "kilo",
+          modelId: "reflection/beam-free",
+        }),
+      );
+      const missingConversationResultMessage = await log.waitFor(
+        (message) =>
+          message.includes('"type":"command.result"') &&
+          message.includes(`"requestId":"${missingConversationRequestId}"`),
+        8_000,
+      );
+      expect(parseServerEventEnvelope(missingConversationResultMessage)).toMatchObject({
+        type: "command.result",
+        command: "conversation.setModel",
+        requestId: missingConversationRequestId,
+        ok: false,
+      });
+
       const requestId = "fake-llm-prompt";
       ws.send(
         JSON.stringify({

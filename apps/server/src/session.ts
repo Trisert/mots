@@ -518,6 +518,7 @@ export class Session extends DurableObject<Env> {
         return;
       }
       case "conversation.setModel": {
+        await this.#requireConversation(command.conversationId as ConversationId);
         if (!this.#canSelectModel(command.provider, command.modelId)) {
           throw new ModelNotAllowedError();
         }
