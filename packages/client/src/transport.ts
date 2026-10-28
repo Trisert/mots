@@ -87,6 +87,7 @@ export class MotsClient {
   #reconnectAttempt = 0;
   #reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   #locale: SessionLocale | undefined;
+  #pushToken: string | undefined;
 
   constructor(options: MotsClientOptions) {
     this.#options = options;
@@ -253,6 +254,12 @@ export class MotsClient {
     this.#sendLocale();
   }
 
+  /** Store the device's Expo push token. Sent now when connected, otherwise after the next snapshot. */
+  setPushToken(token: string): void {
+    this.#pushToken = token;
+    this.#sendPushToken();
+  }
+
   clearError(): void {
     if (this.#state.error === undefined) return;
     this.#dispatch({ type: "clear-error" });
@@ -322,6 +329,7 @@ export class MotsClient {
         );
       }
       this.#sendLocale();
+      this.#sendPushToken();
       this.#outbox.replay((command) => this.#transmit(command));
     }
 
@@ -373,6 +381,14 @@ export class MotsClient {
     if (this.#locale === undefined) return;
     this.#send(
       { type: "session.setLocale", requestId: newRequestId(), locale: this.#locale },
+      false,
+    );
+  }
+
+  #sendPushToken(): void {
+    if (this.#pushToken === undefined) return;
+    this.#send(
+      { type: "pushToken.register", requestId: newRequestId(), token: this.#pushToken },
       false,
     );
   }
