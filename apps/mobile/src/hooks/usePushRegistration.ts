@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Platform } from "react-native";
+import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import type { MotsClient } from "@mots/client";
 
@@ -56,6 +57,9 @@ async function registerForPush(): Promise<string | undefined> {
       ? current.status
       : (await Notifications.requestPermissionsAsync()).status;
   if (status !== "granted") return undefined;
-  const { data } = await Notifications.getExpoPushTokenAsync();
+  // The EAS project id from app.json. Expo issues the token for this project only.
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+  if (typeof projectId !== "string" || projectId.length === 0) return undefined;
+  const { data } = await Notifications.getExpoPushTokenAsync({ projectId });
   return data;
 }
