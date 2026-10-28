@@ -38,6 +38,14 @@ describe("parseWebUrl", () => {
   test("accepts public http and https addresses on default ports", () => {
     expect(parseWebUrl(" https://example.com/a?b=1 ").toString()).toBe("https://example.com/a?b=1");
     expect(parseWebUrl("http://example.org").protocol).toBe("http:");
+    for (const url of [
+      "https://fcbarcelona.com",
+      "https://fdic.gov",
+      "https://100.128.0.1",
+      "https://[2606:4700::1111]",
+    ]) {
+      expect(parseWebUrl(url).protocol).toBe("https:");
+    }
   });
 
   test("rejects other schemes, credentials and non-default ports", () => {
@@ -58,6 +66,12 @@ describe("parseWebUrl", () => {
       "http://172.20.0.1/",
       "http://169.254.169.254/latest/meta-data",
       "http://[::1]/",
+      "http://100.64.0.1",
+      "http://100.127.255.255",
+      "http://[::ffff:127.0.0.1]",
+      "http://[::ffff:10.0.0.1]",
+      "http://[64:ff9b::a00:1]",
+      "http://[febf::1]",
       "http://printer.local/",
       "http://service.internal/",
     ]) {
