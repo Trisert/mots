@@ -116,6 +116,8 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const [editing, setEditing] = useState<
     { readonly entryId: number; readonly branchFrom: number | undefined } | undefined
   >(undefined);
+  /** The composer's own draft, kept while a message is edited and given back when the edit ends. */
+  const [draftBeforeEdit, setDraftBeforeEdit] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const closePicker = useCallback(() => setPickerOpen(false), []);
@@ -215,23 +217,26 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     if (text !== undefined) announce(text);
   }, [liveActive, announce, t]);
 
-  // Editing belongs to one conversation; switching to another drops it.
+  // Editing belongs to one conversation. Switching to another ends the edit and restores the draft.
   useEffect(() => {
+    if (editing === undefined) return;
     setEditing(undefined);
+    setInput(draftBeforeEdit);
   }, [activeConversationId]);
 
   const edit = useCallback(
     (entry: TranscriptEntry) => {
+      if (editing === undefined) setDraftBeforeEdit(input);
       setEditing({ entryId: entry.id, branchFrom: branchEntryId(entries, entry.id) });
       setInput(messageBody(entry.text));
     },
-    [entries],
+    [editing, entries, input],
   );
 
   const cancelEdit = useCallback(() => {
     setEditing(undefined);
-    setInput("");
-  }, []);
+    setInput(draftBeforeEdit);
+  }, [draftBeforeEdit]);
 
   const send = useCallback(async () => {
     if (activeConversationId === undefined) return;
@@ -239,12 +244,16 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     if (text.length === 0) return;
     setSending(true);
     try {
-      const accepted =
-        editing === undefined
-          ? await client.submitPrompt(activeConversationId, text)
-          : await client.editPrompt(activeConversationId, editing.branchFrom, text);
+      let accepted: boolean;
+      if (editing === undefined) {
+        accepted = await client.submitPrompt(activeConversationId, text);
+      } else {
+        // Leaving edit mode before the branch switches conversation keeps that switch from touching the composer.
+        setEditing(undefined);
+        accepted = await client.editPrompt(activeConversationId, editing.branchFrom, text);
+      }
       if (accepted) {
-        setInput("");
+        setInput(editing === undefined ? "" : draftBeforeEdit);
         setEditing(undefined);
         client.setTyping(activeConversationId, false);
       }
@@ -256,7 +265,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     } finally {
       setSending(false);
     }
-  }, [activeConversationId, client, editing, input, t]);
+  }, [activeConversationId, client, draftBeforeEdit, editing, input, t]);
 
   useEffect(() => {
     if (activeConversationId === undefined || !connected) return;
