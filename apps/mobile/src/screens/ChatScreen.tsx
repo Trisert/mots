@@ -17,7 +17,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAvoidingView, useKeyboardState } from "react-native-keyboard-controller";
-import type { TranscriptEntry } from "@mots/client";
+import type { SessionError, TranscriptEntry } from "@mots/client";
 import {
   connectionAnnouncement,
   lastAssistantId,
@@ -38,7 +38,14 @@ import { ModelPicker } from "../components/ModelPicker";
 import { SessionSheet } from "../components/SessionSheet";
 import { probeSession, type SessionAccess } from "../api";
 import { useMotsSession } from "../hooks/useMotsSession";
-import { presentConnection, presentError, presentModel, presentRunError, providerLabel } from "../present";
+import {
+  presentConnection,
+  presentError,
+  presentModel,
+  presentRawError,
+  presentRunError,
+  providerLabel,
+} from "../present";
 import { fonts, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { toolLabel } from "../tools";
 import { groupToolRuns, type ChatItem } from "../tool-runs";
@@ -188,7 +195,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     if (text !== undefined) announce(text);
   }, [state.status, announce]);
 
-  const lastError = useRef<string | undefined>(undefined);
+  const lastError = useRef<SessionError | undefined>(undefined);
   useEffect(() => {
     const previous = lastError.current;
     lastError.current = state.error;
@@ -217,7 +224,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     } catch (error) {
       Alert.alert(
         t("chat.sendFailed"),
-        error instanceof Error ? presentError(error.message, t) : t("chat.tryShortly"),
+        error instanceof Error ? presentRawError(error.message, t) : t("chat.tryShortly"),
       );
     } finally {
       setSending(false);
@@ -331,7 +338,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
         <View style={styles.live}>
           {liveText.length > 0 ? <MarkdownText text={liveText} /> : <Thinking />}
           {active?.live?.retry !== undefined ? (
-            <Text style={styles.danger}>{presentError(active.live.retry.error, t)}</Text>
+            <Text style={styles.danger}>{presentRawError(active.live.retry.error, t)}</Text>
           ) : null}
         </View>
       ) : null}

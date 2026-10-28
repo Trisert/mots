@@ -7,6 +7,7 @@ import {
   type SessionLocale,
 } from "@mots/protocol";
 import { CommandOutbox, type RetriableCommand } from "./command-outbox.ts";
+import { CLIENT_ERROR, type SessionError } from "./errors.ts";
 import {
   initialSessionState,
   sessionReducer,
@@ -137,13 +138,19 @@ export class MotsClient {
       this.#socket = undefined;
       if (this.#closed) return;
       if (this.#terminal || TERMINAL_CLOSE_CODES.has(event.code)) {
+        const wasTerminal = this.#terminal;
         this.#terminal = true;
         this.#outbox.clear();
         this.#dispatch({ type: "connection", status: "failed" });
-        this.#dispatch({
-          type: "error",
-          message: event.reason?.trim() || "The session connection failed.",
-        });
+        if (!wasTerminal) {
+          this.#dispatch({
+            type: "error",
+            error: {
+              code: CLIENT_ERROR.connectionFailed,
+              message: event.reason?.trim() || "The session connection failed.",
+            },
+          });
+        }
         return;
       }
       this.#dispatch({ type: "connection", status: "connecting" });
@@ -192,13 +199,22 @@ export class MotsClient {
 
   submitPrompt(conversationId: number, content: string): Promise<boolean> {
     if (content.trim().length === 0) {
-      this.#dispatch({ type: "error", message: "A prompt must contain text" });
+      this.#dispatch({
+        type: "error",
+        error: {
+          code: CLIENT_ERROR.emptyPrompt,
+          message: "A prompt must contain text",
+        },
+      });
       return Promise.resolve(false);
     }
     if (content.length > MAX_PROMPT_CHARACTERS) {
       this.#dispatch({
         type: "error",
-        message: `A prompt cannot exceed ${MAX_PROMPT_CHARACTERS.toLocaleString()} characters`,
+        error: {
+          code: CLIENT_ERROR.promptTooLong,
+          message: `A prompt cannot exceed ${MAX_PROMPT_CHARACTERS.toLocaleString()} characters`,
+        },
       });
       return Promise.resolve(false);
     }
@@ -244,14 +260,20 @@ export class MotsClient {
 
   #handleMessage(socket: SocketLike, data: unknown): void {
     if (typeof data !== "string") {
-      this.#fail(socket, "Server sent a binary protocol frame.");
+      this.#fail(socket, {
+        code: CLIENT_ERROR.invalidFrame,
+        message: "Server sent a binary protocol frame.",
+      });
       return;
     }
     let event: ServerEvent;
     try {
       event = parseServerEventEnvelope(data);
     } catch {
-      this.#fail(socket, "Server sent an invalid protocol frame.");
+      this.#fail(socket, {
+        code: CLIENT_ERROR.invalidFrame,
+        message: "Server sent an invalid protocol frame.",
+      });
       return;
     }
 
@@ -262,7 +284,7 @@ export class MotsClient {
         event.error.code === "frame_too_large")
     ) {
       this.#terminal = true;
-      this.#fail(socket, event.error.message);
+      this.#fail(socket, event.error);
       return;
     }
 
@@ -308,7 +330,7 @@ export class MotsClient {
       if (!event.ok) {
         this.#dispatch({
           type: "error",
-          message: event.error.message,
+          error: event.error,
         });
       } else if (
         acknowledged !== undefined &&
@@ -322,11 +344,11 @@ export class MotsClient {
     }
   }
 
-  #fail(socket: SocketLike, message: string): void {
+  #fail(socket: SocketLike, error: SessionError): void {
     this.#terminal = true;
     this.#outbox.clear();
     this.#dispatch({ type: "connection", status: "failed" });
-    this.#dispatch({ type: "error", message });
+    this.#dispatch({ type: "error", error });
     try {
       socket.close(1002, "Invalid protocol frame");
     } catch {
@@ -359,7 +381,13 @@ export class MotsClient {
     const socket = this.#socket;
     if (socket === undefined || socket.readyState !== 1) {
       if (reportFailure) {
-        this.#dispatch({ type: "error", message: "The session is not connected" });
+        this.#dispatch({
+          type: "error",
+          error: {
+            code: CLIENT_ERROR.notConnected,
+            message: "The session is not connected",
+          },
+        });
       }
       return false;
     }
@@ -368,7 +396,13 @@ export class MotsClient {
       return true;
     } catch {
       if (reportFailure) {
-        this.#dispatch({ type: "error", message: "The session connection failed" });
+        this.#dispatch({
+          type: "error",
+          error: {
+            code: CLIENT_ERROR.connectionFailed,
+            message: "The session connection failed",
+          },
+        });
       }
       return false;
     }
@@ -388,7 +422,13 @@ export class MotsClient {
     if (this.#terminal || this.#closed) {
       // Nothing replays the outbox after a terminal close, so fail now rather than queue forever.
       this.#outbox.cancel(command.requestId);
-      this.#dispatch({ type: "error", message: "The session is not connected" });
+      this.#dispatch({
+        type: "error",
+        error: {
+          code: CLIENT_ERROR.notConnected,
+          message: "The session is not connected",
+        },
+      });
       return;
     }
     const socket = this.#socket;
@@ -399,7 +439,13 @@ export class MotsClient {
       // The socket reported open but send threw, so the frame may or may not have left. Replaying
       // it later could duplicate it, so fail it now, as before.
       this.#outbox.cancel(command.requestId);
-      this.#dispatch({ type: "error", message: "The session connection failed" });
+      this.#dispatch({
+        type: "error",
+        error: {
+          code: CLIENT_ERROR.connectionFailed,
+          message: "The session connection failed",
+        },
+      });
       return;
     }
     this.#outbox.markSent(command.requestId);

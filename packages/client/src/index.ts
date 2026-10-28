@@ -4,6 +4,7 @@ export {
   type SocketFactory,
   type SocketLike,
 } from "./transport.ts";
+export { CLIENT_ERROR, type SessionError } from "./errors.ts";
 export {
   initialSessionState,
   sessionReducer,

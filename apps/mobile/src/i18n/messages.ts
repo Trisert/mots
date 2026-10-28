@@ -192,6 +192,7 @@ const en = {
   "error.emptyPrompt": "Write a message before sending.",
   "error.invalidFrame": "The server sent an invalid message.",
   "error.modelUnavailable": "That model is not available on this server.",
+  "error.dailyLimit": "This session reached today's message limit. It resets at 00:00 UTC.",
   "error.promptTooLong": "A message cannot exceed {count} characters.",
   "run.noResponse": "The model did not respond. Check the provider's limits or credits, then try again.",
 
@@ -402,6 +403,7 @@ export const messages: Readonly<Record<"en" | "it", Readonly<Record<MessageKey, 
     "error.emptyPrompt": "Scrivi un messaggio prima di inviare.",
     "error.invalidFrame": "Il server ha inviato un messaggio non valido.",
     "error.modelUnavailable": "Quel modello non è disponibile su questo server.",
+    "error.dailyLimit": "Questa sessione ha raggiunto il limite di messaggi di oggi. Si azzera alle 00:00 UTC.",
     "error.promptTooLong": "Un messaggio non può superare {count} caratteri.",
     "run.noResponse": "Il modello non ha risposto. Controlla i limiti o i crediti del provider e riprova.",
 

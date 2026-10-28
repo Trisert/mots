@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { MAX_PROMPT_CHARACTERS } from "@mots/protocol";
 import { MotsClient, type SocketLike } from "../src/index.ts";
 
 type MessageListener = (event: { readonly data: unknown }) => void;
@@ -164,7 +165,50 @@ describe("MotsClient", () => {
     try {
       socket.message("{not json");
       expect(client.getSnapshot().status).toBe("failed");
-      expect(client.getSnapshot().error).toContain("Invalid protocol frame");
+      expect(client.getSnapshot().error).toEqual({
+        code: "invalid_frame",
+        message: "Server sent an invalid protocol frame.",
+      });
+    } finally {
+      client.dispose();
+    }
+  });
+
+  test("preserves terminal server error codes", () => {
+    const { client, socket } = connect();
+    try {
+      const error = { code: "invalid_command", message: "The command is invalid." };
+      socket.message(JSON.stringify({ type: "error", error }));
+      expect(client.getSnapshot().status).toBe("failed");
+      expect(client.getSnapshot().error).toEqual(error);
+    } finally {
+      client.dispose();
+    }
+  });
+
+  test("reports an empty prompt with a stable error code", async () => {
+    const { client, socket } = connect();
+    try {
+      await expect(client.submitPrompt(1, " \n ")).resolves.toBe(false);
+      expect(socket.sent).toHaveLength(0);
+      expect(client.getSnapshot().error).toEqual({
+        code: "empty_prompt",
+        message: "A prompt must contain text",
+      });
+    } finally {
+      client.dispose();
+    }
+  });
+
+  test("reports an oversized prompt with a stable error code", async () => {
+    const { client, socket } = connect();
+    try {
+      await expect(client.submitPrompt(1, "x".repeat(100_001))).resolves.toBe(false);
+      expect(socket.sent).toHaveLength(0);
+      expect(client.getSnapshot().error).toEqual({
+        code: "prompt_too_long",
+        message: `A prompt cannot exceed ${MAX_PROMPT_CHARACTERS.toLocaleString()} characters`,
+      });
     } finally {
       client.dispose();
     }
@@ -246,7 +290,10 @@ describe("MotsClient", () => {
         }),
       );
       await expect(accepted).resolves.toBe(false);
-      expect(client.getSnapshot().error).toBe("Try again later");
+      expect(client.getSnapshot().error).toEqual({
+        code: "unavailable",
+        message: "Try again later",
+      });
     } finally {
       client.dispose();
     }
@@ -450,11 +497,15 @@ describe("MotsClient outbox while disconnected", () => {
       const model = client.setModel(1, "openrouter", "reflection/beam-free");
 
       client.connect();
-      sockets[1]!.close(1002, "Invalid protocol frame");
+      sockets[1]!.close(1002, "  Invalid protocol frame  ");
 
       await expect(prompt).resolves.toBe(false);
       await expect(model).resolves.toBe(false);
       expect(client.getSnapshot().status).toBe("failed");
+      expect(client.getSnapshot().error).toEqual({
+        code: "connection_failed",
+        message: "Invalid protocol frame",
+      });
       await expect(client.submitPrompt(1, "Tardi")).resolves.toBe(false);
       expect(sockets[1]!.sent).toHaveLength(0);
     } finally {
