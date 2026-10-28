@@ -20,6 +20,7 @@ import {
   type QueuedInput,
   type ServerEvent,
 } from "@mots/protocol";
+import type { SessionError } from "./errors.ts";
 
 /** Stable reason for a run that ended silently. The app owns the wording. */
 export type RunErrorCode = "no_response";
@@ -112,14 +113,14 @@ export interface SessionState {
   readonly activeConversationId?: number;
   readonly snapshots: Readonly<Record<number, ConversationSnapshot>>;
   readonly activity?: TaskGraph;
-  readonly error?: string;
+  readonly error?: SessionError;
 }
 
 export type SessionAction =
   | { readonly type: "connection"; readonly status: ConnectionStatus }
   | { readonly type: "select"; readonly conversationId: number }
   | { readonly type: "event"; readonly event: ServerEvent }
-  | { readonly type: "error"; readonly message: string }
+  | { readonly type: "error"; readonly error: SessionError }
   | { readonly type: "clear-error" };
 
 export const initialSessionState: SessionState = {
@@ -135,7 +136,7 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
     case "select":
       return { ...state, activeConversationId: action.conversationId, error: undefined };
     case "error":
-      return { ...state, error: action.message };
+      return { ...state, error: action.error };
     case "clear-error":
       return { ...state, error: undefined };
     case "event":
@@ -200,13 +201,13 @@ function reduceServerEvent(state: SessionState, event: ServerEvent): SessionStat
       };
     }
     case "command.result":
-      if (!event.ok) return { ...state, error: event.error.message };
+      if (!event.ok) return { ...state, error: event.error };
       return event.conversationId === undefined ||
         (event.command !== "conversation.create" && event.command !== "conversation.fork")
         ? state
         : { ...state, activeConversationId: event.conversationId, error: undefined };
     case "error":
-      return { ...state, error: event.error.message };
+      return { ...state, error: event.error };
   }
 }
 

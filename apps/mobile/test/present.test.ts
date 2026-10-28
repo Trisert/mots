@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { CLIENT_ERROR } from "@mots/client";
+import { COMMAND_ERROR, MAX_PROMPT_CHARACTERS } from "@mots/protocol";
 import {
   presentConnection,
   presentError,
   presentModel,
+  presentRawError,
   presentRunError,
   providerLabel,
   shortModelName,
@@ -45,27 +48,62 @@ describe("providerLabel", () => {
 });
 
 describe("presentError", () => {
-  test("translates client connection errors", () => {
-    expect(presentError("The session is not connected", t)).toBe("The session is not connected.");
-    expect(presentError("The session connection failed.", t)).toBe(
+  test("translates client errors by code", () => {
+    expect(presentError({ code: CLIENT_ERROR.notConnected, message: "" }, t)).toBe(
+      "The session is not connected.",
+    );
+    expect(presentError({ code: CLIENT_ERROR.connectionFailed, message: "" }, t)).toBe(
       "The connection to the session failed.",
     );
-  });
-
-  test("translates the prompt length error", () => {
-    expect(presentError("A prompt cannot exceed 100,000 characters", t)).toBe(
-      "A message cannot exceed 100,000 characters.",
+    expect(presentError({ code: CLIENT_ERROR.emptyPrompt, message: "" }, t)).toBe(
+      "Write a message before sending.",
+    );
+    expect(presentError({ code: CLIENT_ERROR.invalidFrame, message: "" }, t)).toBe(
+      "The server sent an invalid message.",
     );
   });
 
-  test("passes server text through", () => {
-    expect(presentError("Try again later", t)).toBe("Try again later");
+  test("uses the protocol prompt limit for the prompt-too-long copy", () => {
+    expect(
+      presentError(
+        {
+          code: CLIENT_ERROR.promptTooLong,
+          message: `A prompt cannot exceed ${MAX_PROMPT_CHARACTERS.toLocaleString()} characters`,
+        },
+        t,
+      ),
+    ).toBe(`A message cannot exceed ${MAX_PROMPT_CHARACTERS.toLocaleString()} characters.`);
   });
 
-  test("translates a model the server refused", () => {
-    expect(presentError("That model is not available.", t)).toBe(
+  test("translates server errors by code", () => {
+    expect(presentError({ code: COMMAND_ERROR.modelNotAllowed, message: "" }, t)).toBe(
       "That model is not available on this server.",
     );
+    expect(presentError({ code: COMMAND_ERROR.dailyLimitReached, message: "" }, t)).toBe(
+      "This session reached today's message limit. It resets at 00:00 UTC.",
+    );
+    expect(presentError({ code: COMMAND_ERROR.commandFailed, message: "" }, t)).toBe(
+      "Something went wrong.",
+    );
+  });
+
+  test("falls back to an unknown error's message", () => {
+    expect(presentError({ code: "future_error", message: "Try again later" }, t)).toBe(
+      "Try again later",
+    );
+  });
+
+  test("uses generic copy when an unknown error has no message", () => {
+    expect(presentError({ code: "future_error", message: " \n " }, t)).toBe(
+      "Something went wrong.",
+    );
+  });
+});
+
+describe("presentRawError", () => {
+  test("trims raw messages and uses generic copy when empty", () => {
+    expect(presentRawError("  Try again later  ", t)).toBe("Try again later");
+    expect(presentRawError(" \n ", t)).toBe("Something went wrong.");
   });
 });
 
@@ -82,13 +120,21 @@ describe("presentConnection", () => {
   });
 
   test("shows a translated error on a terminal failure", () => {
-    expect(presentConnection("failed", t, "The session connection failed.").body).toBe(
+    expect(
+      presentConnection("failed", t, {
+        code: CLIENT_ERROR.connectionFailed,
+        message: "The session connection failed.",
+      }).body,
+    ).toBe(
       "The connection to the session failed.",
     );
   });
 
   test("does not offer retry while the session is up", () => {
-    const connected = presentConnection("connected", t, "The session is not connected");
+    const connected = presentConnection("connected", t, {
+      code: CLIENT_ERROR.notConnected,
+      message: "The session is not connected",
+    });
     expect(connected.tone).toBe("ok");
     expect(connected.canRetry).toBe(false);
     expect(connected.busy).toBe(false);

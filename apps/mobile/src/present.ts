@@ -1,5 +1,5 @@
-import type { RunErrorCode } from "@mots/client";
-import type { ConnectionStatus } from "@mots/protocol";
+import { CLIENT_ERROR, type RunErrorCode, type SessionError } from "@mots/client";
+import { COMMAND_ERROR, MAX_PROMPT_CHARACTERS, type ConnectionStatus } from "@mots/protocol";
 import type { MessageKey, Translate } from "./i18n/translate";
 
 /** Enough of the server agent to read the model it actually configured. */
@@ -34,14 +34,14 @@ const PROVIDER_LABELS: Readonly<Record<string, string>> = {
   nvidia: "NVIDIA",
 };
 
-const KNOWN_ERRORS: Readonly<Record<string, MessageKey>> = {
-  "The session is not connected": "error.notConnected",
-  "The session connection failed": "error.connectionFailed",
-  "The session connection failed.": "error.connectionFailed",
-  "A prompt must contain text": "error.emptyPrompt",
-  "Server sent a binary protocol frame.": "error.invalidFrame",
-  "Server sent an invalid protocol frame.": "error.invalidFrame",
-  "That model is not available.": "error.modelUnavailable",
+const ERROR_KEYS: Readonly<Record<string, MessageKey>> = {
+  [CLIENT_ERROR.notConnected]: "error.notConnected",
+  [CLIENT_ERROR.connectionFailed]: "error.connectionFailed",
+  [CLIENT_ERROR.emptyPrompt]: "error.emptyPrompt",
+  [CLIENT_ERROR.invalidFrame]: "error.invalidFrame",
+  [COMMAND_ERROR.modelNotAllowed]: "error.modelUnavailable",
+  [COMMAND_ERROR.dailyLimitReached]: "error.dailyLimit",
+  [COMMAND_ERROR.commandFailed]: "error.generic",
 };
 
 export function providerLabel(provider: string): string {
@@ -67,15 +67,19 @@ export function presentModel(agent: AgentModelSource | undefined): PresentedMode
   return { provider, modelId, shortName: shortModelName(modelId) };
 }
 
-export function presentError(message: string, t: Translate): string {
+export function presentError(error: SessionError, t: Translate): string {
+  if (error.code === CLIENT_ERROR.promptTooLong) {
+    return t("error.promptTooLong", {
+      count: MAX_PROMPT_CHARACTERS.toLocaleString(),
+    });
+  }
+  const key = ERROR_KEYS[error.code];
+  return key === undefined ? presentRawError(error.message, t) : t(key);
+}
+
+export function presentRawError(message: string, t: Translate): string {
   const trimmed = message.trim();
   if (trimmed.length === 0) return t("error.generic");
-  const known = KNOWN_ERRORS[trimmed];
-  if (known !== undefined) return t(known);
-  const length = /^A prompt cannot exceed ([\d,]+) characters$/.exec(trimmed);
-  if (length?.[1] !== undefined) {
-    return t("error.promptTooLong", { count: length[1] });
-  }
   return trimmed;
 }
 
@@ -95,9 +99,9 @@ export function presentRunError(code: RunErrorCode, t: Translate): string {
 export function presentConnection(
   status: ConnectionStatus,
   t: Translate,
-  rawError?: string,
+  error?: SessionError,
 ): ConnectionPresentation {
-  const error = rawError === undefined ? undefined : presentError(rawError, t);
+  const presentedError = error === undefined ? undefined : presentError(error, t);
   switch (status) {
     case "connected":
       return {
@@ -113,7 +117,7 @@ export function presentConnection(
         tone: "danger",
         label: t("connection.offline"),
         title: t("connection.interrupted"),
-        body: error ?? t("connection.closedBody"),
+        body: presentedError ?? t("connection.closedBody"),
         busy: false,
         canRetry: true,
       };
@@ -122,7 +126,7 @@ export function presentConnection(
         tone: "wait",
         label: t("connection.connecting"),
         title: t("connection.connectingTitle"),
-        body: error ?? t("connection.checkingBody"),
+        body: presentedError ?? t("connection.checkingBody"),
         busy: true,
         canRetry: true,
       };
