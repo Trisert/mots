@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -10,7 +11,17 @@ import {
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { useI18n, type Translate } from "../i18n";
-import { ArrowUpIcon, BookmarkIcon, ClockIcon, PlusIcon, SearchIcon } from "./Icon";
+import { MAX_PROMPT_IMAGES } from "@mots/protocol";
+import type { AttachedImage } from "../attachments";
+import {
+  ArrowUpIcon,
+  BookmarkIcon,
+  ClockIcon,
+  CloseIcon,
+  ImageIcon,
+  PlusIcon,
+  SearchIcon,
+} from "./Icon";
 import { fonts, hit, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
 
 type Props = {
@@ -20,6 +31,11 @@ type Props = {
   readonly disabled: boolean;
   readonly sending: boolean;
   readonly hint?: string;
+  readonly attachments: readonly AttachedImage[];
+  readonly onAttach: () => void;
+  readonly onRemoveAttachment: (index: number) => void;
+  /** False while the composer edits a message, which cannot carry new pictures. */
+  readonly canAttach: boolean;
 };
 
 const ACTION_SIZE = 40;
@@ -55,7 +71,18 @@ function quickActions(t: Translate) {
   ];
 }
 
-export function Composer({ value, onChange, onSend, disabled, sending, hint }: Props) {
+export function Composer({
+  value,
+  onChange,
+  onSend,
+  disabled,
+  sending,
+  hint,
+  attachments,
+  onAttach,
+  onRemoveAttachment,
+  canAttach,
+}: Props) {
   const { colors } = useTheme();
   const { t } = useI18n();
   const actions = useMemo(() => quickActions(t), [t]);
@@ -63,7 +90,8 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
   const [toolsOpen, setToolsOpen] = useState(false);
   const [focused, setFocused] = useState(false);
   const [inputHeight, setInputHeight] = useState<number | undefined>(undefined);
-  const canSend = value.trim().length > 0 && !disabled && !sending;
+  const canSend = (value.trim().length > 0 || attachments.length > 0) && !disabled && !sending;
+  const attachDisabled = disabled || !canAttach || attachments.length >= MAX_PROMPT_IMAGES;
 
   useEffect(() => {
     if (value.trim().length === 0) setInputHeight(undefined);
@@ -90,6 +118,24 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
               {action.icon(colors.textPrimary)}
               <Text style={styles.toolLabel}>{action.label}</Text>
             </Pressable>
+          ))}
+        </View>
+      ) : null}
+
+      {attachments.length > 0 ? (
+        <View style={styles.thumbs}>
+          {attachments.map((image, index) => (
+            <View key={`${index}-${image.uri}`} style={styles.thumb}>
+              <Image source={{ uri: image.uri }} style={styles.thumbImage} />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("composer.removeImage")}
+                onPress={() => onRemoveAttachment(index)}
+                style={({ pressed }) => [styles.thumbRemove, pressed && styles.pressed]}
+              >
+                <CloseIcon size={12} color={colors.textPrimary} strokeWidth={2.4} />
+              </Pressable>
+            </View>
           ))}
         </View>
       ) : null}
@@ -137,6 +183,18 @@ export function Composer({ value, onChange, onSend, disabled, sending, hint }: P
         />
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel={t("composer.attach")}
+          accessibilityState={{ disabled: attachDisabled }}
+          onPress={onAttach}
+          disabled={attachDisabled}
+          style={({ pressed }) => [styles.target, pressed && !attachDisabled && styles.pressed]}
+        >
+          <View style={[styles.circle, styles.circleBorder]}>
+            <ImageIcon size={18} color={attachDisabled ? colors.textSecondary : colors.textPrimary} />
+          </View>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
           accessibilityLabel={t("composer.send")}
           accessibilityState={{ disabled: !canSend, busy: sending }}
           onPress={onSend}
@@ -173,6 +231,34 @@ function createStyles(colors: ThemeColors) {
       paddingTop: spacing.xs,
       paddingBottom: spacing.xs,
       backgroundColor: colors.bgMain,
+    },
+    thumbs: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing.sm,
+      paddingHorizontal: spacing.xs,
+    },
+    thumb: {
+      width: 64,
+      height: 64,
+    },
+    thumbImage: {
+      width: 64,
+      height: 64,
+      borderRadius: radius.sm,
+      backgroundColor: colors.sunk,
+    },
+    thumbRemove: {
+      position: "absolute",
+      top: -6,
+      right: -6,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.sunk,
+      ...shadows.card,
     },
     hint: {
       ...typeScale.small,

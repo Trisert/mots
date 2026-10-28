@@ -6,6 +6,7 @@ export {
   releasedPromptCount,
 } from "./daily-limit.ts";
 export { isAllowedAgentModel, ModelNotAllowedError, type ModelCatalog } from "./allowlist.ts";
+export { ImagesNotSupportedError, modelAcceptsImages } from "./images.ts";
 export { createMotsHarnessOptions, type MotsHarnessOptions } from "./chat.ts";
 export { addMissingDefaultTools, DEFAULT_TOOL_NAMES } from "./default-tools.ts";
 export { createStubModels } from "./stub-models.ts";

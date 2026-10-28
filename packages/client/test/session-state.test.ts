@@ -89,3 +89,27 @@ describe("sessionReducer message updates", () => {
     expect(state.snapshots[1]?.runError).toBeUndefined();
   });
 });
+
+describe("sessionReducer user pictures", () => {
+  test("keeps the pictures of a sent message and leaves the image marker out of its text", () => {
+    const userEntry: EntryRecord = {
+      id: 3 as EntryId,
+      conversationId,
+      kind: "pi.user",
+      model: [
+        {
+          role: "user",
+          timestamp: 1,
+          content: [
+            { type: "text", text: "[Luca]\nCosa vedi?" },
+            { type: "image", data: "/9j/4AAQ", mimeType: "image/jpeg" },
+          ],
+        } as never,
+      ],
+    };
+    const state = applyAgentEvents(initialSessionState, [{ type: "message_end", entry: userEntry }]);
+    const sent = state.snapshots[conversationId]?.entries[0];
+    expect(sent?.text).toBe("[Luca]\nCosa vedi?");
+    expect(sent?.images).toEqual([{ mimeType: "image/jpeg", data: "/9j/4AAQ" }]);
+  });
+});

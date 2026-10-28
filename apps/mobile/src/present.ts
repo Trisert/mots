@@ -1,5 +1,5 @@
 import { CLIENT_ERROR, type RunErrorCode, type SessionError } from "@mots/client";
-import { COMMAND_ERROR, MAX_PROMPT_CHARACTERS, type ConnectionStatus } from "@mots/protocol";
+import { COMMAND_ERROR, MAX_PROMPT_CHARACTERS, MAX_PROMPT_IMAGES, type ConnectionStatus } from "@mots/protocol";
 import type { MessageKey, Translate } from "./i18n/translate";
 
 /** Enough of the server agent to read the model it actually configured. */
@@ -39,6 +39,8 @@ const ERROR_KEYS: Readonly<Record<string, MessageKey>> = {
   [CLIENT_ERROR.connectionFailed]: "error.connectionFailed",
   [CLIENT_ERROR.emptyPrompt]: "error.emptyPrompt",
   [CLIENT_ERROR.invalidFrame]: "error.invalidFrame",
+  [CLIENT_ERROR.imageTooLarge]: "error.imageTooLarge",
+  [COMMAND_ERROR.imagesNotSupported]: "error.imagesNotSupported",
   [COMMAND_ERROR.modelNotAllowed]: "error.modelUnavailable",
   [COMMAND_ERROR.dailyLimitReached]: "error.dailyLimit",
   [COMMAND_ERROR.commandFailed]: "error.generic",
@@ -68,6 +70,9 @@ export function presentModel(agent: AgentModelSource | undefined): PresentedMode
 }
 
 export function presentError(error: SessionError, t: Translate): string {
+  if (error.code === CLIENT_ERROR.tooManyImages) {
+    return t("error.tooManyImages", { count: MAX_PROMPT_IMAGES });
+  }
   if (error.code === CLIENT_ERROR.promptTooLong) {
     return t("error.promptTooLong", {
       count: MAX_PROMPT_CHARACTERS.toLocaleString(),

@@ -16,6 +16,7 @@ export {
   type SessionState,
   type ToolProgress,
   type TranscriptEntry,
+  type TranscriptImage,
   type TranscriptToolCall,
   type TranscriptToolResult,
 } from "./session-state.ts";

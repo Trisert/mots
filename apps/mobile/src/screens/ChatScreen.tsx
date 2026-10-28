@@ -18,6 +18,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAvoidingView, useKeyboardState } from "react-native-keyboard-controller";
 import type { SessionError, TranscriptEntry } from "@mots/client";
+import { MAX_PROMPT_IMAGES } from "@mots/protocol";
+import { attachImages, type AttachedImage } from "../attachments";
 import {
   connectionAnnouncement,
   lastAssistantId,
@@ -112,6 +114,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   });
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [attachments, setAttachments] = useState<readonly AttachedImage[]>([]);
   /** The sent message being edited, and the entry its branch starts from (none for the first message). */
   const [editing, setEditing] = useState<
     | {
@@ -250,15 +253,35 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     setInput(draftBeforeEdit);
   }, [draftBeforeEdit]);
 
+  // Pictures travel with a new message only. An edit replaces the text of a branch, as before.
+  const attach = useCallback(async () => {
+    const remaining = MAX_PROMPT_IMAGES - attachments.length;
+    if (remaining <= 0) return;
+    let picked: Awaited<ReturnType<typeof attachImages>>;
+    try {
+      picked = await attachImages(remaining);
+    } catch {
+      Alert.alert(t("composer.imagePickFailed"));
+      return;
+    }
+    if (picked === undefined) return;
+    if (picked.images.length > 0) {
+      setAttachments((current) => [...current, ...picked.images].slice(0, MAX_PROMPT_IMAGES));
+    }
+    if (picked.tooLarge > 0) Alert.alert(t("error.imageTooLarge"));
+  }, [attachments.length, t]);
+
   const send = useCallback(async () => {
     if (activeConversationId === undefined) return;
     const text = input.trim();
-    if (text.length === 0) return;
+    const images = editing === undefined ? attachments : [];
+    if (text.length === 0 && images.length === 0) return;
     setSending(true);
     try {
       let accepted: boolean;
       if (editing === undefined) {
-        accepted = await client.submitPrompt(activeConversationId, text);
+        const payload = images.map(({ mimeType, data }) => ({ mimeType, data }));
+        accepted = await client.submitPrompt(activeConversationId, text, payload);
       } else {
         // Leaving edit mode before the branch switches conversation keeps that switch from touching the composer.
         setEditing(undefined);
@@ -285,6 +308,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
       }
       if (accepted) {
         setInput(editing === undefined ? "" : draftBeforeEdit);
+        if (editing === undefined) setAttachments([]);
         setEditing(undefined);
         client.setTyping(activeConversationId, false);
       }
@@ -296,7 +320,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     } finally {
       setSending(false);
     }
-  }, [activeConversationId, client, draftBeforeEdit, editing, input, t]);
+  }, [activeConversationId, attachments, client, draftBeforeEdit, editing, input, t]);
 
   useEffect(() => {
     if (activeConversationId === undefined || !connected) return;
@@ -607,6 +631,12 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
               disabled={!canWrite}
               sending={sending}
               hint={composerHint}
+              attachments={editing === undefined ? attachments : []}
+              onAttach={() => void attach()}
+              onRemoveAttachment={(index) =>
+                setAttachments((current) => current.filter((_, position) => position !== index))
+              }
+              canAttach={editing === undefined}
             />
           </View>
         </KeyboardAvoidingView>

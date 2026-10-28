@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { MAX_PROMPT_CHARACTERS } from "@mots/protocol";
+import { MAX_PROMPT_CHARACTERS, MAX_PROMPT_IMAGES } from "@mots/protocol";
 import { MotsClient, type SocketLike } from "../src/index.ts";
 
 type MessageListener = (event: { readonly data: unknown }) => void;
@@ -621,6 +621,26 @@ describe("MotsClient outbox while disconnected", () => {
       });
       await expect(client.submitPrompt(1, "Tardi")).resolves.toBe(false);
       expect(sockets[1]!.sent).toHaveLength(0);
+    } finally {
+      client.dispose();
+    }
+  });
+  test("sends pictures with the prompt, and refuses too many before anything is sent", async () => {
+    const { client, socket } = connect();
+    try {
+      const image = { mimeType: "image/jpeg" as const, data: "/9j/4AAQ" };
+      void client.submitPrompt(1, "", [image]);
+      expect(JSON.parse(socket.sent.at(-1)!)).toMatchObject({
+        type: "prompt.submit",
+        content: "",
+        images: [image],
+      });
+
+      const before = socket.sent.length;
+      const extra = Array.from({ length: MAX_PROMPT_IMAGES + 1 }, () => image);
+      await expect(client.submitPrompt(1, "x", extra)).resolves.toBe(false);
+      expect(socket.sent).toHaveLength(before);
+      expect(client.getSnapshot().error?.code).toBe("too_many_images");
     } finally {
       client.dispose();
     }

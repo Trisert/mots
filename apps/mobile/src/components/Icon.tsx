@@ -263,6 +263,25 @@ export function SearchIcon({
   );
 }
 
+/** A picture frame: attaches an image to the message */
+export function ImageIcon({ size = 18, color, strokeWidth = 2 }: IconProps) {
+  const { colors } = useTheme();
+  const iconColor = color ?? colors.textPrimary;
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="3" y="4" width="18" height="16" rx="3" stroke={iconColor} strokeWidth={strokeWidth} />
+      <Circle cx="9" cy="10" r="1.8" fill={iconColor} />
+      <Path
+        d="M21 16L15.5 11.5L8 19"
+        stroke={iconColor}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 /** Bookmark ribbon for memory storage tools */
 export function BookmarkIcon({
   size = 16,
