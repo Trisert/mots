@@ -81,6 +81,8 @@ export class MotsClient {
   #state: SessionState = initialSessionState;
   #socket: SocketLike | undefined;
   #desiredConversationId: number | undefined;
+  /** Prompts waiting for the branch command that will hold them, keyed by that command's request ID. */
+  readonly #branchPrompts = new Map<string, (conversationId: number) => void>();
   #conversationOpened = false;
   #closed = false;
   #terminal = false;
@@ -190,6 +192,46 @@ export class MotsClient {
       requestId: newRequestId(),
       conversationId,
       entryId,
+    });
+  }
+
+  /**
+   * Sends an edited message: branches the conversation before the edited entry (a new empty
+   * conversation when there is none), then submits the new text in that branch. The original
+   * conversation is kept, so the answers that followed the edited message leave the chat.
+   */
+  editPrompt(
+    conversationId: number,
+    previousEntryId: number | undefined,
+    content: string,
+  ): Promise<boolean> {
+    // An invalid text is refused by submitPrompt before anything is sent, so no branch is made.
+    if (content.trim().length === 0 || content.length > MAX_PROMPT_CHARACTERS) {
+      return this.submitPrompt(conversationId, content);
+    }
+    const command: RetriableCommand =
+      previousEntryId === undefined
+        ? { type: "conversation.create", requestId: newRequestId() }
+        : {
+            type: "conversation.fork",
+            requestId: newRequestId(),
+            conversationId,
+            entryId: previousEntryId,
+          };
+    return new Promise((resolve) => {
+      this.#branchPrompts.set(command.requestId, (branchId) => {
+        try {
+          resolve(this.submitPrompt(branchId, content));
+        } catch {
+          resolve(false);
+        }
+      });
+      this.#outbox.enqueue(command, (accepted) => {
+        if (accepted) return;
+        this.#branchPrompts.delete(command.requestId);
+        resolve(false);
+      });
+      this.#transmit(command);
     });
   }
 
@@ -340,6 +382,9 @@ export class MotsClient {
       ) {
         this.#desiredConversationId = event.conversationId;
         this.#dispatch({ type: "select", conversationId: event.conversationId });
+        const branchPrompt = this.#branchPrompts.get(acknowledged.requestId);
+        this.#branchPrompts.delete(acknowledged.requestId);
+        branchPrompt?.(event.conversationId);
       }
     }
   }

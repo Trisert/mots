@@ -134,6 +134,74 @@ describe("MotsClient", () => {
     }
   });
 
+  test("edits a prompt by forking before it, then submits the new text in the branch", () => {
+    const { client, socket } = connect();
+    try {
+      void client.editPrompt(1, 40, "Versione corretta");
+      const fork = JSON.parse(socket.sent[0]!) as { readonly requestId: string };
+      expect(JSON.parse(socket.sent[0]!)).toMatchObject({
+        type: "conversation.fork",
+        conversationId: 1,
+        entryId: 40,
+      });
+
+      socket.message(
+        JSON.stringify({
+          type: "command.result",
+          command: "conversation.fork",
+          requestId: fork.requestId,
+          ok: true,
+          conversationId: 2,
+        }),
+      );
+
+      expect(client.getSnapshot().activeConversationId).toBe(2);
+      expect(socket.sent).toHaveLength(2);
+      expect(JSON.parse(socket.sent[1]!)).toMatchObject({
+        type: "prompt.submit",
+        conversationId: 2,
+        content: "Versione corretta",
+      });
+    } finally {
+      client.dispose();
+    }
+  });
+
+  test("edits the first message by creating an empty conversation, then submitting in it", () => {
+    const { client, socket } = connect();
+    try {
+      void client.editPrompt(1, undefined, "Ciao");
+      expect(JSON.parse(socket.sent[0]!)).toMatchObject({ type: "conversation.create" });
+      const create = JSON.parse(socket.sent[0]!) as { readonly requestId: string };
+      socket.message(
+        JSON.stringify({
+          type: "command.result",
+          command: "conversation.create",
+          requestId: create.requestId,
+          ok: true,
+          conversationId: 3,
+        }),
+      );
+      expect(JSON.parse(socket.sent[1]!)).toMatchObject({
+        type: "prompt.submit",
+        conversationId: 3,
+        content: "Ciao",
+      });
+    } finally {
+      client.dispose();
+    }
+  });
+
+  test("does not branch when the edited text is empty", async () => {
+    const { client, socket } = connect();
+    try {
+      expect(await client.editPrompt(1, 40, "   ")).toBe(false);
+      expect(socket.sent).toHaveLength(0);
+    } finally {
+      client.dispose();
+    }
+  });
+
   test("selects a newly created conversation", () => {
     const { client, socket } = connect();
     try {

@@ -30,6 +30,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useI18n, type Translate } from "../i18n";
 import { Composer } from "../components/Composer";
 import { conversationStatus } from "../conversation-status";
+import { branchEntryId, messageBody } from "../edit-message";
 import { ChevronDownIcon, MenuIcon, PlusIcon } from "../components/Icon";
 import { MarkdownText } from "../components/MarkdownText";
 import { MessageBubble } from "../components/MessageBubble";
@@ -111,6 +112,10 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   });
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  /** The sent message being edited, and the entry its branch starts from (none for the first message). */
+  const [editing, setEditing] = useState<
+    { readonly entryId: number; readonly branchFrom: number | undefined } | undefined
+  >(undefined);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const closePicker = useCallback(() => setPickerOpen(false), []);
@@ -210,15 +215,37 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     if (text !== undefined) announce(text);
   }, [liveActive, announce, t]);
 
+  // Editing belongs to one conversation; switching to another drops it.
+  useEffect(() => {
+    setEditing(undefined);
+  }, [activeConversationId]);
+
+  const edit = useCallback(
+    (entry: TranscriptEntry) => {
+      setEditing({ entryId: entry.id, branchFrom: branchEntryId(entries, entry.id) });
+      setInput(messageBody(entry.text));
+    },
+    [entries],
+  );
+
+  const cancelEdit = useCallback(() => {
+    setEditing(undefined);
+    setInput("");
+  }, []);
+
   const send = useCallback(async () => {
     if (activeConversationId === undefined) return;
     const text = input.trim();
     if (text.length === 0) return;
     setSending(true);
     try {
-      const accepted = await client.submitPrompt(activeConversationId, text);
+      const accepted =
+        editing === undefined
+          ? await client.submitPrompt(activeConversationId, text)
+          : await client.editPrompt(activeConversationId, editing.branchFrom, text);
       if (accepted) {
         setInput("");
+        setEditing(undefined);
         client.setTyping(activeConversationId, false);
       }
     } catch (error) {
@@ -229,7 +256,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
     } finally {
       setSending(false);
     }
-  }, [activeConversationId, client, input, t]);
+  }, [activeConversationId, client, editing, input, t]);
 
   useEffect(() => {
     if (activeConversationId === undefined || !connected) return;
@@ -499,7 +526,7 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
                     live={index === items.length - 1 && (liveActive || runningTools.length > 0)}
                   />
                 ) : (
-                  <MessageBubble entry={item.entry} onFork={fork} />
+                  <MessageBubble entry={item.entry} onFork={fork} onEdit={canWrite ? edit : undefined} />
                 )
               }
               contentContainerStyle={[styles.list, entries.length === 0 && styles.listEmpty]}
@@ -523,6 +550,14 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
             {showErrorBanner && state.error !== undefined ? (
               <View style={styles.bannerWrap}>
                 <Banner message={presentError(state.error, t)} onDismiss={() => client.clearError()} />
+              </View>
+            ) : null}
+            {editing !== undefined ? (
+              <View style={styles.editBar}>
+                <Text style={styles.editText}>{t("chat.editing")}</Text>
+                <Pressable accessibilityRole="button" hitSlop={8} onPress={cancelEdit} style={styles.editCancel}>
+                  <Text style={styles.editCancelText}>{t("common.cancel")}</Text>
+                </Pressable>
               </View>
             ) : null}
             <Composer
@@ -793,6 +828,28 @@ function createStyles(colors: ThemeColors) {
     bannerWrap: {
       paddingHorizontal: spacing.lg,
       paddingTop: spacing.sm,
+    },
+    editBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.sm,
+    },
+    editText: {
+      ...typeScale.caption,
+      flex: 1,
+      color: colors.textSecondary,
+    },
+    editCancel: {
+      minHeight: 44,
+      justifyContent: "center",
+      paddingHorizontal: spacing.sm,
+    },
+    editCancelText: {
+      ...typeScale.caption,
+      color: colors.textPrimary,
     },
     pressed: {
       opacity: 0.75,
