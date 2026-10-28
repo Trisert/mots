@@ -39,14 +39,6 @@ const PUSH_TIMEOUT_MS = 8_000;
 const TITLE_CHARACTERS = 80;
 const BODY_CHARACTERS = 500;
 
-let expoAccessToken: string | undefined;
-
-/** Remember the Worker's optional Expo access token. A blank value clears it. */
-export function useExpoAccessToken(token: string | undefined): void {
-  const trimmed = token?.trim() ?? "";
-  expoAccessToken = trimmed.length > 0 ? trimmed : undefined;
-}
-
 type ReminderPush = {
   readonly id: string;
   readonly conversationId: number;
@@ -105,8 +97,9 @@ export async function sendReminderPush(
   reminder: ReminderPush,
   token: string,
   locale?: SessionLocale,
+  accessToken?: string,
 ): Promise<void> {
-  await postPush(reminderMessage(reminder, token, locale));
+  await postPush(reminderMessage(reminder, token, locale), accessToken);
 }
 
 /** Tell the user a routine stopped after repeated failed runs. Throws when the request fails. */
@@ -114,18 +107,26 @@ export async function sendRoutineStoppedPush(
   reminder: ReminderPush,
   token: string,
   locale?: SessionLocale,
+  accessToken?: string,
 ): Promise<void> {
   await postPush(
     reminderMessage(reminder, token, locale, pushCopyFor(locale).routineStopped),
+    accessToken,
   );
 }
 
-async function postPush(message: ReturnType<typeof reminderMessage>): Promise<void> {
+async function postPush(
+  message: ReturnType<typeof reminderMessage>,
+  accessToken?: string,
+): Promise<void> {
   const headers: Record<string, string> = {
     accept: "application/json",
     "content-type": "application/json",
   };
-  if (expoAccessToken !== undefined) headers.Authorization = `Bearer ${expoAccessToken}`;
+  const trimmedAccessToken = accessToken?.trim();
+  if (trimmedAccessToken !== undefined && trimmedAccessToken.length > 0) {
+    headers.Authorization = `Bearer ${trimmedAccessToken}`;
+  }
   const response = await globalThis.fetch(EXPO_PUSH_URL, {
     method: "POST",
     headers,

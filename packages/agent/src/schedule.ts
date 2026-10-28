@@ -276,134 +276,158 @@ export const ScheduleDeliveries = defineDoc<{
   initial: () => ({ active: [] }),
 });
 
-export const DeliverScheduledInstruction = defineTask<ScheduledInstruction, DeliveryState, null>({
-  name: "app.deliver-scheduled-instruction",
-  version: 1,
-  initial: () => ({ phase: "wait" }),
-  phases: {
-    wait: async (task, runtime, context) => {
-      await runtime.sleep(task.input.runAt, context);
-      await runtime.commit(async (tx) => {
-        const deliveries = await tx.doc(ScheduleDeliveries);
-        if (!deliveries.active.some(({ scheduleId }) => scheduleId === task.input.id)) {
-          deliveries.active.push({
-            scheduleId: task.input.id,
-            conversationId: task.input.conversationId,
-            instruction: task.input.instruction,
-            name: task.input.name,
-            runAt: task.input.runAt,
-            ...(task.input.recurrence === undefined ? {} : { recurrence: task.input.recurrence }),
-            ...(task.input.failures === undefined ? {} : { failures: task.input.failures }),
-          });
-        }
-        return { status: "running", checkpoint: { phase: "deliver" } };
-      }, context);
-    },
-    deliver: async (task, runtime, context) => {
-      let delivered = false;
-      // True once the turn has settled (done or failed), or the run has thrown.
-      let ended = false;
-      // A missing or unreadable language falls back to English. It never blocks the push.
-      const pushLocale = async (): Promise<SessionLocale | undefined> => {
-        try {
-          return readStoredLocale(await runtime.snapshot(LocaleDoc, context));
-        } catch {
-          return undefined;
-        }
-      };
-      const notifyStopped = async (): Promise<void> => {
-        try {
-          const stored = await runtime.snapshot(PushTokenDoc, context);
-          const token = readStoredPushToken(stored);
-          if (token !== undefined) await sendRoutineStoppedPush(task.input, token, await pushLocale());
-        } catch (error) {
+/**
+ * The exported handle is for `createTask` and kind lookups; the harness registers the instance
+ * built with the Worker's token.
+ */
+export function createDeliverScheduledInstruction(options: {
+  readonly expoAccessToken?: string;
+} = {}) {
+  return defineTask<ScheduledInstruction, DeliveryState, null>({
+    name: "app.deliver-scheduled-instruction",
+    version: 1,
+    initial: () => ({ phase: "wait" }),
+    phases: {
+      wait: async (task, runtime, context) => {
+        await runtime.sleep(task.input.runAt, context);
+        await runtime.commit(async (tx) => {
+          const deliveries = await tx.doc(ScheduleDeliveries);
+          if (!deliveries.active.some(({ scheduleId }) => scheduleId === task.input.id)) {
+            deliveries.active.push({
+              scheduleId: task.input.id,
+              conversationId: task.input.conversationId,
+              instruction: task.input.instruction,
+              name: task.input.name,
+              runAt: task.input.runAt,
+              ...(task.input.recurrence === undefined ? {} : { recurrence: task.input.recurrence }),
+              ...(task.input.failures === undefined ? {} : { failures: task.input.failures }),
+            });
+          }
+          return { status: "running", checkpoint: { phase: "deliver" } };
+        }, context);
+      },
+      deliver: async (task, runtime, context) => {
+        let delivered = false;
+        // True once the turn has settled (done or failed), or the run has thrown.
+        let ended = false;
+        // A missing or unreadable language falls back to English. It never blocks the push.
+        const pushLocale = async (): Promise<SessionLocale | undefined> => {
           try {
-            runtime.report(error);
+            return readStoredLocale(await runtime.snapshot(LocaleDoc, context));
           } catch {
-            // Reporting must not change the outcome either.
+            return undefined;
           }
-        }
-      };
-      // The run that brings the failure count to the limit stops the routine.
-      const stopsRoutine =
-        task.input.recurrence !== undefined &&
-        (task.input.failures ?? 0) + 1 >= MAX_CONSECUTIVE_FAILURES;
-      try {
-        const conversation = await runtime.conversation(task.input.conversationId, context);
-        if (conversation !== undefined) {
-          const submission = await conversation.submit(
-            {
-              type: "input",
-              content: formatScheduledInstruction(task.input),
-              requestId: task.input.id,
-              whenBusy: "followUp",
-            },
-            context,
-          );
-          const turn = await submission.wait(context);
-          delivered = turn.status === "done";
-          // A user abort withdraws the input, and that stops the routine. Any other
-          // unanswered turn is a failure, and the routine goes on.
-          ended = turn.status === "done" || turn.reason !== "aborted";
-          if (turn.status !== "done") {
-            // The next run is still scheduled, so report the miss instead of
-            // letting a failing routine repeat silently.
-            try {
-              runtime.report(
-                new Error(
-                  `Scheduled instruction ${task.input.id} did not complete (${turn.status}${turn.reason === undefined ? "" : `: ${turn.reason}`})`,
-                ),
-              );
-            } catch {
-              // Reporting must not skip the next row either.
-            }
-          }
-        } else {
-          runtime.report(
-            new Error(
-              `Scheduled instruction ${task.input.id} conversation ${task.input.conversationId} is missing`,
-            ),
-          );
-        }
-        // The turn is already in the conversation. A push failure must not
-        // change `delivered`, or the next recurrence row is skipped.
-        if (delivered) {
+        };
+        const notifyStopped = async (): Promise<void> => {
           try {
             const stored = await runtime.snapshot(PushTokenDoc, context);
             const token = readStoredPushToken(stored);
-            if (token !== undefined) await sendReminderPush(task.input, token, await pushLocale());
+            if (token !== undefined) {
+              await sendRoutineStoppedPush(
+                task.input,
+                token,
+                await pushLocale(),
+                options.expoAccessToken,
+              );
+            }
           } catch (error) {
             try {
               runtime.report(error);
             } catch {
-              // Reporting the push failure must not skip the next row either.
+              // Reporting must not change the outcome either.
             }
           }
+        };
+        // The run that brings the failure count to the limit stops the routine.
+        const stopsRoutine =
+          task.input.recurrence !== undefined &&
+          (task.input.failures ?? 0) + 1 >= MAX_CONSECUTIVE_FAILURES;
+        try {
+          const conversation = await runtime.conversation(task.input.conversationId, context);
+          if (conversation !== undefined) {
+            const submission = await conversation.submit(
+              {
+                type: "input",
+                content: formatScheduledInstruction(task.input),
+                requestId: task.input.id,
+                whenBusy: "followUp",
+              },
+              context,
+            );
+            const turn = await submission.wait(context);
+            delivered = turn.status === "done";
+            // A user abort withdraws the input, and that stops the routine. Any other
+            // unanswered turn is a failure, and the routine goes on.
+            ended = turn.status === "done" || turn.reason !== "aborted";
+            if (turn.status !== "done") {
+              // The next run is still scheduled, so report the miss instead of
+              // letting a failing routine repeat silently.
+              try {
+                runtime.report(
+                  new Error(
+                    `Scheduled instruction ${task.input.id} did not complete (${turn.status}${turn.reason === undefined ? "" : `: ${turn.reason}`})`,
+                  ),
+                );
+              } catch {
+                // Reporting must not skip the next row either.
+              }
+            }
+          } else {
+            runtime.report(
+              new Error(
+                `Scheduled instruction ${task.input.id} conversation ${task.input.conversationId} is missing`,
+              ),
+            );
+          }
+          // The turn is already in the conversation. A push failure must not
+          // change `delivered`, or the next recurrence row is skipped.
+          if (delivered) {
+            try {
+              const stored = await runtime.snapshot(PushTokenDoc, context);
+              const token = readStoredPushToken(stored);
+              if (token !== undefined) {
+                await sendReminderPush(
+                  task.input,
+                  token,
+                  await pushLocale(),
+                  options.expoAccessToken,
+                );
+              }
+            } catch (error) {
+              try {
+                runtime.report(error);
+              } catch {
+                // Reporting the push failure must not skip the next row either.
+              }
+            }
+          }
+          await runtime.commit(async (tx) => {
+            await commitDeliveryOutcome(tx, task.input, runtime.now(), ended, undefined, !delivered);
+            return { status: "terminal", outcome: { status: "completed", result: null } };
+          }, context);
+          if (ended && !delivered && stopsRoutine) await notifyStopped();
+        } catch (error) {
+          // An uncaught error faults the task, which is terminal. Write the next row
+          // in this commit first, so one thrown run does not end the routine.
+          await runtime.commit(async (tx) => {
+            await commitDeliveryOutcome(tx, task.input, runtime.now(), true, undefined, true);
+            return { status: "running", checkpoint: { phase: "deliver" } };
+          }, context);
+          if (stopsRoutine) await notifyStopped();
+          throw error;
         }
-        await runtime.commit(async (tx) => {
-          await commitDeliveryOutcome(tx, task.input, runtime.now(), ended, undefined, !delivered);
-          return { status: "terminal", outcome: { status: "completed", result: null } };
-        }, context);
-        if (ended && !delivered && stopsRoutine) await notifyStopped();
-      } catch (error) {
-        // An uncaught error faults the task, which is terminal. Write the next row
-        // in this commit first, so one thrown run does not end the routine.
-        await runtime.commit(async (tx) => {
-          await commitDeliveryOutcome(tx, task.input, runtime.now(), true, undefined, true);
-          return { status: "running", checkpoint: { phase: "deliver" } };
-        }, context);
-        if (stopsRoutine) await notifyStopped();
-        throw error;
-      }
+      },
     },
-  },
-  abort: async (task, runtime, context) => {
-    await runtime.commit(async (tx) => {
-      await commitDeliveryOutcome(tx, task.input, runtime.now(), false);
-      return { status: "terminal", outcome: { status: "aborted" } };
-    }, context);
-  },
-});
+    abort: async (task, runtime, context) => {
+      await runtime.commit(async (tx) => {
+        await commitDeliveryOutcome(tx, task.input, runtime.now(), false);
+        return { status: "terminal", outcome: { status: "aborted" } };
+      }, context);
+    },
+  });
+}
+
+export const DeliverScheduledInstruction = createDeliverScheduledInstruction();
 
 /**
  * Like `planNextInstruction`, but a recurrence that cannot be planned stops the
