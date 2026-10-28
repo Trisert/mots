@@ -69,7 +69,7 @@ describe("sessionReducer message updates", () => {
 
     const dropped = state.snapshots[1]!;
     expect(dropped.partial).toBeUndefined();
-    expect(dropped.live).toEqual(started.live);
+    expect(dropped.live).toEqual({ active: true, text: "" });
     expect(dropped.runHasAssistant).toBe(true);
 
     state = applyAgentEvents(state, [
