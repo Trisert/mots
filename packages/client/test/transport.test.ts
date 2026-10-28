@@ -167,6 +167,28 @@ describe("MotsClient", () => {
     }
   });
 
+  test("reports the created branch before submitting the edited text", () => {
+    const { client, socket } = connect();
+    try {
+      const branches: number[] = [];
+      void client.editPrompt(1, 40, "Versione corretta", (branchId) => branches.push(branchId));
+      const fork = JSON.parse(socket.sent[0]!) as { readonly requestId: string };
+      socket.message(
+        JSON.stringify({
+          type: "command.result",
+          command: "conversation.fork",
+          requestId: fork.requestId,
+          ok: true,
+          conversationId: 7,
+        }),
+      );
+      expect(branches).toEqual([7]);
+      expect(JSON.parse(socket.sent[1]!)).toMatchObject({ type: "prompt.submit", conversationId: 7 });
+    } finally {
+      client.dispose();
+    }
+  });
+
   test("edits the first message by creating an empty conversation, then submitting in it", () => {
     const { client, socket } = connect();
     try {
