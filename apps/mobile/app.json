@@ -10,6 +10,7 @@
     "backgroundColor": "#0F1012",
     "plugins": [
       "expo-notifications",
+      "expo-system-ui",
       [
         "expo-splash-screen",
         {
