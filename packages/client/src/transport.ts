@@ -260,6 +260,13 @@ export class MotsClient {
     this.#sendPushToken();
   }
 
+  /** Forget the device's push token. Sent now when connected, so the session stops pushing to this device. */
+  clearPushToken(): void {
+    if (this.#pushToken === undefined) return;
+    this.#pushToken = undefined;
+    this.#send({ type: "pushToken.clear", requestId: newRequestId() }, false);
+  }
+
   clearError(): void {
     if (this.#state.error === undefined) return;
     this.#dispatch({ type: "clear-error" });

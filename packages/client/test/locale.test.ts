@@ -118,4 +118,25 @@ describe("MotsClient push token", () => {
       client.dispose();
     }
   });
+
+  test("sends pushToken.clear on the open socket and forgets the token", () => {
+    const socket = new SnapshotSocket();
+    const client = new MotsClient({
+      baseUrl: "https://mots.example",
+      sessionId: "session-1",
+      username: "Luca",
+      socketFactory: () => socket,
+    });
+    try {
+      client.setPushToken("ExponentPushToken[first]");
+      client.connect();
+      socket.connect();
+      client.clearPushToken();
+      const types = socket.sent.map((text) => (JSON.parse(text) as { type: string }).type);
+      expect(types.at(-1)).toBe("pushToken.clear");
+      expect(registrations(socket)).toHaveLength(1);
+    } finally {
+      client.dispose();
+    }
+  });
 });
