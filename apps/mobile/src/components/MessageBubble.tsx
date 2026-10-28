@@ -1,9 +1,10 @@
 import { memo, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import type { TranscriptEntry } from "@mots/client";
 import { useTheme } from "../context/ThemeContext";
 import { announceNow } from "../a11y";
+import { messageBody } from "../edit-message";
 import { useI18n } from "../i18n";
 import { fonts, radius, shadows, spacing, type as typeScale, type ThemeColors } from "../theme";
 import { toolLabel, toolSummary } from "../tools";
@@ -25,8 +26,7 @@ import { MascotAvatar } from "./Mascot";
 import { ToolMarker, ToolRun } from "./ToolRun";
 
 function extractThinkingAndText(raw: string): { thinking?: string; text: string } {
-  // Strip user submission ID prefixes if present
-  let clean = raw.replace(/^\[[^\]\n]{1,40}\]\n/, "");
+  let clean = messageBody(raw);
 
   // Match <think>...</think> or <reasoning>...</reasoning>
   const thinkMatch = /<(?:think|reasoning)>([\s\S]*?)<\/(?:think|reasoning)>/i.exec(clean);
@@ -42,9 +42,11 @@ function extractThinkingAndText(raw: string): { thinking?: string; text: string 
 type Props = {
   readonly entry: TranscriptEntry;
   readonly onFork?: (entry: TranscriptEntry) => void;
+  /** Offered for sent messages while the chat can take input. */
+  readonly onEdit?: (entry: TranscriptEntry) => void;
 };
 
-function MessageBubbleComponent({ entry, onFork }: Props) {
+function MessageBubbleComponent({ entry, onFork, onEdit }: Props) {
   const { colors, isDark } = useTheme();
   const { t, locale } = useI18n();
   const localeTag = locale === "it" ? "it-IT" : "en-GB";
@@ -93,7 +95,15 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
     }
   };
 
-  return (
+  const openMessageActions = () => {
+    Alert.alert(t("bubble.messageActions"), undefined, [
+      { text: t("bubble.copyMessage"), onPress: () => void copyMessage() },
+      ...(onEdit !== undefined ? [{ text: t("bubble.editMessage"), onPress: () => onEdit(entry) }] : []),
+      { text: t("common.cancel"), style: "cancel" },
+    ]);
+  };
+
+  const message = (
     <View accessibilityRole="listitem" style={[styles.row, isUser ? styles.rowUser : styles.rowAssistant]}>
       {!isUser ? (
         <View style={styles.avatar}>
@@ -161,7 +171,8 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
           <MarkdownText
             text={text}
             style={[styles.text, isUser && styles.textUser]}
-            selectable
+            // A long press opens the message actions, so a sent message is not selectable text.
+            selectable={!isUser}
           />
         ) : null}
 
@@ -216,6 +227,24 @@ function MessageBubbleComponent({ entry, onFork }: Props) {
         ) : null}
       </View>
     </View>
+  );
+
+  if (!isUser) return message;
+  return (
+    <Pressable
+      delayLongPress={350}
+      onLongPress={openMessageActions}
+      accessibilityActions={[
+        { name: "copy", label: t("bubble.copyMessage") },
+        ...(onEdit !== undefined ? [{ name: "edit", label: t("bubble.editMessage") }] : []),
+      ]}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === "copy") void copyMessage();
+        if (event.nativeEvent.actionName === "edit") onEdit?.(entry);
+      }}
+    >
+      {message}
+    </Pressable>
   );
 }
 
