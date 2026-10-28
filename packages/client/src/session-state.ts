@@ -274,14 +274,16 @@ function reduceAgentEvent(
             runHasAssistant: true,
           }
         : conversation;
-    case "message_update":
-      return conversation.partial === undefined
-        ? conversation
-        : withPartial(
-            conversation,
-            applyMessageChanges(conversation.partial, event.changes, event.usage),
-            conversation.live?.retry,
-          );
+    case "message_update": {
+      if (conversation.partial === undefined) return conversation;
+      let partial: AssistantMessage;
+      try {
+        partial = applyMessageChanges(conversation.partial, event.changes, event.usage);
+      } catch {
+        return { ...conversation, partial: undefined };
+      }
+      return withPartial(conversation, partial, conversation.live?.retry);
+    }
     case "message_end": {
       const next = clearCommittedPartial(appendEntry(conversation, event.entry), event.entry);
       return event.entry.model?.some((message) => message.role === "assistant")
