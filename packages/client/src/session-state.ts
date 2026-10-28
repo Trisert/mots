@@ -280,7 +280,11 @@ function reduceAgentEvent(
       try {
         partial = applyMessageChanges(conversation.partial, event.changes, event.usage);
       } catch {
-        return { ...conversation, partial: undefined };
+        return {
+          ...conversation,
+          partial: undefined,
+          live: conversation.live === null ? null : { ...conversation.live, text: "" },
+        };
       }
       return withPartial(conversation, partial, conversation.live?.retry);
     }
