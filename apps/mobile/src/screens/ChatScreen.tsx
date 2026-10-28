@@ -114,7 +114,12 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const [sending, setSending] = useState(false);
   /** The sent message being edited, and the entry its branch starts from (none for the first message). */
   const [editing, setEditing] = useState<
-    { readonly entryId: number; readonly branchFrom: number | undefined } | undefined
+    | {
+        readonly conversationId: number;
+        readonly entryId: number;
+        readonly branchFrom: number | undefined;
+      }
+    | undefined
   >(undefined);
   /** The composer's own draft, kept while a message is edited and given back when the edit ends. */
   const [draftBeforeEdit, setDraftBeforeEdit] = useState("");
@@ -227,10 +232,15 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
   const edit = useCallback(
     (entry: TranscriptEntry) => {
       if (editing === undefined) setDraftBeforeEdit(input);
-      setEditing({ entryId: entry.id, branchFrom: branchEntryId(entries, entry.id) });
+      if (activeConversationId === undefined) return;
+      setEditing({
+        conversationId: activeConversationId,
+        entryId: entry.id,
+        branchFrom: branchEntryId(entries, entry.id),
+      });
       setInput(messageBody(entry.text));
     },
-    [editing, entries, input],
+    [activeConversationId, editing, entries, input],
   );
 
   const cancelEdit = useCallback(() => {
@@ -250,7 +260,9 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
       } else {
         // Leaving edit mode before the branch switches conversation keeps that switch from touching the composer.
         setEditing(undefined);
-        accepted = await client.editPrompt(activeConversationId, editing.branchFrom, text);
+        accepted = await client.editPrompt(editing.conversationId, editing.branchFrom, text);
+        // A failed branch keeps the edit, so a retry edits the message again instead of posting here.
+        if (!accepted) setEditing(editing);
       }
       if (accepted) {
         setInput(editing === undefined ? "" : draftBeforeEdit);
