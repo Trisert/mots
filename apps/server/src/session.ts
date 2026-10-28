@@ -490,14 +490,15 @@ export class Session extends DurableObject<Env> {
       }
       case "prompt.submit": {
         this.#setTyping(socket, false);
-        const conversation = await this.#requireConversation(
-          command.conversationId as ConversationId,
-        );
-        const slot = await this.#reservePromptSlot();
-        let submission: Awaited<ReturnType<typeof conversation.submit>>;
-        try {
-          await this.#setAlarmNoLaterThan(Date.now() + RECOVERY_ALARM_DELAY_MS);
-          submission = await conversation.submit(
+        const conversationId = command.conversationId as ConversationId;
+        const conversation = await this.#requireConversation(conversationId);
+        const alreadyAdmitted =
+          (await this.#harness.commit(
+            (tx) => tx.submissionByRequest(conversationId, command.requestId),
+            BACKGROUND_CONTEXT,
+          )) !== undefined;
+        const submitPrompt = () =>
+          conversation.submit(
             {
               type: "input",
               content: attributedPrompt(
@@ -510,13 +511,22 @@ export class Session extends DurableObject<Env> {
             },
             BACKGROUND_CONTEXT,
           );
-        } catch (error) {
+        let submission: Awaited<ReturnType<typeof conversation.submit>>;
+        if (alreadyAdmitted) {
+          submission = await submitPrompt();
+        } else {
+          const slot = await this.#reservePromptSlot();
           try {
-            await this.#releasePromptSlot(slot);
-          } catch (releaseError) {
-            reportError("Session prompt slot release failed", releaseError);
+            await this.#setAlarmNoLaterThan(Date.now() + RECOVERY_ALARM_DELAY_MS);
+            submission = await submitPrompt();
+          } catch (error) {
+            try {
+              await this.#releasePromptSlot(slot);
+            } catch (releaseError) {
+              reportError("Session prompt slot release failed", releaseError);
+            }
+            throw error;
           }
-          throw error;
         }
         this.#send(socket, {
           type: "command.result",
