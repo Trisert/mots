@@ -200,11 +200,13 @@ export class MotsClient {
    * Sends an edited message: branches the conversation before the edited entry (a new empty
    * conversation when there is none), then submits the new text in that branch. The original
    * conversation is kept, so the answers that followed the edited message leave the chat.
+   * `onBranch` receives the new branch's ID once the server has created it, before the text is sent.
    */
   editPrompt(
     conversationId: number,
     previousEntryId: number | undefined,
     content: string,
+    onBranch?: (branchId: number) => void,
   ): Promise<boolean> {
     // An invalid text is refused by submitPrompt before anything is sent, so no branch is made.
     if (content.trim().length === 0 || content.length > MAX_PROMPT_CHARACTERS) {
@@ -222,6 +224,7 @@ export class MotsClient {
     return new Promise((resolve) => {
       this.#branchPrompts.set(command.requestId, (branchId) => {
         try {
+          onBranch?.(branchId);
           resolve(this.submitPrompt(branchId, content));
         } catch {
           resolve(false);

@@ -118,6 +118,8 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
         readonly conversationId: number;
         readonly entryId: number;
         readonly branchFrom: number | undefined;
+        /** The branch a previous attempt created, so a retry only sends the text again. */
+        readonly branchId?: number;
       }
     | undefined
   >(undefined);
@@ -260,9 +262,26 @@ export function ChatScreen({ identity, onLeave, onIdentityChange, onRestart }: P
       } else {
         // Leaving edit mode before the branch switches conversation keeps that switch from touching the composer.
         setEditing(undefined);
-        accepted = await client.editPrompt(editing.conversationId, editing.branchFrom, text);
-        // A failed branch keeps the edit, so a retry edits the message again instead of posting here.
-        if (!accepted) setEditing(editing);
+        if (editing.branchId !== undefined) {
+          accepted = await client.submitPrompt(editing.branchId, text);
+          // Keep the edit so a retry sends to the same branch and the saved draft is still restored.
+          if (!accepted) setEditing(editing);
+        } else {
+          let createdBranchId: number | undefined;
+          accepted = await client.editPrompt(
+            editing.conversationId,
+            editing.branchFrom,
+            text,
+            (branchId) => {
+              createdBranchId = branchId;
+            },
+          );
+          if (!accepted) {
+            // Keep the edit so a retry edits the message again; a created branch is reused, not forked again.
+            const branchId = createdBranchId ?? editing.branchId;
+            setEditing({ ...editing, ...(branchId === undefined ? {} : { branchId }) });
+          }
+        }
       }
       if (accepted) {
         setInput(editing === undefined ? "" : draftBeforeEdit);
