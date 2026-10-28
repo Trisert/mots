@@ -502,7 +502,6 @@ export class Session extends DurableObject<Env> {
         const conversationId = command.conversationId as ConversationId;
         const conversation = await this.#requireConversation(conversationId);
         const images = command.images ?? [];
-        if (images.length > 0) await this.#requireImageModel(conversationId);
         const alreadyAdmitted =
           (await this.#harness.commit(
             (tx) => tx.submissionByRequest(conversationId, command.requestId),
@@ -526,6 +525,9 @@ export class Session extends DurableObject<Env> {
         if (alreadyAdmitted) {
           submission = await submitPrompt();
         } else {
+          // Only a new admission is checked against the current model. A replay of an admitted prompt
+          // must still return its submission, even after the model changed.
+          if (images.length > 0) await this.#requireImageModel(conversationId);
           const slot = await this.#reservePromptSlot();
           try {
             await this.#setAlarmNoLaterThan(Date.now() + RECOVERY_ALARM_DELAY_MS);
@@ -559,9 +561,18 @@ export class Session extends DurableObject<Env> {
         return;
       }
       case "conversation.setModel": {
-        await this.#requireConversation(command.conversationId as ConversationId);
+        const targetId = command.conversationId as ConversationId;
+        await this.#requireConversation(targetId);
         if (!this.#canSelectModel(command.provider, command.modelId)) {
           throw new ModelNotAllowedError();
+        }
+        // A queued picture runs under whichever model is set when its turn starts, so a text-only
+        // model is refused while one waits.
+        if (
+          !modelAcceptsImages(this.#models, command.provider, command.modelId) &&
+          (await this.#hasQueuedImages(targetId))
+        ) {
+          throw new ImagesNotSupportedError();
         }
         await this.#harness.commit(async (tx) => {
           await configure(tx, command.conversationId as ConversationId, {
@@ -618,6 +629,17 @@ export class Session extends DurableObject<Env> {
         return;
       }
     }
+  }
+
+  /** Whether a follow-up waiting in the conversation's inbox carries a picture. */
+  async #hasQueuedImages(conversationId: ConversationId): Promise<boolean> {
+    const inbox = await this.#harness.snapshot(InboxDoc, conversationId, BACKGROUND_CONTEXT);
+    return (inbox?.items ?? []).some(
+      (item) =>
+        item.mode !== "write" &&
+        Array.isArray(item.content) &&
+        item.content.some((part) => part.type === "image"),
+    );
   }
 
   /** Refuses images for a model whose catalog entry does not accept them. */
