@@ -666,7 +666,16 @@ export class Session extends DurableObject<Env> {
       const attachment = connectionState(socket);
       if (attachment?.conversationId !== undefined) {
         const conversationId = attachment.conversationId as ConversationId;
-        await this.#watchConversation(socket, conversationId, attachment.typing === true);
+        try {
+          await this.#watchConversation(socket, conversationId, attachment.typing === true);
+        } catch (error) {
+          reportError("Session event stream restore failed", error);
+          try {
+            socket.close(1011, "Conversation unavailable");
+          } catch {
+            // The socket may already have closed.
+          }
+        }
       }
     }
   }
