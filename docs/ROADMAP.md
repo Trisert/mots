@@ -34,7 +34,7 @@ Mots is a pocket companion: one session is a Cloudflare Durable Object running a
 | **M22 ESLint** | **Open** | |
 | M23 Fake-LLM Worker smoke | Done | `apps/server/test/fake-llm.test.ts` |
 | M24 Italian copy out of the client | Done 2026-10-26 | `RunErrorCode`, `apps/mobile/src/present.ts` |
-| **M25 Trailer to LFS or release** | **Owner decision** | do not delete |
+| M25 Trailer | Done | removed from the tree at the owner's request; it remains in git history |
 
 Also landed on 2026-10-26, outside the M list:
 
