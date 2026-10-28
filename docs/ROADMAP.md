@@ -24,7 +24,7 @@ Mots is a pocket companion: one session is a Cloudflare Durable Object running a
 | M12 Outbox while disconnected | Done 2026-10-26 | `packages/client/src/command-outbox.ts` |
 | M13 Push token protocol | Done | `pushToken.*` |
 | M14 Push on delivery | Done | `packages/agent/src/push-token.ts` |
-| M15 Mobile push registration | Code done, device check open | `apps/mobile/src/hooks/usePushRegistration.ts`; needs FCM setup, see `apps/mobile/README.md` |
+| M15 Mobile push registration | Done (verified on Android, dev build) | `apps/mobile/src/hooks/usePushRegistration.ts`; FCM setup in `apps/mobile/README.md` |
 | M16 Markdown links | Done | `apps/mobile/src/markdown.ts` |
 | **M17 Image messages** | **Open** | |
 | **M18 Voice messages** | **Open** | |
@@ -72,7 +72,7 @@ One task per pull request, as `AGENTS.md` asks. Branch from current `main`, run 
 - [x] Safe `forget`
 - [x] M12 offline outbox
 - [x] M24 run error code
-- [x] **M15** mobile push registration (`expo-notifications`, register on connect with `pushToken.register`). Code and client tests are in. Not yet verified on a device: needs the FCM steps in `apps/mobile/README.md` and a development build.
+- [x] **M15** mobile push registration (`expo-notifications`, register on connect with `pushToken.register`). Verified on an Android development build: a reminder arrived with the app closed, with the assistant reply as the text.
 - [ ] Timezone follow-up: show the stored zone in the session sheet and let the user override it.
 
 ### Phase 1. Accounts and transparent memory
