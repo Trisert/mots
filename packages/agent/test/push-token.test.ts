@@ -100,6 +100,7 @@ async function runDeliver(options: {
   phase?: "deliver" | "abort";
   accessToken?: string;
   instructionText?: string;
+  replyText?: string;
   respond?: () => Response | Promise<Response>;
 }) {
   const order: string[] = [];
@@ -152,11 +153,19 @@ async function runDeliver(options: {
             return {
               wait: async () => {
                 order.push("wait");
-                return { status: mode === "unanswered" ? "unanswered" : "done" };
+                if (mode === "unanswered") return { status: "unanswered" };
+                return options.replyText === undefined
+                  ? { status: "done" }
+                  : { status: "done", answer: "answer-1" };
               },
             };
           },
         };
+      },
+      entry: async () => {
+        order.push("entry");
+        if (options.replyText === undefined) return undefined;
+        return { model: [{ role: "assistant", content: options.replyText }] };
       },
       commit: async (change: (transaction: Tx) => Promise<unknown>) => {
         order.push("commit");
@@ -207,7 +216,7 @@ describe("push token delivery", () => {
     expect(request.body).toMatchObject({
       to: replacement,
       title: "Briefing",
-      body: "Send the briefing",
+      body: "A scheduled reminder is ready.",
       sound: "default",
       priority: "high",
       data: { scheduleId: "schedule:source", conversationId },
@@ -334,11 +343,24 @@ describe("push token delivery", () => {
     expectNextRow(result.created);
   });
 
+  test("pushes the assistant reply, never the stored instruction", async () => {
+    const doc: { token?: string } = {};
+    register(doc, TOKEN, "req-reply");
+    const result = await runDeliver({
+      doc,
+      instructionText: "Internal note: the user asked for a water reminder",
+      replyText: "Ricordati di bere un bicchiere d'acqua.",
+    });
+    const body = result.requests[0]?.body.body;
+    expect(body).toBe("Ricordati di bere un bicchiere d'acqua.");
+    expect(JSON.stringify(result.requests[0]?.body)).not.toContain("Internal note");
+  });
+
   test("keeps the full instruction in the conversation and clips only the push body", async () => {
     const text = "A".repeat(600);
     const doc: { token?: string } = {};
     register(doc, TOKEN, "req-1");
-    const result = await runDeliver({ doc, instructionText: text });
+    const result = await runDeliver({ doc, instructionText: text, replyText: text });
     expect(result.submitted[0]?.includes(text)).toBe(true);
     const body = result.requests[0]?.body.body;
     expect(typeof body).toBe("string");

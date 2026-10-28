@@ -1,3 +1,4 @@
+import type { AssistantMessage } from "@earendil-works/pi-ai";
 import {
   type ConversationId,
   defineDoc,
@@ -13,6 +14,7 @@ import {
   sendRoutineStoppedPush,
 } from "./push-token.ts";
 import { LocaleDoc, readStoredLocale } from "./locale.ts";
+import { messageText } from "./message-text.ts";
 
 export type ScheduleCadence = {
   readonly unit: "minute" | "hour" | "day" | "week" | "month";
@@ -342,6 +344,8 @@ export function createDeliverScheduledInstruction(options: {
         const stopsRoutine =
           task.input.recurrence !== undefined &&
           (task.input.failures ?? 0) + 1 >= MAX_CONSECUTIVE_FAILURES;
+        // The assistant's reply to this run. It becomes the push body; the stored instruction does not.
+        let replyText: string | undefined;
         try {
           const conversation = await runtime.conversation(task.input.conversationId, context);
           if (conversation !== undefined) {
@@ -356,6 +360,10 @@ export function createDeliverScheduledInstruction(options: {
             );
             const turn = await submission.wait(context);
             delivered = turn.status === "done";
+            if (turn.status === "done" && turn.answer !== undefined) {
+              const answer = await runtime.entry(turn.answer, context);
+              replyText = messageText(answer?.model?.[0] as AssistantMessage | undefined);
+            }
             // A user abort withdraws the input, and that stops the routine. Any other
             // unanswered turn is a failure, and the routine goes on.
             ended = turn.status === "done" || turn.reason !== "aborted";
@@ -391,6 +399,7 @@ export function createDeliverScheduledInstruction(options: {
                   token,
                   await pushLocale(),
                   options.expoAccessToken,
+                  replyText,
                 );
               }
             } catch (error) {

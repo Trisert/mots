@@ -1,5 +1,5 @@
 import type { Context } from "@earendil-works/chord";
-import { type AssistantMessage, type Message, Type } from "@earendil-works/pi-ai";
+import { type AssistantMessage, Type } from "@earendil-works/pi-ai";
 import {
   AssistantEntry,
   configure,
@@ -12,6 +12,7 @@ import {
   type ToolRegistration,
   UserEntry,
 } from "@earendil-works/pi-durable";
+import { messageText } from "./message-text.ts";
 
 export const SEARCH_CONVERSATIONS_TOOL_NAME = "search_conversations";
 export const SEARCH_HISTORY_TOOL_NAME = "search_history";
@@ -30,12 +31,6 @@ export type ConversationMatch = {
   readonly role: "user" | "assistant";
   readonly snippet: string;
 };
-
-function messageText(message: Message | undefined): string {
-  if (message === undefined || message.role === "toolResult") return "";
-  if (typeof message.content === "string") return message.content;
-  return message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n");
-}
 
 function snippet(text: string, index: number, length: number): string {
   const start = Math.max(0, index - SNIPPET_RADIUS);

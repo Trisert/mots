@@ -56,10 +56,10 @@ const reminderMessage = (
   reminder: ReminderPush,
   token: string,
   locale: SessionLocale | undefined,
-  bodyText?: string,
+  bodyText: string,
 ) => {
   const title = clip(reminder.name ?? "", TITLE_CHARACTERS);
-  const body = clip(bodyText ?? reminder.instruction, BODY_CHARACTERS);
+  const body = clip(bodyText, BODY_CHARACTERS);
   return {
     to: token,
     title: title.length > 0 ? title : "Mots",
@@ -90,16 +90,20 @@ const ticketError = (payload: unknown): string | undefined => {
 };
 
 /**
- * POST one reminder to Expo. Throws when the request fails.
- * The delivery caller must catch that and still write the next recurrence row.
+ * POST one reminder to Expo. The body is the assistant's reply in the delivered turn, so the
+ * stored instruction (written for the model, not the user) never reaches the phone.
+ * Throws when the request fails. The delivery caller must catch that and still write the next row.
  */
 export async function sendReminderPush(
   reminder: ReminderPush,
   token: string,
   locale?: SessionLocale,
   accessToken?: string,
+  replyText?: string,
 ): Promise<void> {
-  await postPush(reminderMessage(reminder, token, locale), accessToken);
+  const trimmed = replyText?.trim() ?? "";
+  const bodyText = trimmed.length > 0 ? trimmed : pushCopyFor(locale).fallbackBody;
+  await postPush(reminderMessage(reminder, token, locale, bodyText), accessToken);
 }
 
 /** Tell the user a routine stopped after repeated failed runs. Throws when the request fails. */
