@@ -101,6 +101,7 @@ async function runDeliver(options: {
   accessToken?: string;
   instructionText?: string;
   replyText?: string;
+  entryFails?: boolean;
   respond?: () => Response | Promise<Response>;
 }) {
   const order: string[] = [];
@@ -164,8 +165,15 @@ async function runDeliver(options: {
       },
       entry: async () => {
         order.push("entry");
+        if (options.entryFails) throw new Error("storage read failed");
         if (options.replyText === undefined) return undefined;
-        return { model: [{ role: "assistant", content: options.replyText }] };
+        // A tool call first, then the text: the reply is the last message with text.
+        return {
+          model: [
+            { role: "assistant", content: [] },
+            { role: "assistant", content: options.replyText },
+          ],
+        };
       },
       commit: async (change: (transaction: Tx) => Promise<unknown>) => {
         order.push("commit");
@@ -354,6 +362,16 @@ describe("push token delivery", () => {
     const body = result.requests[0]?.body.body;
     expect(body).toBe("Ricordati di bere un bicchiere d'acqua.");
     expect(JSON.stringify(result.requests[0]?.body)).not.toContain("Internal note");
+  });
+
+  test("still pushes the default text when reading the reply fails", async () => {
+    const doc: { token?: string } = {};
+    register(doc, TOKEN, "req-entry-fails");
+    const result = await runDeliver({ doc, replyText: "unused", entryFails: true });
+    expect(result.thrown).toBeUndefined();
+    expect(result.requests[0]?.body.body).toBe("A scheduled reminder is ready.");
+    expect(result.reports).toHaveLength(1);
+    expectNextRow(result.created);
   });
 
   test("keeps the full instruction in the conversation and clips only the push body", async () => {

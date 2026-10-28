@@ -11,26 +11,44 @@ const ANDROID_CHANNEL_ID = "default";
  * Runs once per client. Expo Go and web have no native push, so they stay silent.
  */
 export function usePushRegistration(client: MotsClient, enabled: boolean, channelName: string): void {
+  // The channel name follows the app language. Only this effect depends on it, so a language
+  // change does not register the push token again.
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    void Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
+      name: channelName,
+      importance: Notifications.AndroidImportance.HIGH,
+    }).catch((error: unknown) => {
+      console.warn("Notification channel setup failed", error);
+    });
+  }, [channelName]);
+
   useEffect(() => {
     if (!enabled || Platform.OS !== "android") return;
     let alive = true;
-    void registerForPush(channelName)
+    void registerForPush()
       .then((token) => {
         if (alive && token !== undefined) client.setPushToken(token);
       })
-      .catch(() => {
-        // No token means no push. The chat still works; the app shows nothing new.
+      .catch((error: unknown) => {
+        // Without a token the app gets no push. Log the reason so a missing Firebase setup is visible.
+        console.warn("Push registration failed", error);
       });
     return () => {
       alive = false;
     };
-  }, [client, enabled, channelName]);
+  }, [client, enabled]);
 }
 
-async function registerForPush(channelName: string): Promise<string | undefined> {
-  await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
-    name: channelName,
-    importance: Notifications.AndroidImportance.HIGH,
+async function registerForPush(): Promise<string | undefined> {
+  // Show reminders while the app is open too. Without a handler, Expo drops foreground banners.
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
   });
   const current = await Notifications.getPermissionsAsync();
   const status =

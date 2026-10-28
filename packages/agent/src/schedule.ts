@@ -361,8 +361,21 @@ export function createDeliverScheduledInstruction(options: {
             const turn = await submission.wait(context);
             delivered = turn.status === "done";
             if (turn.status === "done" && turn.answer !== undefined) {
-              const answer = await runtime.entry(turn.answer, context);
-              replyText = messageText(answer?.model?.[0] as AssistantMessage | undefined);
+              try {
+                // A tool call can come before the text, so take the last message that has text.
+                const answer = await runtime.entry(turn.answer, context);
+                const texts = (answer?.model ?? [])
+                  .map((message) => messageText(message as AssistantMessage))
+                  .filter((text) => text.trim().length > 0);
+                replyText = texts[texts.length - 1];
+              } catch (error) {
+                // The push falls back to the default text. A failed read must not skip it.
+                try {
+                  runtime.report(error);
+                } catch {
+                  // Reporting must not change the delivery either.
+                }
+              }
             }
             // A user abort withdraws the input, and that stops the routine. Any other
             // unanswered turn is a failure, and the routine goes on.
