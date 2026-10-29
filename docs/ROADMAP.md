@@ -26,7 +26,7 @@ Mots is a pocket companion: one session is a Cloudflare Durable Object running a
 | M14 Push on delivery | Done | `packages/agent/src/push-token.ts` |
 | M15 Mobile push registration | Done (verified on Android, dev build) | `apps/mobile/src/hooks/usePushRegistration.ts`; FCM setup in `apps/mobile/README.md` |
 | M16 Markdown links | Done | `apps/mobile/src/markdown.ts` |
-| **M17 Image messages** | **Open** | |
+| M17 Image messages | Done | `apps/mobile/src/attachments.ts`, `prompt.submit` `images` in `packages/protocol` |
 | **M18 Voice messages** | **Open** | |
 | M19 EAS and iOS | Done (preview profile) | `apps/mobile/eas.json` |
 | M20 Staging Worker | Done | `wrangler.jsonc` `staging` |

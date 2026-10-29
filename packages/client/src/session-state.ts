@@ -39,6 +39,12 @@ export interface TranscriptToolResult {
   readonly nestedCalls?: NestedToolCalls;
 }
 
+/** A picture in a user message, as base64. Assistant and tool entries carry none. */
+export interface TranscriptImage {
+  readonly mimeType: string;
+  readonly data: string;
+}
+
 export interface TranscriptEntry {
   readonly id: number;
   readonly conversationId: number;
@@ -58,6 +64,7 @@ export interface TranscriptEntry {
   readonly diagnostics?: readonly ToolDiagnostic[];
   readonly toolCalls?: readonly TranscriptToolCall[];
   readonly toolResult?: TranscriptToolResult;
+  readonly images?: readonly TranscriptImage[];
 }
 
 export interface LiveConversation {
@@ -600,9 +607,10 @@ function transcriptEntry(entry: EntryRecord): TranscriptEntry {
       },
     };
   }
+  const images = first?.role === "user" ? transcriptImages(first.content) : [];
   const rawText =
     entry.model?.map(messageText).filter(Boolean).join("\n\n") ||
-    (first?.role === "assistant"
+    (first?.role === "assistant" || first?.role === "user"
       ? ""
       : entry.data === undefined
         ? entry.kind
@@ -624,7 +632,23 @@ function transcriptEntry(entry: EntryRecord): TranscriptEntry {
     text,
     canFork: role === "user" || role === "assistant",
     ...(toolCalls.length === 0 ? {} : { toolCalls }),
+    ...(images.length === 0 ? {} : { images }),
   };
+}
+
+/** The pictures of a user message. Text parts are shown as text; a picture-only message has no text. */
+function transcriptImages(content: string | readonly unknown[]): TranscriptImage[] {
+  if (typeof content === "string") return [];
+  const images: TranscriptImage[] = [];
+  for (const part of content) {
+    if (isRecord(part) && part.type === "image" && typeof part.data === "string") {
+      images.push({
+        mimeType: typeof part.mimeType === "string" ? part.mimeType : "image/jpeg",
+        data: part.data,
+      });
+    }
+  }
+  return images;
 }
 
 /** Compaction entries wrap the summary in the Harness's fixed `<summary>` framing. */
@@ -678,7 +702,7 @@ function messageText(message: Message): string {
       return [content, ...sections].filter(Boolean).join("\n\n");
     }
     case "user":
-      return contentText(message.content);
+      return textParts(message.content);
     case "assistant":
       return assistantText(message.content) || message.errorMessage || "";
     case "toolResult":
@@ -695,6 +719,15 @@ function contentText(content: string | readonly unknown[]): string {
       if (part.type === "image") return "[Image]";
       return "";
     })
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** The text of a user message without its pictures. */
+function textParts(content: string | readonly unknown[]): string {
+  if (typeof content === "string") return content;
+  return content
+    .map((part) => (isRecord(part) && part.type === "text" && typeof part.text === "string" ? part.text : ""))
     .filter(Boolean)
     .join("\n");
 }

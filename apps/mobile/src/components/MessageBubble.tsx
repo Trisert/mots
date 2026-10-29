@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import type { TranscriptEntry } from "@mots/client";
 import { useTheme } from "../context/ThemeContext";
@@ -167,6 +167,22 @@ function MessageBubbleComponent({ entry, onFork, onEdit }: Props) {
           </View>
         ) : null}
 
+        {entry.images !== undefined && entry.images.length > 0 ? (
+          <View style={styles.images}>
+            {entry.images.map((image, index) => (
+              <Image
+                // Pictures of one message have no id; their order is stable.
+                key={index}
+                accessibilityRole="image"
+                accessibilityLabel={t("chat.imageAlt")}
+                source={{ uri: `data:${image.mimeType};base64,${image.data}` }}
+                style={styles.image}
+                resizeMode="cover"
+              />
+            ))}
+          </View>
+        ) : null}
+
         {text.length > 0 ? (
           <MarkdownText
             text={text}
@@ -290,6 +306,17 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     },
     bubbleScheduled: {
       paddingHorizontal: 2,
+    },
+    images: {
+      gap: spacing.sm,
+      marginBottom: spacing.xs,
+    },
+    image: {
+      width: 220,
+      maxWidth: "100%",
+      aspectRatio: 1,
+      borderRadius: radius.bubble / 2,
+      backgroundColor: colors.sunk,
     },
     text: {
       fontFamily: fonts.regular,

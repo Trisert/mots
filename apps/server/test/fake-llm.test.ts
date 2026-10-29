@@ -210,6 +210,26 @@ describe("fake LLM smoke", () => {
 
       const reply = await log.waitFor((message) => message.includes('"text":"stub-ok"'), 8_000);
       expect(reply).toContain('"text":"stub-ok"');
+
+      // The stub model is text-only, so a picture is refused before it reaches the conversation.
+      const imageRequestId = "fake-llm-image";
+      ws.send(
+        JSON.stringify({
+          type: "prompt.submit",
+          requestId: imageRequestId,
+          conversationId,
+          content: "Cosa vedi?",
+          images: [{ mimeType: "image/png", data: "iVBORw0KGgo=" }],
+        }),
+      );
+      const refused = await log.waitFor(
+        (message) =>
+          message.includes('"type":"command.result"') &&
+          message.includes(`"requestId":"${imageRequestId}"`),
+        8_000,
+      );
+      expect(refused).toContain('"ok":false');
+      expect(refused).toContain('"code":"images_not_supported"');
       expect(outbound).toEqual([]);
     } finally {
       ws.close();

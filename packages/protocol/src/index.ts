@@ -23,6 +23,20 @@ export {
 
 export const ROOT_CONVERSATION_ID = 1;
 export const MAX_PROMPT_CHARACTERS = 100_000;
+/** Images per message. The phone resizes each one before it is sent. */
+export const MAX_PROMPT_IMAGES = 3;
+/**
+ * Base64 characters per image (about 450 KB of bytes). Three images stay under the 2 MB row limit of
+ * Durable Object storage, because a submitted message is stored as one row.
+ */
+export const MAX_IMAGE_BASE64_CHARACTERS = 600_000;
+export const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+export type ImageMimeType = (typeof IMAGE_MIME_TYPES)[number];
+/** An image attached to a prompt. `data` is base64 without a `data:` prefix. */
+export interface PromptImage {
+  readonly mimeType: ImageMimeType;
+  readonly data: string;
+}
 export const MAX_REQUEST_ID_CHARACTERS = 256;
 // Expo push tokens (`ExponentPushToken[...]`, `ExpoPushToken[...]`, or a legacy UUID).
 export const MAX_PUSH_TOKEN_CHARACTERS = 256;
@@ -32,7 +46,10 @@ export const SESSION_LOCALES = ["en", "it"] as const;
 export type SessionLocale = (typeof SESSION_LOCALES)[number];
 // JSON may escape each prompt code unit as six characters.
 export const MAX_CLIENT_FRAME_CHARACTERS =
-  MAX_PROMPT_CHARACTERS * 6 + MAX_REQUEST_ID_CHARACTERS + 1024;
+  MAX_PROMPT_CHARACTERS * 6 +
+  MAX_REQUEST_ID_CHARACTERS +
+  MAX_PROMPT_IMAGES * MAX_IMAGE_BASE64_CHARACTERS +
+  1024;
 const SCHEDULED_INSTRUCTION_PREFIX = "Scheduled instruction due now: ";
 const RECURRENCE_NOTE_PREFIX = "\n\nThis instruction recurs.";
 
@@ -146,6 +163,7 @@ export type ClientCommand =
       readonly requestId: string;
       readonly conversationId: number;
       readonly content: string;
+      readonly images?: readonly PromptImage[];
     }
   | {
       readonly type: "conversation.setModel";
@@ -305,6 +323,30 @@ const requireLocale = (value: unknown): SessionLocale => {
     throw new InvalidClientCommand(`locale must be one of ${SESSION_LOCALES.join(", ")}`);
   }
   return value as SessionLocale;
+};
+
+const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
+
+const requireImages = (value: unknown): readonly PromptImage[] => {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new InvalidClientCommand("images must be an array");
+  if (value.length > MAX_PROMPT_IMAGES) {
+    throw new InvalidClientCommand(`images cannot exceed ${MAX_PROMPT_IMAGES} per message`);
+  }
+  return value.map((image: unknown) => {
+    if (!isRecord(image)) throw new InvalidClientCommand("each image must be an object");
+    if (!(IMAGE_MIME_TYPES as readonly unknown[]).includes(image.mimeType)) {
+      throw new InvalidClientCommand(`image mimeType must be one of ${IMAGE_MIME_TYPES.join(", ")}`);
+    }
+    if (typeof image.data !== "string" || image.data.length === 0) {
+      throw new InvalidClientCommand("image data must be base64");
+    }
+    if (image.data.length > MAX_IMAGE_BASE64_CHARACTERS) {
+      throw new InvalidClientCommand(`an image cannot exceed ${MAX_IMAGE_BASE64_CHARACTERS} base64 characters`);
+    }
+    if (!BASE64_PATTERN.test(image.data)) throw new InvalidClientCommand("image data must be base64");
+    return { mimeType: image.mimeType as ImageMimeType, data: image.data };
+  });
 };
 
 const commandTypes = new Set<ClientCommandType>([
@@ -469,7 +511,12 @@ export function parseClientCommand(message: string): ClientCommand {
         entryId: requireId(value.entryId, "entryId"),
       };
     case "prompt.submit": {
-      if (typeof value.content !== "string" || value.content.trim().length === 0) {
+      const images = requireImages(value.images);
+      if (typeof value.content !== "string") {
+        throw new InvalidClientCommand("content must contain text");
+      }
+      // A picture may stand alone, so text is required only when no image is attached.
+      if (value.content.trim().length === 0 && images.length === 0) {
         throw new InvalidClientCommand("content must contain text");
       }
       if (value.content.length > MAX_PROMPT_CHARACTERS) {
@@ -480,6 +527,7 @@ export function parseClientCommand(message: string): ClientCommand {
         requestId,
         conversationId: requireId(value.conversationId, "conversationId"),
         content: value.content,
+        ...(images.length === 0 ? {} : { images }),
       };
     }
     case "conversation.setModel": {

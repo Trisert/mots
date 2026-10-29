@@ -1,8 +1,11 @@
 import {
+  MAX_IMAGE_BASE64_CHARACTERS,
   MAX_PROMPT_CHARACTERS,
+  MAX_PROMPT_IMAGES,
   parseServerEventEnvelope,
   ROOT_CONVERSATION_ID,
   type ClientCommand,
+  type PromptImage,
   type ServerEvent,
   type SessionLocale,
 } from "@mots/protocol";
@@ -243,8 +246,12 @@ export class MotsClient {
     this.#send({ type: "presence.typing", conversationId, typing }, false);
   }
 
-  submitPrompt(conversationId: number, content: string): Promise<boolean> {
-    if (content.trim().length === 0) {
+  submitPrompt(
+    conversationId: number,
+    content: string,
+    images: readonly PromptImage[] = [],
+  ): Promise<boolean> {
+    if (content.trim().length === 0 && images.length === 0) {
       this.#dispatch({
         type: "error",
         error: {
@@ -264,6 +271,26 @@ export class MotsClient {
       });
       return Promise.resolve(false);
     }
+    if (images.length > MAX_PROMPT_IMAGES) {
+      this.#dispatch({
+        type: "error",
+        error: {
+          code: CLIENT_ERROR.tooManyImages,
+          message: `A message can carry up to ${MAX_PROMPT_IMAGES} images`,
+        },
+      });
+      return Promise.resolve(false);
+    }
+    if (images.some((image) => image.data.length > MAX_IMAGE_BASE64_CHARACTERS)) {
+      this.#dispatch({
+        type: "error",
+        error: {
+          code: CLIENT_ERROR.imageTooLarge,
+          message: "An image is too large to send",
+        },
+      });
+      return Promise.resolve(false);
+    }
     if (this.#outbox.has("prompt.submit")) {
       throw new Error("A prompt submission is already pending");
     }
@@ -272,6 +299,7 @@ export class MotsClient {
       requestId: newRequestId(),
       conversationId,
       content,
+      ...(images.length === 0 ? {} : { images }),
     } satisfies Extract<ClientCommand, { readonly type: "prompt.submit" }>;
     return new Promise((resolve) => {
       this.#outbox.enqueue(command, resolve);
