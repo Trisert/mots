@@ -21,7 +21,8 @@ type PushTokenCommand = Extract<
  */
 export function applyPushTokenCommand(doc: { token?: string }, command: PushTokenCommand): void {
   if (command.type === "pushToken.clear") {
-    delete doc.token;
+    // A device can only remove its own token. A stale clear for a token that was already replaced is a no-op.
+    if (doc.token === command.token) delete doc.token;
     return;
   }
   doc.token = command.token;

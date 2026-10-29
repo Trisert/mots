@@ -56,7 +56,11 @@ export function useMotsSession(options: MotsSessionOptions) {
   useEffect(() => {
     if (options.enabled === false) return;
     client.connect();
-    return () => client.dispose();
+    return () => {
+      // The session stops pushing to this device once the device leaves it.
+      client.clearPushToken();
+      client.dispose();
+    };
   }, [client, options.enabled]);
 
   return { client, state, retry };

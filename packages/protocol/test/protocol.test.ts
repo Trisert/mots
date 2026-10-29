@@ -193,9 +193,15 @@ describe("push token commands", () => {
 
     expect(
       parseClientCommand(
-        JSON.stringify({ type: "pushToken.clear", requestId: "req-push-4" }),
+        JSON.stringify({ type: "pushToken.clear", requestId: "req-push-4", token: exponentToken }),
       ),
-    ).toEqual({ type: "pushToken.clear", requestId: "req-push-4" });
+    ).toEqual({ type: "pushToken.clear", requestId: "req-push-4", token: exponentToken });
+  });
+
+  test("rejects a clear without the token it removes", () => {
+    expect(() =>
+      parseClientCommand(JSON.stringify({ type: "pushToken.clear", requestId: "req-push-5" })),
+    ).toThrow(InvalidClientCommand);
   });
 
   test("accepts a token at the size limit and rejects a longer one", () => {
